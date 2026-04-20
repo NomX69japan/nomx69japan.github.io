@@ -2360,8 +2360,8 @@
     border: 1px solid #ddd;
   }
   /* ロールに応じてタブ非表示 */
-  body.role-boy .nav-tab:not([data-page="tables"]) { display: none; }
-  body.role-kitchen .nav-tab:not([data-page="tables"]) { display: none; }
+  body.role-boy .nav-tab:not([data-page="tables"]):not([data-page="shift"]):not([data-page="reserve"]) { display: none; }
+  body.role-kitchen .nav-tab:not([data-page="tables"]):not([data-page="shift"]):not([data-page="reserve"]) { display: none; }
   body.role-cashier .nav-tab[data-page="settings"],
   body.role-cashier .nav-tab[data-page="payroll"] { display: none; }
 
@@ -2466,6 +2466,37 @@
   .backup-btn:hover { background: #111; color: #fff; }
   .backup-btn.danger { border-color: #c0294e; color: #c0294e; }
   .backup-btn.danger:hover { background: #c0294e; color: #fff; }
+
+
+  /* 予約↔シフト連動 */
+  .reserve-badge-shift {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(107,63,160,0.15);
+    color: #6b3fa0;
+    border: 1px solid rgba(107,63,160,0.3);
+    margin-top: 2px;
+  }
+  .shift-reserve-badge {
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: #f0e8ff;
+    color: #6b3fa0;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .shift-block.has-reserve {
+    border: 1px solid rgba(107,63,160,0.4);
+  }
 
 </style>
 </head>
@@ -2751,6 +2782,73 @@
     </div>
 
 
+
+
+    <!-- Push通知設定 -->
+    <div class="section-title">Push通知設定</div>
+    <div class="settings-card" style="margin-bottom:28px;">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+        入店時に他の端末へ通知を送ります。各端末で「通知を有効にする」を押してください。<br>
+        ※ HTTPSのURLでアクセスしている場合のみ動作します（GitHub Pages対応）。
+      </p>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+        <span id="push-status" style="font-size:13px;color:#aaa;">🔕 通知オフ</span>
+        <button id="push-sub-btn" class="btn btn-gold" style="padding:8px 16px;font-size:13px;" onclick="subscribePush()">🔔 通知を有効にする</button>
+        <button id="push-unsub-btn" class="btn btn-ghost" style="padding:8px 16px;font-size:13px;display:none;" onclick="unsubscribePush()">🔕 通知を解除する</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" style="padding:8px 16px;font-size:13px;" onclick="sendCheckinNotification('テスト卓','2','テスト太郎').then(()=>showToast('テスト通知を送信しました'))">📤 テスト通知を送信</button>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:#f8f8f8;border-radius:8px;font-size:11px;color:#666;line-height:1.7;">
+        <strong>通知が届くタイミング：</strong><br>
+        🎉 お客様が入店したとき<br>
+        ※ 各端末でこのページを開き「通知を有効にする」を押す必要があります
+      </div>
+    </div>
+
+    <!-- GitHub連携 -->
+    <div class="section-title">GitHub 連携（バージョン管理）</div>
+    <div class="settings-card" style="margin-bottom:28px;">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
+        POSファイルをGitHubリポジトリで管理します。変更履歴の保存・複数PC間でのファイル共有が可能です。
+      </p>
+      <div class="settings-field">
+        <label class="settings-label">GitHub Personal Access Token</label>
+        <input class="settings-input" type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">
+          GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → <strong>repo スコープ</strong>で生成
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="settings-field">
+          <label class="settings-label">ユーザー名</label>
+          <input class="settings-input" id="gh-user" placeholder="your-github-username">
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">リポジトリ名</label>
+          <input class="settings-input" id="gh-repo" placeholder="clubnoir-pos">
+        </div>
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">ファイル名（リポジトリ内のパス）</label>
+        <input class="settings-input" id="gh-filename" placeholder="cabaret-pos.html" value="cabaret-pos.html">
+      </div>
+      <div id="gh-status" style="font-size:12px;color:#888;min-height:18px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="backup-btn" style="width:auto;padding:9px 18px;" onclick="saveGithubConfig()">設定を保存</button>
+        <button class="backup-btn" style="width:auto;padding:9px 18px;" onclick="pushToGithub()">
+          ⬆ GitHubにアップロード
+        </button>
+        <button class="backup-btn" style="width:auto;padding:9px 18px;" onclick="pullFromGithub()">
+          ⬇ GitHubから取得
+        </button>
+      </div>
+      <p style="font-size:11px;color:#aaa;margin-top:10px;">
+        ※ HTMLファイル全体をGitHubに保存します。データはHTMLに埋め込まれません（localStorageを使用）。<br>
+        ※ アップロードするとGitHub上のファイルが上書きされます。
+      </p>
+    </div>
+
     <!-- サーバー接続設定 -->
     <div class="section-title">サーバー接続設定（複数端末同期）</div>
     <div class="settings-card" style="margin-bottom:28px;">
@@ -2777,7 +2875,22 @@
         <button class="btn btn-ghost" style="padding:8px 16px;font-size:13px;" onclick="loadFromServer().then(()=>showToast('サーバーから読み込みました'))">サーバーから取得</button>
         <button class="btn btn-ghost" style="padding:8px 16px;font-size:13px;" onclick="saveToServer(true);showToast('サーバーへ送信しました')">サーバーへ送信</button>
       </div>
-      <div style="margin-top:14px;padding:10px 14px;background:#f8f8f8;border-radius:8px;font-size:12px;color:#555;">
+      <div class="settings-field" style="margin-top:12px;">
+        <label class="settings-label">自動同期の間隔</label>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+          <input type="range" id="polling-interval" min="10" max="120" step="10" value="30"
+            style="flex:1;accent-color:#111;"
+            oninput="updatePollingInterval(this.value)">
+          <span id="polling-interval-label" style="min-width:50px;font-size:13px;font-weight:700;">30秒</span>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">短いほどリアルタイムに近くなりますが、サーバーへのリクエストが増えます（推奨：30秒）</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-ghost" style="padding:7px 14px;font-size:12px;" onclick="doPoll().then(()=>showToast('今すぐ同期しました'))">今すぐ同期</button>
+        <button class="btn btn-ghost" style="padding:7px 14px;font-size:12px;" onclick="stopPolling();showToast('自動同期を停止しました')">同期停止</button>
+        <button class="btn btn-gold"  style="padding:7px 14px;font-size:12px;" onclick="startPolling();showToast('自動同期を開始しました')">同期再開</button>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:#f8f8f8;border-radius:8px;font-size:12px;color:#555;">
         <strong>同期状態：</strong> <span id="sync-indicator-settings">確認中…</span>
         <span style="color:#aaa;margin-left:12px;">最終同期：<span id="last-sync-time">−</span></span>
       </div>
@@ -3471,7 +3584,7 @@ function showAlert(t, isOver = false, isBirthday = false) {
 let _lastBirthdayCheck = '';
 function checkBirthdayAlerts() {
   if(!customers || !customers.length) return;
-  const todayKey = new Date().toISOString().slice(0,10);
+  const todayKey = localDateStr();
   if(_lastBirthdayCheck === todayKey) return;
   _lastBirthdayCheck = todayKey;
   const todayBirthdays = customers.filter(c => isBirthdayToday && isBirthdayToday(c));
@@ -4997,7 +5110,7 @@ function confirmCheckout(tableId, grand) {
 
   const discMemo = document.getElementById('disc-memo')?.value || '';
   salesLog.push({
-    date: new Date().toISOString().slice(0,10),
+    date: localDateStr(),
     time: new Date().toLocaleTimeString('ja-JP'),
     table: tableId, tableLabel: t.label||'',
     guests: t.guests,
@@ -5011,7 +5124,7 @@ function confirmCheckout(tableId, grand) {
     const cu = customers.find(c=>c.id===t.customerId);
     if(cu) {
       if(!cu.visitLog) cu.visitLog=[];
-      cu.visitLog.push({ date: new Date().toISOString().slice(0,10), amount: grand, table: t.label||'' });
+      cu.visitLog.push({ date: localDateStr(), amount: grand, table: t.label||'' });
       persistSave();
     }
   }
@@ -5233,7 +5346,7 @@ function renderYearReport(year) {
 
 function renderReport() {
   const now = new Date();
-  const todayKey  = now.toISOString().slice(0,10);
+  const todayKey  = localDateStr(now);
   const monthEl   = document.getElementById('report-month');
   const monthKey  = monthEl?.value || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const isToday   = _reportTab === 'today';
@@ -5318,6 +5431,24 @@ function renderReport() {
           <td style="font-weight:700;color:#996a00;">¥${l.total.toLocaleString()}</td>
         </tr>`;
       }).join('');
+}
+
+
+// ローカル日付（YYYY-MM-DD）を返す — toISOString はUTCのため日本では1日ズレる
+function localDateStr(d) {
+  const dt = d || new Date();
+  const y   = dt.getFullYear();
+  const m   = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// YYYY-MM-DD 文字列をローカル時間のDateオブジェクトに変換
+// new Date('YYYY-MM-DD') はUTC解釈になるため1日ズレる問題を修正
+function parseDateLocal(dateStr) {
+  if(!dateStr) return new Date();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d); // ローカル時間として解釈
 }
 
 // ========== UTILS ==========
@@ -5439,6 +5570,18 @@ function renderSettings() {
   const dohanFeeEl = document.getElementById('cfg-dohan-fee'); if(dohanFeeEl) dohanFeeEl.value = config.dohanFee || 3000;
   // バックアップ履歴を表示
   renderBackupHistory();
+  // Push通知ステータス更新
+  setTimeout(updatePushStatus, 500);
+  // GitHub設定の読み込み
+  loadGithubConfig();
+
+  // ポーリング間隔の読み込み
+  const savedInterval = parseInt(localStorage.getItem('pos_polling_interval')) || 30;
+  _pollingInterval = savedInterval;
+  const piEl = document.getElementById('polling-interval');
+  const piLbl = document.getElementById('polling-interval-label');
+  if(piEl)  piEl.value       = savedInterval;
+  if(piLbl) piLbl.textContent = savedInterval + '秒';
 
   // サーバー設定の読み込み
   const srvUrlEl   = document.getElementById('srv-url');
@@ -5715,7 +5858,7 @@ function getWeekMonday(offset = 0) {
 }
 
 function dateToKey(d) {
-  return d.toISOString().slice(0,10);
+  return localDateStr(d);
 }
 
 function shiftKey(staffId, dateKey) {
@@ -5840,11 +5983,24 @@ function renderShift() {
           label = '−'; cls = 'shift-off';
         }
 
+        // その日のキャスト指名予約を取得
+        const castIdNum = parseInt(String(s.id).replace('cast_',''));
+        const dayReserves = reservations.filter(r =>
+          r.date === dk &&
+          r.status === 'confirmed' &&
+          (r.castId === castIdNum || r.dohanCastId === castIdNum)
+        );
+        const reserveBadges = dayReserves.map(r =>
+          `<span class="shift-reserve-badge">📅 ${r.time} ${r.name}${r.dohanCastId===castIdNum?' 💑':''}</span>`
+        ).join('');
+        const hasReserve = dayReserves.length > 0;
+
         return `<td class="shift-cell ${isToday?'today-col':''}" style="${isSun?'opacity:0.7':''}">
-          <div class="shift-block ${cls}" onclick="openShiftEdit('${s.id}','${dk}')">
+          <div class="shift-block ${cls}${hasReserve?' has-reserve':''}" onclick="openShiftEdit('${s.id}','${dk}')">
             <span>${label}</span>
             ${timeStr ? `<span class="shift-time">${timeStr}</span>` : ''}
             ${dohanBadge}
+            ${reserveBadges}
           </div>
         </td>`;
       }).join('');
@@ -5903,10 +6059,17 @@ function openShiftEdit(staffId, dateKey) {
   const sh = getShift(staffId, dateKey);
   _editStatus = sh ? sh.status : 'on';
 
-  const d = new Date(dateKey);
+  const d = parseDateLocal(dateKey);
   const dayLabel = `${d.getMonth()+1}/${d.getDate()} (${DAYS_JP[d.getDay()===0?6:d.getDay()-1]})`;
 
   document.getElementById('shift-edit-title').textContent = `${s?.name} — ${dayLabel}`;
+
+  // その日の予約を確認
+  const castIdNum2 = parseInt(String(staffId).replace('cast_',''));
+  const dayReserves2 = reservations.filter(r =>
+    r.date === dateKey && r.status === 'confirmed' &&
+    (r.castId === castIdNum2 || r.dohanCastId === castIdNum2)
+  );
 
   const startVal = sh ? sh.start : (s?.defaultStart || '20:00');
   const endVal   = sh ? sh.end   : (s?.defaultEnd   || '25:00');
@@ -5917,6 +6080,16 @@ function openShiftEdit(staffId, dateKey) {
   const dohanTimeVal = sh?.dohanTime || '';
 
   document.getElementById('shift-edit-content').innerHTML = `
+    ${dayReserves2.length ? `
+    <div style="background:#f0e8ff;border:1px solid #c4a0f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:#6b3fa0;margin-bottom:6px;">📅 この日の予約</div>
+      ${dayReserves2.map(r=>`
+        <div style="font-size:12px;color:#333;padding:4px 0;border-bottom:1px solid rgba(107,63,160,0.15);">
+          <strong>${r.time}</strong> ${r.name}（${r.guests}名）
+          ${r.dohanCastId===castIdNum2?' <span style="color:#6b3fa0;">💑同伴</span>':''}
+          ${r.memo?`<span style="color:#888;font-size:11px;"> / ${r.memo}</span>`:''}
+        </div>`).join('')}
+    </div>` : ''}
     <div class="shift-edit-grid" style="margin-bottom:16px;">
       <div class="shift-status-btn ${_editStatus==='on'?'active-on':''}"      onclick="selectEditStatus('on')"      id="edit-btn-on">✅ 出勤</div>
       <div class="shift-status-btn ${_editStatus==='off'?'active-off':''}"     onclick="selectEditStatus('off')"     id="edit-btn-off">− 未設定</div>
@@ -6308,7 +6481,7 @@ function renderCustomerTab(c, tab) {
     const logs = (c?.visitLog||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end;margin-bottom:14px;">
-        <div class="settings-field" style="margin:0"><label class="settings-label">来店日</label><input class="settings-input" type="date" id="v-date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="settings-field" style="margin:0"><label class="settings-label">来店日</label><input class="settings-input" type="date" id="v-date" value="${localDateStr()}"></div>
         <div class="settings-field" style="margin:0"><label class="settings-label">売上</label><input class="settings-input" type="number" id="v-amount" placeholder="50000" style="width:110px;"></div>
         <div class="settings-field" style="margin:0"><label class="settings-label">テーブル</label><input class="settings-input" id="v-table" placeholder="洋室" style="width:80px;"></div>
         <button class="btn btn-gold" style="margin-top:auto;padding:9px 14px;font-size:12px;" onclick="addVisitLog('${c?.id||''}')">追加</button>
@@ -6382,7 +6555,7 @@ function renderCustomerTab(c, tab) {
           </div>
           <div class="settings-field" style="margin:0;">
             <label class="settings-label">購入日</label>
-            <input class="settings-input" type="date" id="b-date" value="${new Date().toISOString().slice(0,10)}">
+            <input class="settings-input" type="date" id="b-date" value="${localDateStr()}">
           </div>
           <div class="settings-field" style="margin:0;">
             <label class="settings-label">金額（円）</label>
@@ -6922,9 +7095,9 @@ let nextReserveId = 1;
 let reserveDateOffset = 0; // 0=今日
 
 function getReserveDate(offset) {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  d.setHours(0,0,0,0);
+  const now = new Date();
+  // 正午に設定することでタイムゾーンのズレを防ぐ
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12, 0, 0, 0);
   return d;
 }
 
@@ -6940,7 +7113,7 @@ function reserveGoToday() {
 
 function renderReservePage() {
   const d = getReserveDate(reserveDateOffset);
-  const dateKey = d.toISOString().slice(0,10);
+  const dateKey = localDateStr(d);
   const isToday = reserveDateOffset === 0;
 
   // 日付ラベル
@@ -7000,6 +7173,19 @@ function renderReserveCard(r) {
         ${r.table ? `<span>📍 ${r.table}</span>` : ''}
         ${r.castId ? `<span>💃 ${castName}</span>` : ''}
         ${r.phone ? `<span>📞 ${r.phone}</span>` : ''}
+        ${r.dohan ? `<span style="color:#6b3fa0;font-weight:700;">💑 同伴${r.dohanTime?' '+r.dohanTime:''}${r.dohanCastId?` (${casts.find(c=>c.id===r.dohanCastId)?.name||''})`:''}</span>` : ''}
+        ${(()=>{
+          // 指名キャストのシフト状況を表示
+          if(!r.castId) return '';
+          const staffEntry = staffList.find(s=>s.id==='cast_'+r.castId);
+          if(!staffEntry) return '';
+          const sh = getShift(staffEntry.id, r.date);
+          if(!sh) return '<span style="font-size:10px;color:#c0294e;">⚠ シフト未登録</span>';
+          if(sh.status==='on')      return `<span style="font-size:10px;color:#1a7a3e;">✓ 出勤 ${sh.start}〜${sh.end}</span>`;
+          if(sh.status==='holiday') return '<span style="font-size:10px;color:#c0294e;">⚠ 休み</span>';
+          if(sh.status==='maybe')   return '<span style="font-size:10px;color:#c04800;">? 未定</span>';
+          return '<span style="font-size:10px;color:#aaa;">シフト未設定</span>';
+        })()}
       </div>
       ${r.memo ? `<div class="reserve-note">📝 ${r.memo}</div>` : ''}
     </div>
@@ -7058,7 +7244,8 @@ function openReserveModal(reserveId) {
   const r = reserveId ? reservations.find(x=>x.id===reserveId) : null;
   document.getElementById('reserve-modal-title').textContent = r ? '予約編集' : '予約追加';
 
-  const today = new Date().toISOString().slice(0,10);
+  // 予約ページで選択中の日付をデフォルトにする（ナビとズレないよう）
+  const today = localDateStr(getReserveDate(reserveDateOffset));
   const castOptions = casts.map(c=>`<option value="${c.id}" ${r?.castId==c.id?'selected':''}>${c.name}</option>`).join('');
   const tableOptions = ['−', ...tables.map(t=>t.label)].map(l=>`<option value="${l==='−'?'':l}" ${r?.table===(l==='−'?'':l)?'selected':''}>${l}</option>`).join('');
   const customerOptions = ['<option value="">顧客DBから選択</option>',
@@ -7100,6 +7287,26 @@ function openReserveModal(reserveId) {
       <div class="settings-field">
         <label class="settings-label">顧客DB連携</label>
         <select class="staff-role-select" id="rv-customer">${customerOptions}</select>
+      </div>
+    </div>
+    <div class="settings-field" style="margin-top:4px;">
+      <label class="settings-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="rv-dohan" ${r?.dohan?'checked':''} style="accent-color:#111;width:16px;height:16px;"
+          onchange="document.getElementById('rv-dohan-row').style.display=this.checked?'':'none'">
+        <span style="font-weight:700;">💑 同伴あり</span>
+      </label>
+      <div id="rv-dohan-row" style="${r?.dohan?'':'display:none;'}margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="settings-field" style="margin:0;">
+          <label class="settings-label">同伴キャスト</label>
+          <select class="staff-role-select" id="rv-dohan-cast">
+            <option value="">指定なし</option>
+            ${casts.map(c=>`<option value="${c.id}" ${r?.dohanCastId==c.id?'selected':''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="settings-field" style="margin:0;">
+          <label class="settings-label">同伴予定時間</label>
+          <input class="settings-input" type="time" id="rv-dohan-time" value="${r?.dohanTime||'19:30'}">
+        </div>
       </div>
     </div>
     <div class="settings-field" style="margin-top:4px;">
@@ -7146,6 +7353,9 @@ function saveReservation() {
   if(!date)  { showToast('予約日を入力してください'); return; }
   if(!time)  { showToast('予約時間を入力してください'); return; }
 
+  const dohan     = document.getElementById('rv-dohan')?.checked || false;
+  const dohanCastId = parseInt(document.getElementById('rv-dohan-cast')?.value) || null;
+  const dohanTime = document.getElementById('rv-dohan-time')?.value || '';
   const data = {
     name,
     date,
@@ -7156,6 +7366,9 @@ function saveReservation() {
     castId:     parseInt(document.getElementById('rv-cast')?.value) || null,
     customerId: document.getElementById('rv-customer')?.value || null,
     memo:       document.getElementById('rv-memo')?.value.trim() || '',
+    dohan,
+    dohanCastId,
+    dohanTime,
   };
 
   if(_editReserveId) {
@@ -7215,7 +7428,7 @@ function checkReserveAlerts() {
   if(curMin === _lastReserveAlertMin) return;
   _lastReserveAlertMin = curMin;
   // フロアページが表示中でなければ予約アラートバナー更新
-  const todayKey = now.toISOString().slice(0,10);
+  const todayKey = localDateStr(now);
   const soon = reservations.filter(r => {
     if(r.date !== todayKey || r.status !== 'confirmed') return false;
     const [h,m] = r.time.split(':').map(Number);
@@ -7282,7 +7495,7 @@ function openPenaltyLogModal(staffId) {
 }
 
 function renderPenaltyModalContent(s) {
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   const opts = (config.penalties||[]).map(p =>
     `<option value="${p.id}">${p.label}（¥${p.amount.toLocaleString()}）</option>`
   ).join('');
@@ -7351,7 +7564,7 @@ function addPenaltyLog() {
   if(!s) return;
   const sel    = document.getElementById('pen-type')?.value;
   const amount = parseInt(document.getElementById('pen-custom-amount')?.value) || 0;
-  const date   = document.getElementById('pen-date')?.value || new Date().toISOString().slice(0,10);
+  const date   = document.getElementById('pen-date')?.value || localDateStr();
   const note   = document.getElementById('pen-note')?.value || '';
   const p      = (config.penalties||[]).find(p=>p.id===sel);
   const label  = sel==='custom' ? (note||'カスタム') : p?.label || '';
@@ -7488,8 +7701,8 @@ function saveRolePins() {
 const _origShowPage = showPage;
 showPage = function(name) {
   const restricted = {
-    boy:     ['cast','report','shift','payroll','reserve','customer','settings'],
-    kitchen: ['cast','report','shift','payroll','reserve','customer','settings'],
+    boy:     ['cast','report','payroll','customer','settings'],
+    kitchen: ['cast','report','payroll','customer','settings'],
     cashier: ['settings','payroll'],
   };
   if(currentRole && (restricted[currentRole]||[]).includes(name)) {
@@ -7503,7 +7716,6 @@ showPage = function(name) {
 // ========== サーバー同期 ==========
 let _serverUrl   = localStorage.getItem('pos_server_url')   || '';
 let _serverToken = localStorage.getItem('pos_server_token') || '';
-let _ws = null;
 let _syncEnabled = false;
 let _saveTimer = null;
 let _lastSyncTime = 0;
@@ -7578,6 +7790,8 @@ function saveToServer(immediate = false) {
       });
       if(r.ok) {
         _lastSyncTime = Date.now();
+        // 自分の保存後はハッシュをリセット（次回ポーリングで無視しないよう）
+        _lastServerHash = '';
         showSyncBadge('送信');
       }
     } catch(e) {
@@ -7587,29 +7801,63 @@ function saveToServer(immediate = false) {
   }, delay);
 }
 
-// ── WebSocket でリアルタイム受信 ──
-function initWebSocket() {
-  if(!serverConfigured()) return;
-  if(_ws && _ws.readyState <= 1) return;
+// ── ポーリングによる自動同期 ──
+let _pollingTimer  = null;
+let _pollingInterval = 30; // 秒（設定可能）
+let _lastServerHash  = ''; // 前回取得データのハッシュ（変化検知）
+let _userActive = true;     // ユーザー操作中フラグ
 
-  const wsUrl = _serverUrl.replace(/^http/, 'ws') + '/ws';
+// ユーザー操作を検知（操作中はポーリング間隔を短く）
+document.addEventListener('mousemove', () => { _userActive = true; });
+document.addEventListener('touchstart', () => { _userActive = true; });
+
+function startPolling() {
+  stopPolling();
+  if(!serverConfigured()) return;
+  _syncEnabled = true;
+  updateSyncIndicator();
+  scheduleNextPoll();
+}
+
+function stopPolling() {
+  if(_pollingTimer) { clearTimeout(_pollingTimer); _pollingTimer = null; }
+  _syncEnabled = false;
+  updateSyncIndicator();
+}
+
+function scheduleNextPoll() {
+  if(!serverConfigured()) return;
+  // ユーザー操作直後は少し待つ（自分の保存と競合しないよう）
+  const interval = _pollingInterval * 1000;
+  _pollingTimer = setTimeout(doPoll, interval);
+}
+
+async function doPoll() {
+  if(!serverConfigured()) return;
   try {
-    _ws = new WebSocket(wsUrl);
-    _ws.onopen    = () => { _syncEnabled = true; updateSyncIndicator(); };
-    _ws.onclose   = () => { _syncEnabled = false; updateSyncIndicator(); setTimeout(initWebSocket, 5000); };
-    _ws.onerror   = () => { _syncEnabled = false; updateSyncIndicator(); };
-    _ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if(msg.type === 'sync' && msg.data) {
-          applyServerData(msg.data);
-          showSyncBadge('受信');
-        }
-      } catch {}
-    };
+    const r = await fetch(_serverUrl + '/data', {
+      headers: { 'X-Auth-Token': _serverToken },
+      cache: 'no-store',
+    });
+    if(!r.ok) throw new Error(r.status);
+    const { data } = await r.json();
+    if(!data) { scheduleNextPoll(); return; }
+
+    // ハッシュで変化チェック（変わってなければ画面更新しない）
+    const hash = JSON.stringify(data).length + '_' + (data.nextCastId||0) + '_' + (data.reservations||[]).length + '_' + (data.salesLog||[]).length;
+    if(hash !== _lastServerHash) {
+      _lastServerHash = hash;
+      // 自分が最近保存した直後は無視（上書き防止）
+      if(Date.now() - _lastSyncTime > 3000) {
+        applyServerData(data);
+        showSyncBadge('受信');
+        _lastSyncTime = Date.now();
+      }
+    }
   } catch(e) {
-    console.warn('WebSocket エラー:', e);
+    console.warn('ポーリングエラー:', e);
   }
+  scheduleNextPoll();
 }
 
 function applyServerData(data) {
@@ -7661,18 +7909,18 @@ function showSyncBadge(label, isError = false) {
 }
 
 function updateSyncIndicator() {
-  const el = document.getElementById('sync-indicator');
-  if(!el) return;
+  const el  = document.getElementById('sync-indicator');
+  const el2 = document.getElementById('sync-indicator-settings');
+  let text, color;
   if(!serverConfigured()) {
-    el.textContent = '⚫ オフライン';
-    el.style.color = '#aaa';
+    text = '⚫ オフライン'; color = '#aaa';
   } else if(_syncEnabled) {
-    el.textContent = '🟢 同期中';
-    el.style.color = '#1a7a3e';
+    text = `🟢 ${_pollingInterval}秒ごと自動同期`; color = '#1a7a3e';
   } else {
-    el.textContent = '🔴 未接続';
-    el.style.color = '#c0294e';
+    text = '🔴 未接続'; color = '#c0294e';
   }
+  if(el)  { el.textContent  = text; el.style.color  = color; }
+  if(el2) { el2.textContent = text; el2.style.color = color; }
 }
 
 async function initServerSync() {
@@ -7684,10 +7932,325 @@ async function initServerSync() {
     syncCastsToStaff();
     renderTables();
   }
-  initWebSocket();
+  startPolling();
   updateSyncIndicator();
 }
 
+
+
+// ========== GitHub 連携 ==========
+function saveGithubConfig() {
+  const token    = document.getElementById('gh-token')?.value.trim();
+  const user     = document.getElementById('gh-user')?.value.trim();
+  const repo     = document.getElementById('gh-repo')?.value.trim();
+  const filename = document.getElementById('gh-filename')?.value.trim() || 'cabaret-pos.html';
+  if(!token || !user || !repo) { showToast('すべての項目を入力してください'); return; }
+  localStorage.setItem('gh_token',    token);
+  localStorage.setItem('gh_user',     user);
+  localStorage.setItem('gh_repo',     repo);
+  localStorage.setItem('gh_filename', filename);
+  showToast('GitHub設定を保存しました ✓');
+}
+
+function loadGithubConfig() {
+  const tokenEl    = document.getElementById('gh-token');
+  const userEl     = document.getElementById('gh-user');
+  const repoEl     = document.getElementById('gh-repo');
+  const filenameEl = document.getElementById('gh-filename');
+  if(tokenEl)    tokenEl.value    = localStorage.getItem('gh_token')    || '';
+  if(userEl)     userEl.value     = localStorage.getItem('gh_user')     || '';
+  if(repoEl)     repoEl.value     = localStorage.getItem('gh_repo')     || '';
+  if(filenameEl) filenameEl.value = localStorage.getItem('gh_filename') || 'cabaret-pos.html';
+}
+
+async function pushToGithub() {
+  const token    = localStorage.getItem('gh_token');
+  const user     = localStorage.getItem('gh_user');
+  const repo     = localStorage.getItem('gh_repo');
+  const filename = localStorage.getItem('gh_filename') || 'cabaret-pos.html';
+  const statusEl = document.getElementById('gh-status');
+
+  if(!token || !user || !repo) {
+    if(statusEl) statusEl.textContent = '❌ GitHub設定を先に保存してください';
+    return;
+  }
+  if(statusEl) statusEl.textContent = '⏳ アップロード中…';
+
+  try {
+    // 現在のファイル内容を取得（SHAが必要）
+    const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/${filename}`;
+    let sha = null;
+    const getRes = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+      }
+    });
+    if(getRes.ok) {
+      const existing = await getRes.json();
+      sha = existing.sha;
+    } else if(getRes.status !== 404) {
+      throw new Error(`取得エラー: ${getRes.status}`);
+    }
+
+    // 現在のHTMLを取得してBase64エンコード
+    const htmlRes  = await fetch(location.href);
+    const htmlText = await htmlRes.text();
+    const encoded  = btoa(unescape(encodeURIComponent(htmlText)));
+
+    // アップロード
+    const body = {
+      message: `POS update ${localDateStr()} ${new Date().toLocaleTimeString('ja-JP')}`,
+      content: encoded,
+      ...(sha ? { sha } : {}),
+    };
+    const putRes = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if(!putRes.ok) {
+      const err = await putRes.json();
+      throw new Error(err.message || putRes.status);
+    }
+    if(statusEl) statusEl.textContent = `✅ アップロード成功！ ${new Date().toLocaleTimeString('ja-JP')}`;
+    showToast('GitHubへのアップロード完了 ✓');
+  } catch(e) {
+    if(statusEl) statusEl.textContent = `❌ エラー: ${e.message}`;
+    showToast('アップロード失敗: ' + e.message);
+  }
+}
+
+async function pullFromGithub() {
+  const token    = localStorage.getItem('gh_token');
+  const user     = localStorage.getItem('gh_user');
+  const repo     = localStorage.getItem('gh_repo');
+  const filename = localStorage.getItem('gh_filename') || 'cabaret-pos.html';
+  const statusEl = document.getElementById('gh-status');
+
+  if(!token || !user || !repo) {
+    if(statusEl) statusEl.textContent = '❌ GitHub設定を先に保存してください';
+    return;
+  }
+  if(statusEl) statusEl.textContent = '⏳ ダウンロード中…';
+
+  try {
+    const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/${filename}`;
+    const res = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+      }
+    });
+    if(!res.ok) throw new Error(`${res.status}`);
+    const data    = await res.json();
+    const decoded = decodeURIComponent(escape(atob(data.content)));
+    // ファイルとしてダウンロード
+    downloadFile(filename, decoded, 'text/html');
+    if(statusEl) statusEl.textContent = `✅ ダウンロード完了！ ファイルを確認してください`;
+    showToast('GitHubから取得してダウンロードしました ✓');
+  } catch(e) {
+    if(statusEl) statusEl.textContent = `❌ エラー: ${e.message}`;
+    showToast('ダウンロード失敗: ' + e.message);
+  }
+}
+
+
+function updatePollingInterval(val) {
+  _pollingInterval = parseInt(val);
+  const label = document.getElementById('polling-interval-label');
+  if(label) label.textContent = val + '秒';
+  localStorage.setItem('pos_polling_interval', val);
+  // 再スケジュール
+  if(_syncEnabled) startPolling();
+}
+
+
+// ========== Web Push 通知 ==========
+let _swRegistration = null;
+let _pushSubscription = null;
+
+const VAPID_PUBLIC_KEY = 'BEpY0wyGndEOf4se20CgV2_bb0a5EweiD8izTWOPmdb2Ht_9dvC-lYbY9RggQLHpX3U7BOGUQHNxHbnK45LuLNw';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+async function initPushNotifications() {
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('Push通知は非対応ブラウザです');
+    return;
+  }
+  if(!serverConfigured()) return;
+
+  try {
+    // Service Worker をBlob URLとして登録
+    const swCode = `
+self.addEventListener('push', (event) => {
+  let data = { title: '入店通知', body: '新しいお客様が入店しました' };
+  try { data = event.data.json(); } catch(e) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'pos-notification',
+      requireInteraction: false,
+      vibrate: [200, 100, 200],
+    })
+  );
+});
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow('/'));
+});
+    `;
+
+    // GitHub Pages ではSWは同一オリジンが必要なため
+    // sw.js を別途アップロードしている場合はそちらを使う
+    // なければBlob URLで代用（限定的な動作）
+    let swUrl = '/sw.js'; // GitHub Pagesにアップ済みの場合
+    try {
+      const testRes = await fetch(swUrl, { method: 'HEAD' });
+      if(!testRes.ok) throw new Error('sw.js not found');
+    } catch {
+      // sw.js がなければBlob URLを使用
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      swUrl = URL.createObjectURL(blob);
+    }
+
+    _swRegistration = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+    await navigator.serviceWorker.ready;
+
+    // 既存のサブスクリプション確認
+    _pushSubscription = await _swRegistration.pushManager.getSubscription();
+
+    updatePushStatus();
+  } catch(e) {
+    console.warn('SW登録エラー:', e);
+  }
+}
+
+async function subscribePush() {
+  if(!_swRegistration) {
+    showToast('Service Worker が初期化されていません');
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted') {
+      showToast('通知が許可されていません。ブラウザの設定を確認してください');
+      return;
+    }
+
+    _pushSubscription = await _swRegistration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    // サーバーに登録
+    const r = await fetch(_serverUrl + '/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': _serverToken },
+      body: JSON.stringify(_pushSubscription),
+    });
+    if(r.ok) {
+      showToast('通知を登録しました ✓ この端末に通知が届きます');
+      localStorage.setItem('pos_push_subscribed', '1');
+    }
+    updatePushStatus();
+  } catch(e) {
+    showToast('通知登録エラー: ' + e.message);
+  }
+}
+
+async function unsubscribePush() {
+  if(!_pushSubscription) return;
+  try {
+    const endpoint = _pushSubscription.endpoint;
+    await _pushSubscription.unsubscribe();
+    _pushSubscription = null;
+
+    await fetch(_serverUrl + '/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': _serverToken },
+      body: JSON.stringify({ endpoint }),
+    });
+    localStorage.removeItem('pos_push_subscribed');
+    showToast('通知を解除しました');
+    updatePushStatus();
+  } catch(e) {
+    showToast('通知解除エラー: ' + e.message);
+  }
+}
+
+function updatePushStatus() {
+  const el = document.getElementById('push-status');
+  if(!el) return;
+  if(!('serviceWorker' in navigator)) {
+    el.textContent = '❌ 非対応ブラウザ';
+    el.style.color = '#aaa';
+    return;
+  }
+  if(_pushSubscription) {
+    el.textContent = '🔔 通知オン（この端末）';
+    el.style.color = '#1a7a3e';
+  } else {
+    el.textContent = '🔕 通知オフ';
+    el.style.color = '#aaa';
+  }
+  // ボタン状態も更新
+  const subBtn   = document.getElementById('push-sub-btn');
+  const unsubBtn = document.getElementById('push-unsub-btn');
+  if(subBtn)   subBtn.style.display   = _pushSubscription ? 'none' : '';
+  if(unsubBtn) unsubBtn.style.display = _pushSubscription ? '' : 'none';
+}
+
+// 入店通知を全端末に送信
+async function sendCheckinNotification(tableLabel, guestCount, castNames) {
+  if(!serverConfigured()) return;
+  try {
+    await fetch(_serverUrl + '/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': _serverToken },
+      body: JSON.stringify({
+        title: `🎉 ${tableLabel} 入店`,
+        body: `${guestCount}名様 ${castNames ? '/ ' + castNames : ''}`,
+        icon: '/favicon.ico',
+      }),
+    });
+  } catch(e) {
+    console.warn('通知送信エラー:', e);
+  }
+}
+
+// 注文確認通知を送信
+async function sendOrderNotification(tableLabel, itemName) {
+  if(!serverConfigured()) return;
+  try {
+    await fetch(_serverUrl + '/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': _serverToken },
+      body: JSON.stringify({
+        title: `🍹 ${tableLabel} オーダー`,
+        body: itemName,
+      }),
+    });
+  } catch(e) {
+    console.warn('通知送信エラー:', e);
+  }
+}
 
 // ========== データ管理 ==========
 function buildExportData() {
@@ -7803,7 +8366,7 @@ function toggleAutoBackup(enabled) {
 
 function runAutoBackup() {
   const data = buildExportData();
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   let backups = [];
   try { backups = JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||'[]'); } catch {}
   // 同日分があれば上書き
@@ -8006,6 +8569,8 @@ function wrapSave(fn) {
 
   // 自動バックアップスケジュール
   scheduleAutoBackup();
+  // Push通知初期化
+  setTimeout(initPushNotifications, 2000);
 
   // 誕生日チェック（ページ起動時 + 1時間ごと）
   setTimeout(checkBirthdayAlerts, 2000);
