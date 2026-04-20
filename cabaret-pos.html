@@ -2498,6 +2498,80 @@
     border: 1px solid rgba(107,63,160,0.4);
   }
 
+
+  /* ── 設定アコーディオン ── */
+  .settings-accordion {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .settings-accordion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    background: #fafafa;
+    transition: background 0.15s;
+  }
+  .settings-accordion-header:hover { background: #f0f0f0; }
+  .settings-accordion-header.open { background: #f5f5f5; border-bottom: 1px solid #e0e0e0; }
+  .settings-accordion-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .settings-accordion-arrow {
+    font-size: 12px;
+    color: #888;
+    transition: transform 0.2s;
+  }
+  .settings-accordion-header.open .settings-accordion-arrow { transform: rotate(180deg); }
+  .settings-accordion-body {
+    display: none;
+    padding: 16px;
+  }
+  .settings-accordion-body.open { display: block; }
+
+  /* クイックアクセスバー */
+  .settings-quick-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 0 16px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 16px;
+  }
+  .settings-quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1.5px solid #ddd;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .settings-quick-btn:hover { border-color: #111; background: #f5f5f5; }
+  .settings-quick-btn.primary { background: #111; color: #fff; border-color: #111; }
+  .settings-quick-btn.primary:hover { background: #333; }
+  .settings-quick-btn.success { border-color: #1a7a3e; color: #1a7a3e; }
+  .settings-quick-btn.success:hover { background: #f0fff5; }
+  .settings-quick-btn.warning { border-color: #c04800; color: #c04800; }
+  .settings-quick-btn.warning:hover { background: #fff7f0; }
+
 </style>
 </head>
 <body>
@@ -2626,6 +2700,27 @@
   <!-- ===== SETTINGS PAGE ===== -->
   <div class="page" id="page-settings">
     <div class="section-title">設定</div>
+
+    <!-- クイックアクセス -->
+    <div class="settings-quick-bar">
+      <button class="settings-quick-btn primary" onclick="saveToServer(true);showToast('サーバーへ送信しました ✓')">
+        ☁ 今すぐ同期
+      </button>
+      <button class="settings-quick-btn success" onclick="doPoll().then(()=>showToast('サーバーから取得しました ✓'))">
+        ↓ サーバーから取得
+      </button>
+      <button class="settings-quick-btn" onclick="exportData('full')">
+        💾 バックアップ
+      </button>
+      <button class="settings-quick-btn" onclick="toggleAccordion('acc-server')">
+        ⚙ サーバー設定
+      </button>
+      <button class="settings-quick-btn" onclick="toggleAccordion('acc-push')">
+        🔔 Push通知
+      </button>
+      <span id="quick-sync-status" style="font-size:11px;color:#888;align-self:center;margin-left:4px;"></span>
+    </div>
+
     <div class="settings-grid">
 
       <!-- 基本料金 -->
@@ -2743,8 +2838,7 @@
 
 
     <!-- PIN設定 -->
-    <div class="section-title">ロール・PINコード設定</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    <div class="settings-accordion" id="acc-pin"><div class="settings-accordion-header" onclick="toggleAccordion('acc-pin')"><span class="settings-accordion-title">🔐 ロール・PINコード設定</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">各ロールのPINコード（4桁以上）を設定してください。デフォルト: 管理者0000 / キャッシャー1111 / ボーイ2222 / キッチン3333</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
         <div class="settings-field"><label class="settings-label">👑 管理者 PIN</label><input class="settings-input" type="password" id="pin-admin" placeholder="4桁以上" maxlength="8" inputmode="numeric"></div>
@@ -2758,8 +2852,8 @@
     </div>
 
     <!-- ドリンクメニュー -->
-    <div class="section-title">ドリンクメニュー</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-drinks"><div class="settings-accordion-header" onclick="toggleAccordion('acc-drinks')"><span class="settings-accordion-title">🍹 ドリンクメニュー</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <div class="drink-settings-list" id="drink-settings-list"></div>
       <div style="margin-top:12px;">
         <button class="btn btn-ghost" style="font-size:13px;padding:8px 16px;" onclick="addDrinkSetting()">＋ ドリンクを追加</button>
@@ -2770,8 +2864,8 @@
     </div>
 
     <!-- キャスト設定 -->
-    <div class="section-title">キャスト設定（指名・料金）</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-cast"><div class="settings-accordion-header" onclick="toggleAccordion('acc-cast')"><span class="settings-accordion-title">💃 キャスト設定（指名・料金）</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <div class="cast-settings-list" id="cast-settings-list"></div>
       <div style="margin-top:12px;">
         <button class="btn btn-ghost" style="font-size:13px;padding:8px 16px;" onclick="addCastSetting()">＋ キャストを追加</button>
@@ -2785,8 +2879,8 @@
 
 
     <!-- Push通知設定 -->
-    <div class="section-title">Push通知設定</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-push"><div class="settings-accordion-header" onclick="toggleAccordion('acc-push')"><span class="settings-accordion-title">🔔 Push通知設定</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
         入店時に他の端末へ通知を送ります。各端末で「通知を有効にする」を押してください。<br>
         ※ HTTPSのURLでアクセスしている場合のみ動作します（GitHub Pages対応）。
@@ -2807,8 +2901,8 @@
     </div>
 
     <!-- GitHub連携 -->
-    <div class="section-title">GitHub 連携（バージョン管理）</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-github"><div class="settings-accordion-header" onclick="toggleAccordion('acc-github')"><span class="settings-accordion-title">🐙 GitHub 連携</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
         POSファイルをGitHubリポジトリで管理します。変更履歴の保存・複数PC間でのファイル共有が可能です。
       </p>
@@ -2850,8 +2944,8 @@
     </div>
 
     <!-- サーバー接続設定 -->
-    <div class="section-title">サーバー接続設定（複数端末同期）</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-server"><div class="settings-accordion-header open" onclick="toggleAccordion('acc-server')"><span class="settings-accordion-title">☁ サーバー接続設定（複数端末同期）</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body open"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
         Cloudflare Workers のURLと認証トークンを設定すると、複数の端末でリアルタイム同期できます。<br>
         設定方法は同梱の <code>README.md</code> を参照してください。
@@ -2907,8 +3001,8 @@
 
 
     <!-- バックアップ・エクスポート -->
-    <div class="section-title">データ管理（バックアップ・復元）</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-backup"><div class="settings-accordion-header" onclick="toggleAccordion('acc-backup')"><span class="settings-accordion-title">💾 データ管理（バックアップ・復元）</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
 
       <div class="backup-section">
         <div class="backup-section-title">📤 エクスポート</div>
@@ -2954,8 +3048,8 @@
     </div>
 
     <!-- 罰金マスタ設定 -->
-    <div class="section-title">罰金・ペナルティ設定</div>
-    <div class="settings-card" style="margin-bottom:28px;">
+    </div></div></div>
+    <div class="settings-accordion" id="acc-penalty"><div class="settings-accordion-header" onclick="toggleAccordion('acc-penalty')"><span class="settings-accordion-title">⚠ 罰金・ペナルティ設定</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <div id="penalty-master-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
       <button class="btn btn-ghost" style="font-size:13px;padding:8px 16px;" onclick="addPenaltyMaster()">＋ 項目を追加</button>
       <div class="settings-save-row">
@@ -2963,6 +3057,7 @@
       </div>
     </div>
 
+    </div></div></div>
     <!-- スタッフ管理 -->
     <div class="section-title">スタッフ管理（シフト・給与・罰金）</div>
     <div class="settings-card">
@@ -7976,6 +8071,8 @@ function updateSyncIndicator() {
   }
   if(el)  { el.textContent  = text; el.style.color  = color; }
   if(el2) { el2.textContent = text; el2.style.color = color; }
+  const qs = document.getElementById('quick-sync-status');
+  if(qs) { qs.textContent = text; qs.style.color = color; }
 }
 
 async function initServerSync() {
@@ -8354,6 +8451,22 @@ function generateShareUrl() {
   if(inp) { inp.value = url; inp.select(); }
   // クリップボードにコピー
   navigator.clipboard?.writeText(url).then(() => showToast('URLをコピーしました！他の端末で開いてください'));
+}
+
+
+// ========== アコーディオン ==========
+function toggleAccordion(id) {
+  const acc = document.getElementById(id);
+  if(!acc) return;
+  const header = acc.querySelector('.settings-accordion-header');
+  const body   = acc.querySelector('.settings-accordion-body');
+  const isOpen = header.classList.contains('open');
+  header.classList.toggle('open', !isOpen);
+  body.classList.toggle('open', !isOpen);
+  // 開いた場合スクロール
+  if(!isOpen) {
+    setTimeout(() => acc.scrollIntoView({ behavior:'smooth', block:'nearest' }), 100);
+  }
 }
 
 // ========== データ管理 ==========
