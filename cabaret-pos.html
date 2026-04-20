@@ -2875,6 +2875,15 @@
         <button class="btn btn-ghost" style="padding:8px 16px;font-size:13px;" onclick="loadFromServer().then(()=>showToast('サーバーから読み込みました'))">サーバーから取得</button>
         <button class="btn btn-ghost" style="padding:8px 16px;font-size:13px;" onclick="saveToServer(true);showToast('サーバーへ送信しました')">サーバーへ送信</button>
       </div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-ghost" style="padding:8px 16px;font-size:13px;width:100%;" onclick="generateShareUrl()">
+          🔗 他の端末用の共有URLを生成
+        </button>
+        <div id="share-url-box" style="display:none;margin-top:8px;">
+          <input class="settings-input" id="share-url-text" readonly style="font-size:11px;cursor:pointer;" onclick="this.select()">
+          <div style="font-size:11px;color:#888;margin-top:4px;">このURLを他の端末で開くと自動でサーバー設定が入ります</div>
+        </div>
+      </div>
       <div class="settings-field" style="margin-top:12px;">
         <label class="settings-label">自動同期の間隔</label>
         <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
@@ -7970,6 +7979,20 @@ function updateSyncIndicator() {
 }
 
 async function initServerSync() {
+  // URLパラメータからサーバー設定を自動読み込み
+  // 例: ?server=https://xxx.workers.dev&token=xxx
+  try {
+    const params = new URLSearchParams(location.search);
+    const paramServer = params.get('server');
+    const paramToken  = params.get('token');
+    if(paramServer && paramToken) {
+      _serverUrl   = paramServer;
+      _serverToken = paramToken;
+      localStorage.setItem('pos_server_url',   paramServer);
+      localStorage.setItem('pos_server_token', paramToken);
+    }
+  } catch(e) {}
+
   if(!serverConfigured()) { updateSyncIndicator(); return; }
   const ok = await loadFromServer();
   if(ok) {
@@ -8192,6 +8215,12 @@ self.addEventListener('notificationclick', (event) => {
     updatePushStatus();
   } catch(e) {
     console.warn('SW登録エラー:', e);
+    // Safari/iPadはホーム画面に追加した場合のみSWが動作する
+    if(/iPad|iPhone|Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)) {
+      showToast('iPadはホーム画面に追加してから通知を有効にしてください');
+    } else {
+      showToast('SW登録エラー: ' + e.message);
+    }
   }
 }
 
@@ -8309,6 +8338,22 @@ async function sendOrderNotification(tableLabel, itemName) {
   } catch(e) {
     console.warn('通知送信エラー:', e);
   }
+}
+
+
+function generateShareUrl() {
+  if(!serverConfigured()) {
+    showToast('先にサーバー設定を保存してください');
+    return;
+  }
+  const base = location.origin + location.pathname;
+  const url  = `${base}?server=${encodeURIComponent(_serverUrl)}&token=${encodeURIComponent(_serverToken)}`;
+  const box  = document.getElementById('share-url-box');
+  const inp  = document.getElementById('share-url-text');
+  if(box) box.style.display = '';
+  if(inp) { inp.value = url; inp.select(); }
+  // クリップボードにコピー
+  navigator.clipboard?.writeText(url).then(() => showToast('URLをコピーしました！他の端末で開いてください'));
 }
 
 // ========== データ管理 ==========
