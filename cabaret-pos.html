@@ -7894,6 +7894,7 @@ function buildSaveData() {
     nextCustomerId,
     reservations,
     nextReserveId,
+    salesLog,
     drinkOrderCount,
   };
 }
@@ -8130,7 +8131,8 @@ self.addEventListener('notificationclick', (event) => {
       swUrl = URL.createObjectURL(blob);
     }
 
-    _swRegistration = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+    // Safari/iPadはscopeの指定が制限される場合があるため省略
+    _swRegistration = await navigator.serviceWorker.register(swUrl);
     await navigator.serviceWorker.ready;
 
     // 既存のサブスクリプション確認
@@ -8143,9 +8145,15 @@ self.addEventListener('notificationclick', (event) => {
 }
 
 async function subscribePush() {
+  // SW未登録なら再試行
   if(!_swRegistration) {
-    showToast('Service Worker が初期化されていません');
-    return;
+    showToast('初期化中です。少し待ってから再度お試しください…');
+    await initPushNotifications();
+    await new Promise(r => setTimeout(r, 1500));
+    if(!_swRegistration) {
+      showToast('Service Workerの初期化に失敗しました。HTTPSでアクセスしているか確認してください');
+      return;
+    }
   }
   try {
     const permission = await Notification.requestPermission();
@@ -8525,6 +8533,24 @@ function persistLoad() {
       data.customers.forEach(c => customers.push(c));
     }
     if(data.nextCustomerId) nextCustomerId = data.nextCustomerId;
+
+    // reservations（予約データ）
+    if(Array.isArray(data.reservations)) {
+      reservations.length = 0;
+      data.reservations.forEach(r => reservations.push(r));
+    }
+    if(data.nextReserveId) nextReserveId = data.nextReserveId;
+
+    // salesLog（売上ログ）
+    if(Array.isArray(data.salesLog)) {
+      salesLog.length = 0;
+      data.salesLog.forEach(l => salesLog.push(l));
+    }
+
+    // drinkOrderCount（注文数カウント）
+    if(data.drinkOrderCount && typeof data.drinkOrderCount === 'object') {
+      Object.assign(drinkOrderCount, data.drinkOrderCount);
+    }
 
     return true;
   } catch(e) {
