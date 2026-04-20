@@ -2851,8 +2851,7 @@
       </div>
     </div>
 
-    <!-- ドリンクメニュー -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-drinks"><div class="settings-accordion-header" onclick="toggleAccordion('acc-drinks')"><span class="settings-accordion-title">🍹 ドリンクメニュー</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <div class="drink-settings-list" id="drink-settings-list"></div>
       <div style="margin-top:12px;">
@@ -2863,8 +2862,7 @@
       </div>
     </div>
 
-    <!-- キャスト設定 -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-cast"><div class="settings-accordion-header" onclick="toggleAccordion('acc-cast')"><span class="settings-accordion-title">💃 キャスト設定（指名・料金）</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <div class="cast-settings-list" id="cast-settings-list"></div>
       <div style="margin-top:12px;">
@@ -2878,8 +2876,7 @@
 
 
 
-    <!-- Push通知設定 -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-push"><div class="settings-accordion-header" onclick="toggleAccordion('acc-push')"><span class="settings-accordion-title">🔔 Push通知設定</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
         入店時に他の端末へ通知を送ります。各端末で「通知を有効にする」を押してください。<br>
@@ -2900,8 +2897,7 @@
       </div>
     </div>
 
-    <!-- GitHub連携 -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-github"><div class="settings-accordion-header" onclick="toggleAccordion('acc-github')"><span class="settings-accordion-title">🐙 GitHub 連携</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
         POSファイルをGitHubリポジトリで管理します。変更履歴の保存・複数PC間でのファイル共有が可能です。
@@ -2943,8 +2939,7 @@
       </p>
     </div>
 
-    <!-- サーバー接続設定 -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-server"><div class="settings-accordion-header open" onclick="toggleAccordion('acc-server')"><span class="settings-accordion-title">☁ サーバー接続設定（複数端末同期）</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body open"><div class="settings-card" style="margin-bottom:0;">
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
         Cloudflare Workers のURLと認証トークンを設定すると、複数の端末でリアルタイム同期できます。<br>
@@ -3000,8 +2995,7 @@
     </div>
 
 
-    <!-- バックアップ・エクスポート -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-backup"><div class="settings-accordion-header" onclick="toggleAccordion('acc-backup')"><span class="settings-accordion-title">💾 データ管理（バックアップ・復元）</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
 
       <div class="backup-section">
@@ -3047,8 +3041,7 @@
 
     </div>
 
-    <!-- 罰金マスタ設定 -->
-    </div></div></div>
+    </div></div>
     <div class="settings-accordion" id="acc-penalty"><div class="settings-accordion-header" onclick="toggleAccordion('acc-penalty')"><span class="settings-accordion-title">⚠ 罰金・ペナルティ設定</span><span class="settings-accordion-arrow">▼</span></div><div class="settings-accordion-body"><div class="settings-card" style="margin-bottom:0;">
       <div id="penalty-master-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
       <button class="btn btn-ghost" style="font-size:13px;padding:8px 16px;" onclick="addPenaltyMaster()">＋ 項目を追加</button>
@@ -3058,6 +3051,7 @@
     </div>
 
     </div></div></div>
+    </div><!-- /settings-grid -->
     <!-- スタッフ管理 -->
     <div class="section-title">スタッフ管理（シフト・給与・罰金）</div>
     <div class="settings-card">
@@ -3071,10 +3065,6 @@
       <div class="settings-save-row">
         <button class="btn btn-gold" onclick="saveStaffSettings()">保存</button>
       </div>
-    </div>
-  </div>
-
-
   <!-- ===== SHIFT PAGE ===== -->
   <div class="page" id="page-shift">
     <div class="shift-toolbar">
