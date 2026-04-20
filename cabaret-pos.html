@@ -7861,23 +7861,68 @@ async function doPoll() {
 }
 
 function applyServerData(data) {
-  // localStorage 経由でロード（既存の persistLoad を利用）
-  const raw = JSON.stringify(data);
-  localStorage.setItem(STORAGE_KEY, raw);
-  persistLoad();
+  // 各データを直接反映（localStorage経由だと取りこぼしがある）
 
-  // テーブル再生成（営業中テーブルは状態を保持）
+  if(data.config) Object.assign(config, data.config);
+
+  if(Array.isArray(data.drinks) && data.drinks.length > 0) {
+    drinks.length = 0;
+    data.drinks.forEach(d => drinks.push(d));
+  }
+  if(Array.isArray(data.casts) && data.casts.length > 0) {
+    casts.length = 0;
+    data.casts.forEach(c => casts.push(c));
+  }
+  if(data.nextCastId) nextCastId = data.nextCastId;
+
+  if(Array.isArray(data.staffList)) {
+    const nonCast = data.staffList.filter(s => s.role !== 'キャスト');
+    staffList.length = 0;
+    nonCast.forEach(s => staffList.push(s));
+  }
+  if(data.shiftData) Object.assign(shiftData, data.shiftData);
+  if(data.nextStaffId) nextStaffId = data.nextStaffId;
+
+  if(Array.isArray(data.customers)) {
+    customers.length = 0;
+    data.customers.forEach(c => customers.push(c));
+  }
+  if(data.nextCustomerId) nextCustomerId = data.nextCustomerId;
+
+  // 予約データ（重要：必ず反映）
+  if(Array.isArray(data.reservations)) {
+    reservations.length = 0;
+    data.reservations.forEach(r => reservations.push(r));
+  }
+  if(data.nextReserveId) nextReserveId = data.nextReserveId;
+
+  // 売上ログ
+  if(Array.isArray(data.salesLog)) {
+    salesLog.length = 0;
+    data.salesLog.forEach(l => salesLog.push(l));
+  }
+
+  // 注文カウント
+  if(data.drinkOrderCount) Object.assign(drinkOrderCount, data.drinkOrderCount);
+
+  // localStorageにも保存
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(buildSaveData())); } catch(e) {}
+
+  // キャスト同期
+  syncCastsToStaff();
+
+  // テーブル再生成（営業中は状態を保持）
   tables = TABLE_DEFS.map(def => {
     const existing = tables.find(t => t.id === def.id);
     return existing || makeEmptyTable(def);
   });
 
-  syncCastsToStaff();
   renderTables();
+
   // アクティブページを再描画
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
   if(activePage && activePage !== 'tables') {
-    try { showPage(activePage); } catch {}
+    try { showPage(activePage); } catch(e) {}
   }
 }
 
@@ -8118,20 +8163,26 @@ self.addEventListener('notificationclick', (event) => {
 });
     `;
 
-    // GitHub Pages ではSWは同一オリジンが必要なため
-    // sw.js を別途アップロードしている場合はそちらを使う
-    // なければBlob URLで代用（限定的な動作）
-    let swUrl = '/sw.js'; // GitHub Pagesにアップ済みの場合
+    // sw.js の URL を現在のオリジンのルートに固定
+    // GitHub Pages: https://nomx69japan.github.io/sw.js
+    const swOrigin = location.origin;
+    const swUrl = swOrigin + '/sw.js';
+
+    // sw.js の存在確認
     try {
       const testRes = await fetch(swUrl, { method: 'HEAD' });
-      if(!testRes.ok) throw new Error('sw.js not found');
-    } catch {
-      // sw.js がなければBlob URLを使用
-      const blob = new Blob([swCode], { type: 'application/javascript' });
-      swUrl = URL.createObjectURL(blob);
+      if(!testRes.ok) {
+        console.warn('sw.js が見つかりません:', swUrl, testRes.status);
+        showToast('sw.js がGitHubにアップロードされていません');
+        return;
+      }
+    } catch(e) {
+      console.warn('sw.js 確認エラー:', e);
+      showToast('sw.js の確認に失敗しました: ' + e.message);
+      return;
     }
 
-    // Safari/iPadはscopeの指定が制限される場合があるため省略
+    // Service Worker 登録（Safari/iPad対応）
     _swRegistration = await navigator.serviceWorker.register(swUrl);
     await navigator.serviceWorker.ready;
 
