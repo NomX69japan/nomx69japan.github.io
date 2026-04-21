@@ -103,6 +103,7 @@
     align-items: center;
     padding: 1.5rem 4rem;
     mix-blend-mode: multiply;
+    transition: background-color 0.4s, backdrop-filter 0.4s, border-color 0.4s;
   }
 
   .nav-logo {
@@ -549,17 +550,41 @@
     color: rgba(245,240,232,0.2);
   }
 
-  /* ── SCROLL REVEAL ── */
+  /* ── SCROLL REVEAL (enhanced) ── */
   .reveal {
     opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.9s ease, transform 0.9s ease;
+    transform: translateY(32px);
+    transition: opacity 1.1s cubic-bezier(0.22, 1, 0.36, 1), transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .reveal.visible {
     opacity: 1;
     transform: none;
   }
+
+  /* Slide reveal from left */
+  .reveal-left {
+    opacity: 0;
+    transform: translateX(-40px);
+    transition: opacity 1.1s cubic-bezier(0.22, 1, 0.36, 1), transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal-left.visible { opacity: 1; transform: none; }
+
+  /* Image mask reveal */
+  .reveal-mask {
+    position: relative;
+    overflow: hidden;
+  }
+  .reveal-mask::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+    transform-origin: bottom;
+    transform: scaleY(1);
+    transition: transform 1.4s cubic-bezier(0.77, 0, 0.175, 1);
+  }
+  .reveal-mask.visible::after { transform: scaleY(0); }
 
   /* ── KEYFRAMES ── */
   @keyframes fadeUp {
@@ -570,6 +595,228 @@
   @keyframes fadeIn {
     to { opacity: 1; }
     from { opacity: 0; }
+  }
+
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.9; }
+  }
+
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes bounceDown {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(8px); opacity: 1; }
+  }
+
+  @keyframes drawLine {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  @keyframes countUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── HERO SCROLL INDICATOR ── */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+    opacity: 0;
+    animation: fadeUp 1s 1.4s forwards;
+    z-index: 2;
+  }
+
+  .scroll-indicator::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: var(--accent);
+    animation: shimmer 2.4s infinite;
+  }
+
+  .scroll-indicator .arrow {
+    display: inline-block;
+    animation: bounceDown 2s infinite;
+  }
+
+  /* ── HERO GOLD ACCENT LINE ── */
+  .hero-left::before {
+    content: '';
+    position: absolute;
+    top: 10rem;
+    left: 4rem;
+    width: 1px;
+    height: 60px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transform-origin: top;
+    animation: drawLine 1.2s 0.2s cubic-bezier(0.77, 0, 0.175, 1) forwards;
+  }
+
+  /* ── SECTION LABEL enhanced ── */
+  .section-label {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .section-label.reveal::before {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 1s cubic-bezier(0.77, 0, 0.175, 1) 0.3s;
+  }
+  .section-label.reveal.visible::before {
+    transform: scaleX(1);
+  }
+
+  /* ── PILLARS CARD enhanced hover ── */
+  .pillar-card {
+    position: relative;
+    overflow: hidden;
+    transition: background 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .pillar-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .pillar-card:hover::before {
+    transform: scaleX(1);
+  }
+
+  .pillar-card:hover .pillar-num {
+    color: rgba(200, 169, 110, 0.25);
+    transform: translateY(-4px);
+  }
+
+  .pillar-num {
+    transition: color 0.6s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ── FEE CARD enhanced ── */
+  .fee-card {
+    overflow: hidden;
+  }
+
+  .fee-card::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .fee-card:hover::before {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  /* ── NAV LINK underline animation ── */
+  nav a {
+    position: relative;
+    display: inline-block;
+  }
+  nav a::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.4s cubic-bezier(0.77, 0, 0.175, 1);
+  }
+  nav a:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  /* ── STATS count-up ── */
+  .stat-value {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.8s, transform 0.8s;
+  }
+  .about-stats.visible .stat-value {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ── PHOTO PARALLAX ── */
+  .hero-image-area img {
+    transition: transform 0.15s ease-out;
+  }
+
+  /* ── CONTACT subtle particles bg ── */
+  .contact-section {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .contact-section::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle at 20% 30%, rgba(200,169,110,0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(200,169,110,0.05) 0%, transparent 40%);
+    animation: floatBg 20s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes floatBg {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(3%, 2%); }
+  }
+
+  .contact-inner {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HERO NAME gradient text shimmer ── */
+  .hero-name em {
+    background: linear-gradient(120deg, var(--accent) 30%, #e6cfa0 50%, var(--accent) 70%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmerGold 4s ease-in-out infinite;
+  }
+
+  @keyframes shimmerGold {
+    0%, 100% { background-position: 200% 50%; }
+    50% { background-position: 0% 50%; }
   }
 
   /* ── SNS BUTTONS ── */
@@ -790,6 +1037,8 @@
     .contact-inner { grid-template-columns: 1fr; gap: 2.5rem; }
     .contact-heading { font-size: clamp(2rem, 8vw, 3rem); }
     footer { padding: 1.5rem; flex-direction: column; gap: 0.8rem; text-align: center; }
+    .scroll-indicator { display: none; }
+    .hero-left::before { display: none; }
   }
 
   @media (max-width: 480px) {
@@ -843,9 +1092,14 @@
         src="https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80&fit=crop&crop=center"
         alt="トレーニング"
         style="width:100%;height:100%;object-fit:cover;display:block;opacity:0;animation:fadeIn 1.5s 1s forwards;"
+        id="hero-img"
       >
       <div class="hero-year-marker">NomX</div>
     </div>
+  </div>
+  <div class="scroll-indicator">
+    <span>Scroll</span>
+    <span class="arrow">↓</span>
   </div>
 </div>
 
@@ -911,11 +1165,13 @@
   <div class="about-inner">
     <div class="about-left reveal">
       <h2 class="about-heading">Nom<span style="color:var(--accent);">X</span><br>とは</h2>
-      <img
-        src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&q=80&fit=crop&crop=center"
-        alt="野村達也"
-        style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;"
-      >
+      <div class="reveal-mask reveal" style="width:100%;">
+        <img
+          src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&q=80&fit=crop&crop=center"
+          alt="野村達也"
+          style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;"
+        >
+      </div>
     </div>
     <div class="about-text">
       <p class="reveal">
@@ -1086,17 +1342,76 @@
     });
   });
 
-  // Scroll reveal
-  const reveals = document.querySelectorAll('.reveal');
+  // Scroll reveal (all .reveal, .reveal-left, .reveal-mask)
+  const reveals = document.querySelectorAll('.reveal, .reveal-left, .reveal-mask');
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e, i) => {
       if (e.isIntersecting) {
-        setTimeout(() => e.target.classList.add('visible'), i * 80);
+        setTimeout(() => e.target.classList.add('visible'), i * 60);
         io.unobserve(e.target);
       }
     });
   }, { threshold: 0.12 });
   reveals.forEach(el => io.observe(el));
+
+  // Hero image parallax (subtle)
+  const heroImg = document.getElementById('hero-img');
+  if (heroImg) {
+    window.addEventListener('scroll', () => {
+      const scrolled = window.scrollY;
+      if (scrolled < window.innerHeight) {
+        heroImg.style.transform = `translateY(${scrolled * 0.15}px) scale(${1 + scrolled * 0.0002})`;
+      }
+    }, { passive: true });
+  }
+
+  // Count-up for stats (Years)
+  const statsSection = document.querySelector('.about-stats');
+  if (statsSection) {
+    const statsIO = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const yearsEl = e.target.querySelector('.stat-value');
+          if (yearsEl && yearsEl.textContent.includes('10')) {
+            let n = 0;
+            const target = 10;
+            const tick = setInterval(() => {
+              n++;
+              yearsEl.textContent = n + '+';
+              if (n >= target) clearInterval(tick);
+            }, 80);
+          }
+          statsIO.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    statsIO.observe(statsSection);
+  }
+
+  // Hide scroll indicator after scrolling
+  const scrollInd = document.querySelector('.scroll-indicator');
+  if (scrollInd) {
+    window.addEventListener('scroll', () => {
+      scrollInd.style.opacity = window.scrollY > 100 ? '0' : '';
+      scrollInd.style.transition = 'opacity 0.4s';
+    }, { passive: true });
+  }
+
+  // Fade-in nav when scrolling past hero
+  const navEl = document.querySelector('nav');
+  if (navEl) {
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 80) {
+        navEl.style.backgroundColor = 'rgba(245,240,232,0.85)';
+        navEl.style.backdropFilter = 'blur(8px)';
+        navEl.style.borderBottom = '1px solid rgba(14,13,11,0.06)';
+      } else {
+        navEl.style.backgroundColor = '';
+        navEl.style.backdropFilter = '';
+        navEl.style.borderBottom = '';
+      }
+    }, { passive: true });
+  }
 </script>
 </body>
 </html>
