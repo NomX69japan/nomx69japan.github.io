@@ -4175,30 +4175,130 @@ function saveStaffSettings() {
     s.defaultEnd  = document.getElementById(`staff-end-${idx}`)?.value   || s.defaultEnd;
     s.memo        = document.getElementById(`staff-memo-${idx}`)?.value  || '';
   });
+  // スタッフ管理から「キャスト」ロールに設定されたものを casts に同期
+  syncStaffCastsToCasts();
   persistSave();
+  saveToServer(true);
+  // シフトが表示中なら再描画
+  if(document.getElementById('page-shift')?.classList.contains('active')) renderShift();
   showToast('スタッフ情報を保存しました ✓');
+}
+
+// スタッフ管理のキャストロールを casts 配列に同期
+function syncStaffCastsToCasts() {
+  const staffCasts = staffList.filter(s => s.role === 'キャスト');
+  staffCasts.forEach(s => {
+    // s.id が 'cast_N' 形式なら対応するcastを探す
+    if(String(s.id).startsWith('cast_')) {
+      const castId = parseInt(String(s.id).replace('cast_', ''));
+      const c = casts.find(x => x.id === castId);
+      if(c) {
+        c.name = s.name;
+        c.hourlyFee = s.hourlyFee;
+      } else {
+        // 対応するcastがなければ追加
+        casts.push({
+          id: castId,
+          name: s.name,
+          title: `No.${casts.length+1}`,
+          color: castColors[casts.length % castColors.length],
+          emoji: castEmojis[casts.length % castEmojis.length],
+          hourlyFee: s.hourlyFee || 1500,
+          nominationFeeA: 1000,
+          nominationFeeB: 500,
+          bottleBackRate: 10,
+          sales: 0, time: 0,
+        });
+        if(castId >= nextCastId) nextCastId = castId + 1;
+      }
+    } else {
+      // 's123' のような旧形式 or スタッフ管理から追加された場合
+      // → 新しいキャストとして casts に追加して staff.id を cast_N に変更
+      const newCastId = nextCastId++;
+      casts.push({
+        id: newCastId,
+        name: s.name,
+        title: `No.${casts.length+1}`,
+        color: castColors[casts.length % castColors.length],
+        emoji: castEmojis[casts.length % castEmojis.length],
+        hourlyFee: s.hourlyFee || 1500,
+        nominationFeeA: 1000,
+        nominationFeeB: 500,
+        bottleBackRate: 10,
+        sales: 0, time: 0,
+      });
+      // シフトデータを新IDに引き継ぎ
+      const oldId = s.id;
+      const newStaffId = 'cast_' + newCastId;
+      Object.keys(shiftData).forEach(key => {
+        if(key.startsWith(oldId + '_')) {
+          const newKey = key.replace(oldId + '_', newStaffId + '_');
+          shiftData[newKey] = shiftData[key];
+          delete shiftData[key];
+        }
+      });
+      s.id = newStaffId;
+    }
+  });
+  // 重複キャスト削除
+  const seen = new Set();
+  for(let i = casts.length - 1; i >= 0; i--) {
+    if(seen.has(casts[i].id)) casts.splice(i, 1);
+    else seen.add(casts[i].id);
+  }
 }
 
 function addStaffFromSettings() {
   const role = staffSettingsActiveRole === 'すべて' ? 'ボーイ' : staffSettingsActiveRole;
   const rc = ROLE_COLORS[role] || ROLE_COLORS['その他'];
-  staffList.push({
-    id: 's' + nextStaffId++,
-    name: '新スタッフ',
-    role,
-    hourlyFee: 1200,
-    defaultStart: '20:00',
-    defaultEnd: '25:00',
-    memo: '',
-    penaltyLog: [],
-  });
+
+  // キャストロールの場合は casts 配列にも追加
+  if(role === 'キャスト') {
+    const newCastId = nextCastId++;
+    casts.push({
+      id: newCastId,
+      name: '新キャスト',
+      title: `No.${casts.length+1}`,
+      color: castColors[casts.length % castColors.length],
+      emoji: castEmojis[casts.length % castEmojis.length],
+      hourlyFee: 1500,
+      nominationFeeA: 1000,
+      nominationFeeB: 500,
+      bottleBackRate: 10,
+      sales: 0, time: 0,
+    });
+    staffList.push({
+      id: 'cast_' + newCastId,
+      name: '新キャスト',
+      role: 'キャスト',
+      hourlyFee: 1500,
+      defaultStart: '20:00',
+      defaultEnd: '25:00',
+      memo: '',
+      penaltyLog: [],
+    });
+  } else {
+    staffList.push({
+      id: 's' + nextStaffId++,
+      name: '新スタッフ',
+      role,
+      hourlyFee: 1200,
+      defaultStart: '20:00',
+      defaultEnd: '25:00',
+      memo: '',
+      penaltyLog: [],
+    });
+  }
   persistSave();
+  saveToServer(true);
   // タブをそのロールに切り替えてから再描画
   if(staffSettingsActiveRole !== 'すべて' && staffSettingsActiveRole !== role) {
     staffSettingsActiveRole = role;
     renderStaffRoleTabs();
   }
   renderStaffSettingsList();
+  // シフトが表示中なら再描画
+  if(document.getElementById('page-shift')?.classList.contains('active')) renderShift();
   showToast(`${role}のスタッフを追加しました`);
 }
 
@@ -5853,7 +5953,12 @@ function addCastSetting() {
   });
   syncCastsToStaff();
   persistSave();
+  // 自分の保存を即座にサーバーに反映（他端末より優先）
+  saveToServer(true);
   renderCastSettings();
+  // シフトが表示中なら再描画
+  if(document.getElementById('page-shift')?.classList.contains('active')) renderShift();
+  showToast('新キャストを追加しました ✓');
 }
 
 function removeCastSetting(i) {
@@ -5861,7 +5966,9 @@ function removeCastSetting(i) {
   casts.splice(i, 1);
   syncCastsToStaff();
   persistSave();
+  saveToServer(true);
   renderCastSettings();
+  if(document.getElementById('page-shift')?.classList.contains('active')) renderShift();
 }
 
 function saveCastSettings() {
@@ -5961,9 +6068,8 @@ function getWeekMonday(offset = 0) {
   const now = new Date();
   const day = now.getDay(); // 0=Sun
   const diff = (day === 0 ? -6 : 1 - day); // 月曜に合わせる
-  const mon = new Date(now);
-  mon.setDate(now.getDate() + diff + offset * 7);
-  mon.setHours(0,0,0,0);
+  // 正午基準で作成（タイムゾーン境界のズレを防ぐ）
+  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff + offset * 7, 12, 0, 0, 0);
   return mon;
 }
 
@@ -6001,16 +6107,21 @@ function shiftGoToday() {
 function renderShift() {
   const mon = getWeekMonday(shiftWeekOffset);
   const days = Array.from({length:7}, (_,i) => {
-    const d = new Date(mon);
-    d.setDate(mon.getDate() + i);
-    return d;
+    // 正午基準で作成（タイムゾーンズレ防止）
+    return new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i, 12, 0, 0, 0);
   });
   const today = dateToKey(new Date());
 
   // week label
   const endDay = days[6];
+  let weekLabel = '';
+  if(shiftWeekOffset === 0) weekLabel = '【今週】';
+  else if(shiftWeekOffset === -1) weekLabel = '【先週】';
+  else if(shiftWeekOffset === 1) weekLabel = '【来週】';
+  else if(shiftWeekOffset < 0) weekLabel = `【${Math.abs(shiftWeekOffset)}週前】`;
+  else weekLabel = `【${shiftWeekOffset}週後】`;
   document.getElementById('shift-week-label').textContent =
-    `${mon.getMonth()+1}/${mon.getDate()} (月) 〜 ${endDay.getMonth()+1}/${endDay.getDate()} (日)`;
+    `${weekLabel} ${mon.getMonth()+1}/${mon.getDate()} (月) 〜 ${endDay.getMonth()+1}/${endDay.getDate()} (日)`;
 
   // thead
   const thead = document.getElementById('shift-thead');
@@ -7958,7 +8069,7 @@ async function doPoll() {
     if(hash !== _lastServerHash) {
       _lastServerHash = hash;
       // 自分が最近保存した直後は無視（上書き防止）
-      if(Date.now() - _lastSyncTime > 3000) {
+      if(Date.now() - _lastSyncTime > 10000) {
         applyServerData(data);
         showSyncBadge('受信');
         _lastSyncTime = Date.now();
@@ -8671,6 +8782,25 @@ function fixStaffDuplication() {
   });
 }
 
+
+// シフトデータのデバッグ用（コンソールから呼び出す）
+window.debugShiftData = function() {
+  const keys = Object.keys(shiftData).sort();
+  const byDate = {};
+  keys.forEach(k => {
+    const parts = k.split('_');
+    const date  = parts[parts.length-1];
+    if(!byDate[date]) byDate[date] = [];
+    byDate[date].push({ key: k, ...shiftData[k] });
+  });
+  console.log('=== シフトデータ（日付別）===');
+  Object.keys(byDate).sort().forEach(d => {
+    console.log(`${d}:`, byDate[d]);
+  });
+  console.log('合計キー数:', keys.length);
+  return byDate;
+};
+
 // ========== 永続化（localStorage）==========
 const STORAGE_KEY = 'clubnoir_settings_v1';
 
@@ -8793,7 +8923,9 @@ function wrapSave(fn) {
   // サーバー同期初期化（設定済みの場合）
   initServerSync();
 
-  // staffList からキャストを完全除去してから同期（重複防止）
+  // スタッフ管理から追加されたキャストを casts に同期
+  try { syncStaffCastsToCasts(); } catch(e) {}
+  // staffList からキャストを完全除去してから再同期（重複防止）
   for(let i = staffList.length - 1; i >= 0; i--) {
     if(staffList[i].role === 'キャスト') staffList.splice(i, 1);
   }
