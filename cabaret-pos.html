@@ -8072,18 +8072,17 @@ async function doPoll() {
       _lastServerHash = hash;
       // 自分が最近保存した直後は無視（上書き防止）
       if(Date.now() - _lastSyncTime > 10000) {
-        // サーバーのキャスト数がローカルより少ない場合はローカル優先
-        // （自分が追加したキャストが他端末からの古いデータで消されるのを防ぐ）
+        // ローカルが新しい可能性があれば、双方向マージで適用
+        // （applyServerData がIDベースでマージするので自分の追加は保持される）
+        applyServerData(data);
+        showSyncBadge('受信');
+        _lastSyncTime = Date.now();
+        // ローカルが新しかった場合はサーバーに送り返す
         const serverCastCount = (data.casts||[]).length;
         const serverNextCastId = data.nextCastId || 0;
         if(serverCastCount < casts.length || serverNextCastId < nextCastId) {
-          console.log('ローカルの方が新しいためサーバーに送信');
-          showSyncBadge('送信');
+          console.log('ローカルにマージ優先分があるのでサーバーに送信');
           saveToServer(true);
-        } else {
-          applyServerData(data);
-          showSyncBadge('受信');
-          _lastSyncTime = Date.now();
         }
       }
     }
@@ -8103,10 +8102,16 @@ function applyServerData(data) {
     data.drinks.forEach(d => drinks.push(d));
   }
   if(Array.isArray(data.casts) && data.casts.length > 0) {
+    // IDベースでマージ: ローカルにしかないキャスト（追加中）は保持
+    const serverCastIds = new Set(data.casts.map(c => c.id));
+    const localOnlyCasts = casts.filter(c => !serverCastIds.has(c.id));
     casts.length = 0;
     data.casts.forEach(c => casts.push(c));
+    // ローカルだけにあったキャストを末尾に追加（追加したばかりのもの）
+    localOnlyCasts.forEach(c => casts.push(c));
   }
-  if(data.nextCastId) nextCastId = data.nextCastId;
+  // nextCastId は大きい方を採用
+  if(data.nextCastId && data.nextCastId > nextCastId) nextCastId = data.nextCastId;
 
   if(Array.isArray(data.staffList)) {
     const nonCast = data.staffList.filter(s => s.role !== 'キャスト');
