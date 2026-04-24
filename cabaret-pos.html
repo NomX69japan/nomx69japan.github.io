@@ -1252,8 +1252,7 @@
   .floor-private-rooms {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    flex: 1;
+    gap: 10px;
   }
 
   /* テーブルカード（全画面モード） */
@@ -1416,13 +1415,13 @@
 
   /* 個室カード（大きめ） */
   .fc-private {
-    flex: 1;
-    min-height: 180px;
+    min-height: 140px;
   }
-  .fc-private .fc-num { font-size: 22px; }
-  .fc-private .fc-info { font-size: 13px; }
-  .fc-private .fc-total { font-size: 16px; }
-  .fc-private .fc-timer-remaining { font-size: 20px; }
+  .fc-private .fc-num { font-size: 20px; }
+  .fc-private .fc-info { font-size: 12px; }
+  .fc-private .fc-total { font-size: 14px; }
+  .fc-private .fc-timer-remaining { font-size: 18px; }
+  .fc-private .fc-bar-wrap { height: 6px; }
 
   /* 空席カウント */
   .floor-stats {
@@ -2171,15 +2170,6 @@
       gap: 8px;
       overflow-x: auto;
     }
-    .fc-private {
-      min-width: 140px;
-      min-height: 90px;
-      flex: 0 0 auto;
-    }
-    /* スマホでカード内テキスト調整 */
-    .floor-card .fc-num { font-size: 14px; }
-    .floor-card .fc-info { font-size: 10px; }
-    .floor-card .fc-total { font-size: 12px; }
     .floor-sidebar-title {
       writing-mode: horizontal-tb;
       margin-bottom: 0;
@@ -2194,8 +2184,12 @@
     }
     .fc-private {
       flex: 1;
-      min-height: 70px;
+      min-width: 120px;
+      min-height: 75px;
     }
+    /* スマホでカード内テキスト調整 */
+    .fc-private .fc-num { font-size: 14px; }
+    .fc-private .fc-info { font-size: 10px; }
 
     /* ── テーブルカード（スマホ最適化） ── */
     .fc {
@@ -2308,28 +2302,17 @@
 
   /* ── LOGIN ── */
   #login-screen {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw;
-    height: 100vh;
+    position: fixed;
+    inset: 0;
     background: #1a1814;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2147483647 !important;
+    z-index: 9999;
     flex-direction: column;
     gap: 0;
-    padding: 20px;
-    box-sizing: border-box;
-    overflow-y: auto;
   }
-  #login-screen.hidden { display: none !important; }
-  body:has(#login-screen:not(.hidden)) {
-    overflow: hidden;
-  }
+  #login-screen.hidden { display: none; }
   .login-box {
     background: #fff;
     border-radius: 16px;
