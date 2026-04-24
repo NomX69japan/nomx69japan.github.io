@@ -2176,31 +2176,33 @@
     #floor-layout {
       flex-direction: column !important;
       height: auto !important;
-      min-height: calc(100vh - 88px) !important;
+      min-height: 0 !important;
       overflow: visible !important;
+      gap: 0 !important;
     }
     .floor-main {
-      flex: 1 1 auto !important;
+      flex: 0 0 auto !important;
       flex-direction: column !important;
-      padding: 10px !important;
-      gap: 10px;
+      padding: 8px 10px !important;
+      gap: 6px;
       min-width: 0 !important;
       border-right: none !important;
     }
     .floor-grid-main {
       grid-template-columns: repeat(3, 1fr) !important;
-      grid-template-rows: repeat(4, minmax(85px, auto)) !important;
+      grid-template-rows: repeat(4, auto) !important;
       gap: 5px;
       flex: none !important;
     }
     .floor-sidebar {
       width: 100% !important;
-      flex: none !important;
+      flex: 0 0 auto !important;
       flex-direction: row !important;
       padding: 8px 10px !important;
       gap: 8px;
       overflow-x: auto;
       border-top: 1px solid rgba(0,0,0,0.1);
+      margin-top: 0 !important;
     }
     .floor-sidebar-title {
       writing-mode: horizontal-tb;
@@ -2216,8 +2218,9 @@
     }
     .fc-private {
       flex: 0 0 auto !important;
-      min-width: 130px !important;
-      min-height: 85px !important;
+      min-width: 140px !important;
+      min-height: 75px !important;
+      max-height: 110px;
     }
     /* スマホでカード内テキスト調整 */
     .fc-private .fc-num { font-size: 14px; }
@@ -2237,7 +2240,7 @@
     .fc-cast { font-size: 9px; }
     .fc-bar-wrap { height: 4px; }
     .fc-timer-elapsed { display: none; } /* スマホでは経過時間非表示 */
-    .floor-stats { gap: 10px; }
+    .floor-stats { gap: 10px; margin-top: 0; padding: 2px 0; }
     .floor-stat-item strong { font-size: 13px; }
 
     /* ── オーダーポップアップ（モバイル用フルスクリーン） ── */
