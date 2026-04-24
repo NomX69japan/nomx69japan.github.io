@@ -929,11 +929,37 @@
   }
   .week-nav-btn:hover { border-color: var(--gold); color: var(--gold); }
 
-  .shift-table-wrap { overflow-x: auto; }
+  .shift-table-wrap {
+    overflow-x: auto;
+    position: relative;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
   .shift-table {
     width: 100%;
     border-collapse: collapse;
     min-width: 700px;
+  }
+  .shift-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #faf8f3;
+  }
+  .shift-table th.staff-col {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #faf8f3;
+  }
+  .shift-table thead th.staff-col {
+    z-index: 5;
+  }
+  .shift-table td.staff-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #faf8f3;
   }
   .shift-table th {
     padding: 10px 6px;
@@ -2279,6 +2305,7 @@
     width: 320px;
     max-width: 90vw;
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    box-sizing: border-box;
   }
   .login-logo {
     font-family: 'Playfair Display', serif;
@@ -2320,10 +2347,14 @@
     display: flex;
     gap: 8px;
     margin-bottom: 12px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .login-pin-row input {
     flex: 1;
-    padding: 10px 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 12px 14px;
     border: 1.5px solid #ddd;
     border-radius: 8px;
     font-size: 16px;
@@ -2331,6 +2362,9 @@
     outline: none;
     text-align: center;
     letter-spacing: 4px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
   }
   .login-pin-row input:focus { border-color: #111; }
   .login-error { color: #c0294e; font-size: 12px; text-align: center; min-height: 18px; margin-bottom: 8px; }
