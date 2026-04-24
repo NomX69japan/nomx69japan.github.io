@@ -1173,23 +1173,20 @@
 
   /* ── FLOOR LAYOUT ── */
   #floor-layout {
-    display: flex !important;
-    flex-direction: row !important;
+    display: flex;
     height: calc(100vh - 60px);
     gap: 0;
     overflow: hidden;
-    width: 100%;
   }
 
   /* 通常卓エリア（左メイン） */
   .floor-main {
-    flex: 1 1 auto !important;
-    display: flex !important;
-    flex-direction: column !important;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     padding: 14px 14px 10px 16px;
     min-width: 0;
     border-right: 1px solid rgba(0,0,0,0.1);
-    overflow: hidden;
   }
   .floor-area-header {
     display: flex;
@@ -1245,6 +1242,11 @@
     }
     .floor-private-rooms {
       flex-direction: column !important;
+      flex: 1 !important;
+    }
+    .fc-private {
+      min-height: 200px !important;
+      flex: 1 1 auto !important;
     }
     .floor-sidebar-title {
       writing-mode: horizontal-tb !important;
@@ -1253,14 +1255,12 @@
 
   /* 個室エリア（右サイドバー） */
   .floor-sidebar {
-    width: 220px !important;
-    flex: 0 0 220px !important;
-    flex-shrink: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
+    width: 180px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
     gap: 0;
     padding: 14px 14px 10px 12px;
-    overflow-y: auto;
   }
   .floor-sidebar-title {
     font-size: 11px;
@@ -1275,6 +1275,8 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex: 1;
+    min-height: 0;
   }
 
   /* テーブルカード（全画面モード） */
@@ -1437,13 +1439,14 @@
 
   /* 個室カード（大きめ） */
   .fc-private {
-    min-height: 140px;
+    flex: 1 1 auto;
+    min-height: 200px;
   }
-  .fc-private .fc-num { font-size: 20px; }
-  .fc-private .fc-info { font-size: 12px; }
-  .fc-private .fc-total { font-size: 14px; }
-  .fc-private .fc-timer-remaining { font-size: 18px; }
-  .fc-private .fc-bar-wrap { height: 6px; }
+  .fc-private .fc-num { font-size: 22px; }
+  .fc-private .fc-info { font-size: 13px; }
+  .fc-private .fc-total { font-size: 15px; }
+  .fc-private .fc-timer-remaining { font-size: 20px; }
+  .fc-private .fc-bar-wrap { height: 7px; }
 
   /* 空席カウント */
   .floor-stats {
@@ -2171,26 +2174,33 @@
 
     /* ── フロアレイアウト ── */
     #floor-layout {
-      flex-direction: column;
-      height: auto;
-      min-height: calc(100vh - 88px);
+      flex-direction: column !important;
+      height: auto !important;
+      min-height: calc(100vh - 88px) !important;
+      overflow: visible !important;
     }
     .floor-main {
-      flex-direction: column;
-      padding: 10px;
+      flex: 1 1 auto !important;
+      flex-direction: column !important;
+      padding: 10px !important;
       gap: 10px;
+      min-width: 0 !important;
+      border-right: none !important;
     }
     .floor-grid-main {
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(4, minmax(88px, auto));
+      grid-template-columns: repeat(3, 1fr) !important;
+      grid-template-rows: repeat(4, minmax(85px, auto)) !important;
       gap: 5px;
+      flex: none !important;
     }
     .floor-sidebar {
-      width: 100%;
-      flex-direction: row;
-      padding: 8px 10px;
+      width: 100% !important;
+      flex: none !important;
+      flex-direction: row !important;
+      padding: 8px 10px !important;
       gap: 8px;
       overflow-x: auto;
+      border-top: 1px solid rgba(0,0,0,0.1);
     }
     .floor-sidebar-title {
       writing-mode: horizontal-tb;
@@ -2205,9 +2215,9 @@
       flex: 1;
     }
     .fc-private {
-      flex: 1;
-      min-width: 120px;
-      min-height: 75px;
+      flex: 0 0 auto !important;
+      min-width: 130px !important;
+      min-height: 85px !important;
     }
     /* スマホでカード内テキスト調整 */
     .fc-private .fc-num { font-size: 14px; }
