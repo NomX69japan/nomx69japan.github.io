@@ -931,11 +931,16 @@
 
   .shift-table-wrap {
     overflow-x: auto;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     position: relative;
-    max-height: calc(100vh - 200px);
-    overflow-y: auto;
+    max-height: calc(100vh - 180px);
     will-change: transform;
+    transform: translateZ(0);
+  }
+  /* Android Chrome対応：親要素にも overflow 設定 */
+  .page#page-shift {
+    overflow: visible;
   }
   .shift-table {
     width: 100%;
@@ -2149,7 +2154,7 @@
       height: auto;
       min-height: calc(100vh - 88px);
     }
-    .floor-main {
+    .floor-main,
       padding: 10px 10px 6px;
       border-right: none;
       border-bottom: 1px solid var(--border-soft);
@@ -2293,17 +2298,28 @@
 
   /* ── LOGIN ── */
   #login-screen {
-    position: fixed;
-    inset: 0;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw;
+    height: 100vh;
     background: #1a1814;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    z-index: 2147483647 !important;
     flex-direction: column;
     gap: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
   }
-  #login-screen.hidden { display: none; }
+  #login-screen.hidden { display: none !important; }
+  body:has(#login-screen:not(.hidden)) {
+    overflow: hidden;
+  }
   .login-box {
     background: #fff;
     border-radius: 16px;
@@ -4139,8 +4155,16 @@ function renderStaffSettingsList() {
   el.innerHTML = filtered.map(s => {
     const idx = staffList.indexOf(s);
     const rc = ROLE_COLORS[s.role] || ROLE_COLORS['その他'];
+    // キャスト(cast_N)の場合、casts配列から体験情報を取得
+    let isTrial = false, trialCount = 0, castObjRef = null;
+    if(String(s.id).startsWith('cast_')) {
+      const castId = parseInt(String(s.id).replace('cast_', ''));
+      castObjRef = casts.find(x => x.id === castId);
+      isTrial = castObjRef?.trial || false;
+      trialCount = castObjRef?.trialCount || 0;
+    }
     return `
-      <div class="staff-settings-row">
+      <div class="staff-settings-row" style="${isTrial?'background:#fff9e6;border-left:4px solid #d4a017;':''}">
         <div class="staff-settings-header">
           <span class="staff-settings-emoji">${rc.emoji}</span>
           <input class="settings-input" type="text" value="${s.name}"
@@ -4151,6 +4175,13 @@ function renderStaffSettingsList() {
               `<option value="${r}" ${s.role===r?'selected':''}>${r}</option>`
             ).join('')}
           </select>
+          ${isTrial && castObjRef ? `
+          <span style="background:${(3-trialCount)>0?'#fff3cc':'#ffe6e6'};color:${(3-trialCount)>0?'#7a4e00':'#c0294e'};padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;">
+            🎟 体験 ${trialCount}/3
+          </span>
+          <button onclick="convertTrialCastToMemberById(${castObjRef.id})"
+            style="padding:4px 10px;border:1px solid #1a7a3e;color:#1a7a3e;background:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;">本採用</button>
+          ` : ''}
           <button class="btn-icon" onclick="removeStaffFromSettings('${s.id}')" title="削除" style="flex-shrink:0;">×</button>
         </div>
         <div class="staff-settings-fields">
@@ -4175,6 +4206,15 @@ function renderStaffSettingsList() {
               id="staff-memo-${idx}" placeholder="備考">
           </div>
         </div>
+        ${s.role === 'キャスト' && castObjRef ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0e0;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#555;">
+            <input type="checkbox" ${isTrial?'checked':''}
+              onchange="toggleCastTrialById(${castObjRef.id}, this.checked)"
+              style="accent-color:#d4a017;width:14px;height:14px;">
+            <strong>🎟 体験入店キャスト</strong>（3回まで体験可能）
+          </label>
+        </div>` : ''}
         <div style="margin-top:10px;border-top:1px solid var(--border-soft);padding-top:10px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
             <span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;">罰金ログ</span>
@@ -5324,11 +5364,175 @@ function renderReceiptContent(tableId) {
       ${!_receiptNoService?`<div class="receipt-row"><span>サービス料 ${config.serviceRate}%</span><span>¥${service.toLocaleString()}</span></div>`:'<div class="receipt-row" style="color:#888;"><span>サービス料（免除）</span><span>-</span></div>'}
       <div class="receipt-row total" id="receipt-grand-row"><span>お会計</span><span>¥${grand.toLocaleString()}</span></div>
     </div>
-    <div class="btn-row">
+    <div class="btn-row" style="flex-wrap:wrap;gap:8px;">
       <button class="btn btn-gold" id="checkout-btn" onclick="confirmCheckout(${tableId},${grand})">精算完了 ¥${grand.toLocaleString()}</button>
+      <button class="btn btn-ghost" style="background:#f0f0f0;" onclick="printReceipt(${tableId},'kiri')">🧾 キリ伝票</button>
+      <button class="btn btn-ghost" style="background:#f0f0f0;" onclick="printReceipt(${tableId},'check')">📋 チェック伝票</button>
       <button class="btn btn-ghost" onclick="closeModal('receipt-modal')">戻る</button>
     </div>
   `;
+}
+
+
+// ========== 伝票印刷 ==========
+// kiri: キリ伝票（支払い前の締め確認用・割引前の詳細）
+// check: チェック伝票（最終精算後の控え・割引適用済み）
+function printReceipt(tableId, type) {
+  const t = tables.find(t=>t.id===tableId);
+  if(!t) return;
+  const now = new Date();
+  const elapsed = Math.floor((Date.now()-t.startTime)/60000);
+  const { fee: setFeeRate, label: setFeeTimeLabel } = calcSetFeeLabel(t.startTime);
+  const ext = calcExtensionFee(t);
+  const setTotal = setFeeRate * t.guests;
+  const cu = t.customerId ? customers.find(c=>c.id===t.customerId) : null;
+  const { subtotal, discountAmt, discountRate, afterDiscount, service, grand } = calcReceiptGrand(tableId);
+
+  const typeLabel = type === 'kiri' ? 'キリ伝票' : 'チェック伝票';
+  const typeSubLabel = type === 'kiri' ? '（会計前確認用）' : '（精算控え）';
+
+  // 伝票HTMLを生成
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${typeLabel} - ${t.label||t.id+'番'}</title>
+<style>
+  @page { size: 80mm auto; margin: 5mm; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    max-width: 320px;
+    margin: 0 auto;
+    padding: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #000;
+  }
+  .title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .type-badge {
+    text-align: center;
+    font-size: 11px;
+    background: ${type==='kiri'?'#fff3cc':'#e6f4ff'};
+    border: 1px solid ${type==='kiri'?'#d4a017':'#4a90d9'};
+    padding: 4px 8px;
+    margin: 6px 0 12px;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+  .sub {
+    font-size: 10px;
+    color: #666;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 12px;
+  }
+  .row.bold { font-weight: 700; }
+  .sep {
+    border-top: 1px dashed #888;
+    margin: 8px 0;
+  }
+  .sep-solid {
+    border-top: 2px solid #000;
+    margin: 8px 0;
+  }
+  .total {
+    font-size: 18px;
+    font-weight: 800;
+    padding: 8px 0;
+  }
+  .footer {
+    text-align: center;
+    font-size: 10px;
+    color: #666;
+    margin-top: 16px;
+    border-top: 1px solid #ccc;
+    padding-top: 8px;
+  }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="title">${config.clubName||'club 道 〜TAO〜'}</div>
+  <div class="type-badge">${typeLabel} ${typeSubLabel}</div>
+  <div class="sub">${now.toLocaleString('ja-JP')}</div>
+
+  <div class="row"><span>テーブル</span><span>${t.label||t.id+'番'}</span></div>
+  <div class="row"><span>お客様</span><span>${cu ? cu.name+'様' : 'ご新規様'}</span></div>
+  <div class="row"><span>人数</span><span>${t.guests}名</span></div>
+  <div class="row"><span>ご来店</span><span>${new Date(t.startTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span></div>
+  <div class="row"><span>滞在時間</span><span>${elapsed}分</span></div>
+
+  <div class="sep"></div>
+
+  <div class="row"><span>セット料金(${setFeeTimeLabel})×${t.guests}</span><span>¥${setTotal.toLocaleString()}</span></div>
+  ${(ext.manualList||[]).map((e,i)=>`<div class="row"><span>延長${i+1}(${e.minutes}分)</span><span>¥${e.fee.toLocaleString()}</span></div>`).join('')}
+  ${ext.autoCount>0?`<div class="row"><span>自動延長(${ext.autoCount*(config.extensionMinutes||30)}分)</span><span>¥${ext.autoTotal.toLocaleString()}</span></div>`:''}
+  ${t.castIds.map(id => {
+    const c = casts.find(c=>c.id===id);
+    const typ = (t.castNomTypes||{})[id]||(t.castNomTypes||{})[String(id)]||'フリー';
+    const fee = c ? (typ==='A'?c.nominationFeeA:typ==='B'?c.nominationFeeB:0) : 0;
+    return c && fee>0 ? `<div class="row"><span>${c.name}(${typ}指名)</span><span>¥${fee.toLocaleString()}</span></div>` : '';
+  }).join('')}
+  ${t.orders.map(o=>`<div class="row"><span>${o.name}</span><span>¥${o.price.toLocaleString()}</span></div>`).join('')}
+  ${(()=>{ const ef=t.extraFees||{}; let rows='';
+    if(ef.nomination) rows+=`<div class="row"><span>指名料</span><span>¥${(config.nominationFee||2000).toLocaleString()}</span></div>`;
+    if(ef.dohan)      rows+=`<div class="row"><span>同伴料金</span><span>¥${(config.dohanFee||3000).toLocaleString()}</span></div>`;
+    if(ef.vipId){ const vip=(config.vipFees||[]).find(v=>v.id===ef.vipId); if(vip) rows+=`<div class="row"><span>VIP ${vip.name}</span><span>¥${vip.fee.toLocaleString()}</span></div>`; }
+    return rows; })()}
+
+  <div class="sep"></div>
+  <div class="row bold"><span>小計</span><span>¥${subtotal.toLocaleString()}</span></div>
+  ${type==='check' ? `
+    ${discountRate>0||discountAmt>0 ? `<div class="row"><span>割引${discountRate>0?`(${discountRate}%)`:''}</span><span>-¥${(subtotal-afterDiscount).toLocaleString()}</span></div>`:''}
+    <div class="row"><span>サービス料 ${config.serviceRate}%${_receiptNoService?'(免除)':''}</span><span>${_receiptNoService?'-':'¥'+service.toLocaleString()}</span></div>
+    <div class="sep-solid"></div>
+    <div class="row total"><span>お会計</span><span>¥${grand.toLocaleString()}</span></div>
+  ` : `
+    <div class="row"><span>サービス料 ${config.serviceRate}% (予定)</span><span>¥${Math.floor(subtotal*config.serviceRate/100).toLocaleString()}</span></div>
+    <div class="sep-solid"></div>
+    <div class="row total"><span>お会計(予定)</span><span>¥${(subtotal+Math.floor(subtotal*config.serviceRate/100)).toLocaleString()}</span></div>
+    <div style="font-size:10px;color:#888;text-align:center;margin-top:6px;">※ 割引・サービス料は精算時に確定します</div>
+  `}
+
+  <div class="footer">
+    ありがとうございました<br>
+    ${config.clubName||'club 道 〜TAO〜'}
+  </div>
+
+  <div class="no-print" style="text-align:center;margin-top:20px;">
+    <button onclick="window.print()" style="padding:10px 24px;font-size:14px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;">🖨 印刷</button>
+    <button onclick="window.close()" style="padding:10px 24px;font-size:14px;margin-left:8px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;cursor:pointer;">閉じる</button>
+  </div>
+
+<scr` + `ipt>
+  window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 300);
+  });
+</scr` + `ipt>
+</body>
+</html>`;
+
+  // 新しいウィンドウで開く
+  const w = window.open('', '_blank', 'width=400,height=700');
+  if(!w) {
+    showToast('ポップアップがブロックされています。許可してください');
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
 }
 
 function updateReceiptTotal(tableId) {
@@ -7411,6 +7615,31 @@ function toggleCastTrial(index, checked) {
   saveToServer(true);
   renderCastSettings();
   showToast(checked ? '体験入店キャストに設定しました' : '体験入店フラグを解除しました');
+}
+
+// キャストIDで体験フラグを切替（スタッフ管理用）
+function toggleCastTrialById(castId, checked) {
+  const c = casts.find(x => x.id === castId);
+  if(!c) return;
+  c.trial = checked;
+  if(checked && !c.trialCount) c.trialCount = 0;
+  persistSave();
+  saveToServer(true);
+  renderStaffSettingsList();
+  showToast(checked ? '体験入店キャストに設定しました' : '体験入店フラグを解除しました');
+}
+
+function convertTrialCastToMemberById(castId) {
+  const c = casts.find(x => x.id === castId);
+  if(!c) return;
+  showDeleteConfirm(`${c.name}を本採用キャストに切り替えますか？`, () => {
+    c.trial = false;
+    c.trialCount = 0;
+    persistSave();
+    saveToServer(true);
+    renderStaffSettingsList();
+    showToast(`${c.name}を本採用に切り替えました ✓`);
+  });
 }
 
 // 体験→本採用切替
