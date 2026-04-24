@@ -1173,20 +1173,23 @@
 
   /* ── FLOOR LAYOUT ── */
   #floor-layout {
-    display: flex;
+    display: flex !important;
+    flex-direction: row !important;
     height: calc(100vh - 60px);
     gap: 0;
     overflow: hidden;
+    width: 100%;
   }
 
   /* 通常卓エリア（左メイン） */
   .floor-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
     padding: 14px 14px 10px 16px;
     min-width: 0;
     border-right: 1px solid rgba(0,0,0,0.1);
+    overflow: hidden;
   }
   .floor-area-header {
     display: flex;
@@ -1223,22 +1226,41 @@
 
   /* 通常卓グリッド（3列×4行 固定） */
   .floor-grid-main {
-    flex: 1;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(3, minmax(140px, 1fr));
+    flex: 1 1 auto !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-rows: repeat(3, minmax(140px, 1fr)) !important;
     gap: 8px;
     min-height: 0;
   }
 
+  /* PC/タブレット専用レイアウト強化 */
+  @media (min-width: 681px) {
+    #floor-layout { flex-direction: row !important; }
+    .floor-main { flex: 1 1 auto !important; }
+    .floor-sidebar { width: 220px !important; flex: 0 0 220px !important; }
+    .floor-grid-main {
+      grid-template-columns: repeat(4, 1fr) !important;
+      grid-template-rows: repeat(3, minmax(140px, 1fr)) !important;
+    }
+    .floor-private-rooms {
+      flex-direction: column !important;
+    }
+    .floor-sidebar-title {
+      writing-mode: horizontal-tb !important;
+    }
+  }
+
   /* 個室エリア（右サイドバー） */
   .floor-sidebar {
-    width: 260px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
+    width: 220px !important;
+    flex: 0 0 220px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 0;
     padding: 14px 14px 10px 12px;
+    overflow-y: auto;
   }
   .floor-sidebar-title {
     font-size: 11px;
