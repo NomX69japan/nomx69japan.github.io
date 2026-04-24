@@ -2154,22 +2154,32 @@
       height: auto;
       min-height: calc(100vh - 88px);
     }
-    .floor-main,
-      padding: 10px 10px 6px;
-      border-right: none;
-      border-bottom: 1px solid var(--border-soft);
+    .floor-main {
+      flex-direction: column;
+      padding: 10px;
+      gap: 10px;
     }
     .floor-grid-main {
       grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(4, auto);
-      gap: 6px;
+      grid-template-rows: repeat(4, minmax(88px, auto));
+      gap: 5px;
     }
     .floor-sidebar {
       width: 100%;
       flex-direction: row;
       padding: 8px 10px;
       gap: 8px;
+      overflow-x: auto;
     }
+    .fc-private {
+      min-width: 140px;
+      min-height: 90px;
+      flex: 0 0 auto;
+    }
+    /* スマホでカード内テキスト調整 */
+    .floor-card .fc-num { font-size: 14px; }
+    .floor-card .fc-info { font-size: 10px; }
+    .floor-card .fc-total { font-size: 12px; }
     .floor-sidebar-title {
       writing-mode: horizontal-tb;
       margin-bottom: 0;
@@ -4206,14 +4216,20 @@ function renderStaffSettingsList() {
               id="staff-memo-${idx}" placeholder="備考">
           </div>
         </div>
-        ${s.role === 'キャスト' && castObjRef ? `
-        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0e0;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#555;">
+        ${s.role === 'キャスト' ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0e0;background:#fafafa;padding:10px;border-radius:6px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#333;font-weight:600;">
             <input type="checkbox" ${isTrial?'checked':''}
-              onchange="toggleCastTrialById(${castObjRef.id}, this.checked)"
-              style="accent-color:#d4a017;width:14px;height:14px;">
-            <strong>🎟 体験入店キャスト</strong>（3回まで体験可能）
+              onchange="toggleCastTrialByStaffId('${s.id}', this.checked)"
+              style="accent-color:#d4a017;width:16px;height:16px;">
+            🎟 体験入店キャスト（3回まで体験可能）
           </label>
+          ${isTrial ? `
+          <div style="margin-top:8px;padding:8px 12px;background:${(3-trialCount)>0?'#fff3cc':'#ffe6e6'};border-radius:6px;font-size:12px;">
+            体験回数: <strong style="font-size:14px;">${trialCount} / 3</strong>
+            ${(3-trialCount)>0 ? `<span style="color:#1a7a3e;margin-left:8px;">あと${3-trialCount}回</span>` : `<span style="color:#c0294e;font-weight:700;margin-left:8px;">⚠ 上限到達</span>`}
+            <button onclick="convertTrialCastToMemberByStaffId('${s.id}')" style="float:right;padding:3px 10px;border:1px solid #1a7a3e;color:#1a7a3e;background:#fff;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;">本採用に切替</button>
+          </div>` : ''}
         </div>` : ''}
         <div style="margin-top:10px;border-top:1px solid var(--border-soft);padding-top:10px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -5364,10 +5380,22 @@ function renderReceiptContent(tableId) {
       ${!_receiptNoService?`<div class="receipt-row"><span>サービス料 ${config.serviceRate}%</span><span>¥${service.toLocaleString()}</span></div>`:'<div class="receipt-row" style="color:#888;"><span>サービス料（免除）</span><span>-</span></div>'}
       <div class="receipt-row total" id="receipt-grand-row"><span>お会計</span><span>¥${grand.toLocaleString()}</span></div>
     </div>
+    <!-- 伝票発行ボタン -->
+    <div style="background:#fff9e6;border:1px solid #d4a017;border-radius:10px;padding:12px;margin:14px 0;">
+      <div style="font-size:11px;font-weight:700;color:#7a4e00;letter-spacing:1px;margin-bottom:8px;">🧾 伝票発行</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="printReceipt(${tableId},'kiri')"
+          style="flex:1;min-width:140px;padding:10px 16px;background:#fff;border:2px solid #d4a017;border-radius:8px;color:#7a4e00;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">
+          🧾 キリ伝票<br><span style="font-size:10px;font-weight:400;">会計前確認用</span>
+        </button>
+        <button onclick="printReceipt(${tableId},'check')"
+          style="flex:1;min-width:140px;padding:10px 16px;background:#fff;border:2px solid #4a90d9;border-radius:8px;color:#1a5a99;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">
+          📋 チェック伝票<br><span style="font-size:10px;font-weight:400;">精算後控え</span>
+        </button>
+      </div>
+    </div>
     <div class="btn-row" style="flex-wrap:wrap;gap:8px;">
       <button class="btn btn-gold" id="checkout-btn" onclick="confirmCheckout(${tableId},${grand})">精算完了 ¥${grand.toLocaleString()}</button>
-      <button class="btn btn-ghost" style="background:#f0f0f0;" onclick="printReceipt(${tableId},'kiri')">🧾 キリ伝票</button>
-      <button class="btn btn-ghost" style="background:#f0f0f0;" onclick="printReceipt(${tableId},'check')">📋 チェック伝票</button>
       <button class="btn btn-ghost" onclick="closeModal('receipt-modal')">戻る</button>
     </div>
   `;
@@ -7629,6 +7657,69 @@ function toggleCastTrialById(castId, checked) {
   showToast(checked ? '体験入店キャストに設定しました' : '体験入店フラグを解除しました');
 }
 
+// スタッフIDから体験フラグ切替（新規キャストでもcastObjRefなしで対応）
+function toggleCastTrialByStaffId(staffId, checked) {
+  // staffIdが cast_N 形式なら対応するcastを探す/作成
+  if(String(staffId).startsWith('cast_')) {
+    const castId = parseInt(String(staffId).replace('cast_', ''));
+    let c = casts.find(x => x.id === castId);
+    if(!c) {
+      // castsに無ければスタッフ情報から作成
+      const st = staffList.find(x => x.id === staffId);
+      if(!st) return;
+      c = {
+        id: castId,
+        name: st.name,
+        title: `No.${casts.length+1}`,
+        color: castColors[casts.length % castColors.length],
+        emoji: castEmojis[casts.length % castEmojis.length],
+        hourlyFee: st.hourlyFee || 1500,
+        nominationFeeA: 1000, nominationFeeB: 500,
+        bottleBackRate: 10, sales: 0, time: 0,
+      };
+      casts.push(c);
+      if(castId >= nextCastId) nextCastId = castId + 1;
+    }
+    c.trial = checked;
+    if(checked && !c.trialCount) c.trialCount = 0;
+  } else {
+    // 旧形式の場合は新しいキャストを作成
+    const st = staffList.find(x => x.id === staffId);
+    if(!st) return;
+    const newCastId = nextCastId++;
+    casts.push({
+      id: newCastId, name: st.name,
+      title: `No.${casts.length}`,
+      color: castColors[casts.length % castColors.length],
+      emoji: castEmojis[casts.length % castEmojis.length],
+      hourlyFee: st.hourlyFee || 1500,
+      nominationFeeA: 1000, nominationFeeB: 500,
+      bottleBackRate: 10, sales: 0, time: 0,
+      trial: checked, trialCount: 0,
+    });
+    st.id = 'cast_' + newCastId;
+  }
+  persistSave();
+  saveToServer(true);
+  renderStaffSettingsList();
+  showToast(checked ? '体験入店キャストに設定しました' : '体験入店フラグを解除しました');
+}
+
+function convertTrialCastToMemberByStaffId(staffId) {
+  if(!String(staffId).startsWith('cast_')) return;
+  const castId = parseInt(String(staffId).replace('cast_', ''));
+  const c = casts.find(x => x.id === castId);
+  if(!c) return;
+  showDeleteConfirm(`${c.name}を本採用キャストに切り替えますか？`, () => {
+    c.trial = false;
+    c.trialCount = 0;
+    persistSave();
+    saveToServer(true);
+    renderStaffSettingsList();
+    showToast(`${c.name}を本採用に切り替えました ✓`);
+  });
+}
+
 function convertTrialCastToMemberById(castId) {
   const c = casts.find(x => x.id === castId);
   if(!c) return;
@@ -8414,7 +8505,8 @@ function startPolling() {
   if(!serverConfigured()) return;
   _syncEnabled = true;
   updateSyncIndicator();
-  scheduleNextPoll();
+  // 即座に一回同期
+  setTimeout(() => doPoll(), 500);
 }
 
 function stopPolling() {
