@@ -931,35 +931,41 @@
 
   .shift-table-wrap {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     position: relative;
     max-height: calc(100vh - 200px);
     overflow-y: auto;
+    will-change: transform;
   }
   .shift-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     min-width: 700px;
   }
   .shift-table thead th {
+    position: -webkit-sticky;
     position: sticky;
     top: 0;
     z-index: 3;
-    background: #faf8f3;
+    background: #faf8f3 !important;
+  }
+  .shift-table th.staff-col,
+  .shift-table td.staff-col {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    background: #faf8f3 !important;
+    box-shadow: 2px 0 4px -2px rgba(0,0,0,0.1);
   }
   .shift-table th.staff-col {
-    position: sticky;
-    left: 0;
     z-index: 4;
-    background: #faf8f3;
   }
   .shift-table thead th.staff-col {
-    z-index: 5;
+    z-index: 5 !important;
   }
   .shift-table td.staff-col {
-    position: sticky;
-    left: 0;
     z-index: 2;
-    background: #faf8f3;
   }
   .shift-table th {
     padding: 10px 6px;
@@ -5907,8 +5913,12 @@ const castColors = ['#e85b8a','#9b59b6','#3498db','#2ecc71','#e67e22','#1abc9c',
 let nextCastId = 9;
 
 function renderCastSettings() {
-  document.getElementById('cast-settings-list').innerHTML = casts.map((c, i) => `
-    <div class="cast-settings-row" style="position:relative;">
+  document.getElementById('cast-settings-list').innerHTML = casts.map((c, i) => {
+    const isTrial = c.trial || false;
+    const trialCount = c.trialCount || 0;
+    const trialRemaining = Math.max(0, 3 - trialCount);
+    return `
+    <div class="cast-settings-row" style="position:relative;${isTrial?'background:#fff9e6;border-left:4px solid #d4a017;':''}">
       <div class="cast-settings-header">
         <!-- 並び替えボタン -->
         <div style="display:flex;flex-direction:column;gap:2px;margin-right:6px;flex-shrink:0;">
@@ -5920,6 +5930,12 @@ function renderCastSettings() {
         <!-- 順番バッジ -->
         <div style="font-size:11px;font-weight:700;color:#888;min-width:20px;text-align:center;flex-shrink:0;">${i+1}</div>
         <div class="cast-settings-name">${c.emoji} <input class="settings-input" style="width:120px" type="text" value="${c.name}" id="cast-name-${i}" placeholder="名前"></div>
+        ${isTrial ? `
+        <span style="background:${trialRemaining>0?'#fff3cc':'#ffe6e6'};color:${trialRemaining>0?'#7a4e00':'#c0294e'};padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;">
+          🎟 体験 ${trialCount}/3 ${trialRemaining===0?'⚠':''}
+        </span>
+        <button onclick="convertTrialCastToMember(${i})" style="padding:4px 10px;border:1px solid #1a7a3e;color:#1a7a3e;background:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;">本採用</button>
+        ` : ''}
         <button class="btn-icon" onclick="removeCastSetting(${i})">×</button>
       </div>
       <div class="cast-settings-fields">
@@ -5944,8 +5960,17 @@ function renderCastSettings() {
           <input class="settings-input" type="number" value="${c.bottleBackRate||10}" id="cast-back-${i}" min="0" max="100">
         </div>
       </div>
+      <!-- 体験キャストフラグ（新規のみ表示） -->
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0e0;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#555;">
+          <input type="checkbox" id="cast-trial-${i}" ${isTrial?'checked':''}
+            onchange="toggleCastTrial(${i}, this.checked)"
+            style="accent-color:#d4a017;width:14px;height:14px;">
+          <strong>🎟 体験入店キャスト</strong>（3回まで体験可能）
+        </label>
+      </div>
     </div>
-  `).join('');
+  `;}).join('');
 }
 
 
@@ -6127,6 +6152,8 @@ function setShift(staffId, dateKey, val) {
   } else {
     shiftData[shiftKey(staffId, dateKey)] = val;
   }
+  // 体験キャストの出勤日数を自動再計算
+  recalcAllTrialCounts();
   persistSave();
 }
 
@@ -6803,6 +6830,14 @@ function renderCustomerTab(c, tab) {
             <select class="staff-role-select" id="b-type" style="width:100%;">${typeOpts}</select>
           </div>
           <div class="settings-field" style="margin:0;">
+            <label class="settings-label">🏷 ネームタグ名</label>
+            <input class="settings-input" id="b-tag" placeholder="例: 田中様 / ○○会社">
+          </div>
+          <div class="settings-field" style="margin:0;">
+            <label class="settings-label">📍 保管場所</label>
+            <input class="settings-input" id="b-location" placeholder="例: 棚A-3 / カウンター">
+          </div>
+          <div class="settings-field" style="margin:0;">
             <label class="settings-label">本数</label>
             <input class="settings-input" type="number" id="b-qty" value="1" min="1">
           </div>
@@ -6836,12 +6871,16 @@ function renderCustomerTab(c, tab) {
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="font-size:20px;">🥃</span>
               <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:14px;">${b.name}</div>
+                <div style="font-weight:700;font-size:14px;">
+                  ${b.name}
+                  ${b.tag?`<span style="background:#fff3cc;border:1px solid #d4a017;color:#7a4e00;padding:2px 8px;border-radius:10px;margin-left:6px;font-size:10px;font-weight:600;">🏷 ${b.tag}</span>`:''}
+                </div>
                 <div style="font-size:11px;color:#888;margin-top:2px;">
                   ${b.type?`<span style="background:#eee;padding:1px 6px;border-radius:8px;margin-right:4px;font-size:10px;">${b.type}</span>`:''}
                   ${b.date} ／ ${b.qty}本
                   ${b.volume?` ／ ${b.volume}ml`: ''}
                   ${b.price?` ／ ¥${b.price.toLocaleString()}`:''}
+                  ${b.location?`<br>📍 保管場所: <strong>${b.location}</strong>`:''}
                 </div>
               </div>
               <span class="bottle-status ${statusCls}">${statusLbl}</span>
@@ -6975,13 +7014,15 @@ function addBottle(cid) {
   if(!c) { showToast('先に基本情報を保存してください'); return; }
   const name = document.getElementById('b-name')?.value.trim();
   if(!name) { showToast('銘柄を入力してください'); return; }
-  const qty   = parseInt(document.getElementById('b-qty')?.value)||1;
-  const date  = document.getElementById('b-date')?.value;
-  const type   = document.getElementById('b-type')?.value||'';
-  const price  = parseInt(document.getElementById('b-price')?.value)||0;
-  const volume = parseInt(document.getElementById('b-volume')?.value)||0;
+  const qty      = parseInt(document.getElementById('b-qty')?.value)||1;
+  const date     = document.getElementById('b-date')?.value;
+  const type     = document.getElementById('b-type')?.value||'';
+  const price    = parseInt(document.getElementById('b-price')?.value)||0;
+  const volume   = parseInt(document.getElementById('b-volume')?.value)||0;
+  const tag      = document.getElementById('b-tag')?.value.trim()||'';
+  const location = document.getElementById('b-location')?.value.trim()||'';
   if(!c.bottles) c.bottles = [];
-  c.bottles.push({ name, qty, date, type, price, volume, remaining: volume * qty, status:'open' });
+  c.bottles.push({ name, qty, date, type, price, volume, tag, location, remaining: volume * qty, status:'open' });
   persistSave();
   renderCustomerTab(c, 'bottles');
   showToast('ボトルを追加しました ✓');
@@ -7316,18 +7357,31 @@ const DRINK_CATS = ['すべて','ビール','カクテル','シャンパン','�
 let _drinkCat = {};  // tableId → activeCategory
 
 function renderDrinkCatBtns(tableId, activeCat) {
-  return DRINK_CATS.map(cat => `
+  const cats = ['⭐ よく使う', ...DRINK_CATS];
+  return cats.map(cat => `
     <button class="drink-cat-btn ${cat===activeCat?'active':''}"
       onclick="switchDrinkCat(${tableId},'${cat}')">${cat}</button>
   `).join('');
 }
 
 function renderDrinkButtons(tableId, activeCat) {
-  let filtered = activeCat === 'すべて'
-    ? [...drinks]
-    : drinks.filter(d => d.cat === activeCat);
-  // 注文回数の多い順にソート
-  filtered.sort((a, b) => (drinkOrderCount[b.name]||0) - (drinkOrderCount[a.name]||0));
+  let filtered;
+  if(activeCat === '⭐ よく使う') {
+    // 注文回数上位15件
+    filtered = [...drinks]
+      .filter(d => (drinkOrderCount[d.name]||0) > 0)
+      .sort((a, b) => (drinkOrderCount[b.name]||0) - (drinkOrderCount[a.name]||0))
+      .slice(0, 15);
+    if(!filtered.length) {
+      return '<div style="color:#aaa;font-size:12px;padding:12px;text-align:center;">まだ注文履歴がありません。<br>注文するとここに人気ドリンクが表示されます。</div>';
+    }
+  } else if(activeCat === 'すべて') {
+    filtered = [...drinks];
+    filtered.sort((a, b) => (drinkOrderCount[b.name]||0) - (drinkOrderCount[a.name]||0));
+  } else {
+    filtered = drinks.filter(d => d.cat === activeCat);
+    filtered.sort((a, b) => (drinkOrderCount[b.name]||0) - (drinkOrderCount[a.name]||0));
+  }
   if(!filtered.length) return '<div style="color:#aaa;font-size:12px;padding:8px;">このカテゴリの商品はありません</div>';
   return filtered.map(d => {
     const cnt = drinkOrderCount[d.name] || 0;
@@ -7344,6 +7398,64 @@ function switchDrinkCat(tableId, cat) {
   const grid = document.getElementById(`drink-grid-${tableId}`);
   if(tabs) tabs.innerHTML = renderDrinkCatBtns(tableId, cat);
   if(grid) grid.innerHTML = renderDrinkButtons(tableId, cat);
+}
+
+
+// ========== キャスト体験入店機能 ==========
+// 体験フラグのON/OFF切替
+function toggleCastTrial(index, checked) {
+  if(!casts[index]) return;
+  casts[index].trial = checked;
+  if(checked && !casts[index].trialCount) casts[index].trialCount = 0;
+  persistSave();
+  saveToServer(true);
+  renderCastSettings();
+  showToast(checked ? '体験入店キャストに設定しました' : '体験入店フラグを解除しました');
+}
+
+// 体験→本採用切替
+function convertTrialCastToMember(index) {
+  const c = casts[index];
+  if(!c) return;
+  showDeleteConfirm(`${c.name}を本採用キャストに切り替えますか？`, () => {
+    c.trial = false;
+    c.trialCount = 0;
+    persistSave();
+    saveToServer(true);
+    renderCastSettings();
+    showToast(`${c.name}を本採用に切り替えました ✓`);
+  });
+}
+
+// 出勤時に体験回数をインクリメント（シフトで「出勤」にした日ごと）
+function incrementCastTrialCount(castId) {
+  const c = casts.find(x => x.id === castId);
+  if(!c || !c.trial) return;
+  c.trialCount = (c.trialCount || 0) + 1;
+  if(c.trialCount >= 3) {
+    showToast(`⚠ ${c.name} は体験入店の上限(3回)に達しました`);
+  }
+}
+
+// 指定キャストの今までの出勤日数をカウント（重複日除外）
+function countCastWorkDays(castId) {
+  const prefix = 'cast_' + castId + '_';
+  const workDates = new Set();
+  Object.keys(shiftData).forEach(k => {
+    if(k.startsWith(prefix) && shiftData[k]?.status === 'on') {
+      workDates.add(k.slice(prefix.length));
+    }
+  });
+  return workDates.size;
+}
+
+// 全体験キャストの出勤日数を再計算（データの整合性取る）
+function recalcAllTrialCounts() {
+  casts.forEach(c => {
+    if(c.trial) {
+      c.trialCount = countCastWorkDays(c.id);
+    }
+  });
 }
 
 // ========== 予約管理 ==========
@@ -8156,17 +8268,24 @@ function applyServerData(data) {
   if(data.nextStaffId) nextStaffId = data.nextStaffId;
 
   if(Array.isArray(data.customers)) {
+    // IDベースマージ: ローカル新規追加の顧客を保持
+    const serverCustIds = new Set(data.customers.map(c => c.id));
+    const localOnlyCust = customers.filter(c => !serverCustIds.has(c.id));
     customers.length = 0;
     data.customers.forEach(c => customers.push(c));
+    localOnlyCust.forEach(c => customers.push(c));
   }
-  if(data.nextCustomerId) nextCustomerId = data.nextCustomerId;
+  if(data.nextCustomerId && data.nextCustomerId > nextCustomerId) nextCustomerId = data.nextCustomerId;
 
   // 予約データ（重要：必ず反映）
   if(Array.isArray(data.reservations)) {
+    const serverRvIds = new Set(data.reservations.map(r => r.id));
+    const localOnlyRv = reservations.filter(r => !serverRvIds.has(r.id));
     reservations.length = 0;
     data.reservations.forEach(r => reservations.push(r));
+    localOnlyRv.forEach(r => reservations.push(r));
   }
-  if(data.nextReserveId) nextReserveId = data.nextReserveId;
+  if(data.nextReserveId && data.nextReserveId > nextReserveId) nextReserveId = data.nextReserveId;
 
   // 売上ログ
   if(Array.isArray(data.salesLog)) {
