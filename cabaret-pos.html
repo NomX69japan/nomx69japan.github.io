@@ -930,48 +930,44 @@
   .week-nav-btn:hover { border-color: var(--gold); color: var(--gold); }
 
   .shift-table-wrap {
-    overflow-x: auto;
-    overflow-y: auto;
+    overflow: auto;
     -webkit-overflow-scrolling: touch;
     position: relative;
     max-height: calc(100vh - 180px);
-    will-change: transform;
-    transform: translateZ(0);
-  }
-  /* Android Chrome対応：親要素にも overflow 設定 */
-  .page#page-shift {
-    overflow: visible;
+    width: 100%;
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    contain: layout;
   }
   .shift-table {
-    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     min-width: 700px;
+    width: max-content;
   }
+  /* sticky（Android対応で transform 必須） */
   .shift-table thead th {
     position: -webkit-sticky;
     position: sticky;
     top: 0;
-    z-index: 3;
-    background: #faf8f3 !important;
+    z-index: 10;
+    background: #faf8f3;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
   .shift-table th.staff-col,
   .shift-table td.staff-col {
     position: -webkit-sticky;
     position: sticky;
     left: 0;
-    background: #faf8f3 !important;
+    background: #faf8f3;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
     box-shadow: 2px 0 4px -2px rgba(0,0,0,0.1);
   }
-  .shift-table th.staff-col {
-    z-index: 4;
-  }
-  .shift-table thead th.staff-col {
-    z-index: 5 !important;
-  }
-  .shift-table td.staff-col {
-    z-index: 2;
-  }
+  .shift-table th.staff-col { z-index: 11; }
+  .shift-table thead th.staff-col { z-index: 20; }
+  .shift-table td.staff-col { z-index: 5; }
   .shift-table th {
     padding: 10px 6px;
     font-size: 11px;
@@ -8467,8 +8463,17 @@ async function testServerConnection() {
 async function loadFromServer() {
   if(!serverConfigured()) return false;
   try {
-    const r = await fetch(_serverUrl + '/data', {
-      headers: { 'X-Auth-Token': _serverToken }
+    const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
+      method: 'GET',
+      headers: {
+        'X-Auth-Token': _serverToken,
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      },
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
     });
     if(!r.ok) return false;
     const { data } = await r.json();
@@ -8490,9 +8495,17 @@ function saveToServer(immediate = false) {
   _saveTimer = setTimeout(async () => {
     try {
       const data = buildSaveData();
-      const r = await fetch(_serverUrl + '/data', {
+      const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': _serverToken },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': _serverToken,
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store',
+        mode: 'cors',
+        credentials: 'omit',
         body: JSON.stringify(data),
       });
       if(r.ok) {
@@ -8523,9 +8536,43 @@ function startPolling() {
   if(!serverConfigured()) return;
   _syncEnabled = true;
   updateSyncIndicator();
-  // 即座に一回同期
-  setTimeout(() => doPoll(), 500);
+  // 即座に一回同期＋以降定期実行
+  setTimeout(() => {
+    doPoll();
+  }, 500);
 }
+
+
+// Android対応：画面復帰時に強制同期
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && _syncEnabled && serverConfigured()) {
+    console.log('[同期] 画面復帰 → 強制ポーリング');
+    clearTimeout(_pollingTimer);
+    setTimeout(() => doPoll(), 200);
+  }
+});
+
+// Android対応：ネットワーク復帰時に強制同期
+window.addEventListener('online', () => {
+  if(_syncEnabled && serverConfigured()) {
+    console.log('[同期] オンライン復帰 → 強制ポーリング');
+    clearTimeout(_pollingTimer);
+    setTimeout(() => doPoll(), 200);
+  }
+});
+
+// 5秒ごとに「ポーリングが止まっていないか」監視（保険）
+setInterval(() => {
+  if(_syncEnabled && serverConfigured()) {
+    const elapsed = Date.now() - _lastSyncTime;
+    // 60秒以上同期していなければ強制実行（タイマーが死んでる可能性）
+    if(elapsed > 60000) {
+      console.log('[同期] 60秒以上経過 → 強制ポーリング');
+      clearTimeout(_pollingTimer);
+      doPoll();
+    }
+  }
+}, 5000);
 
 function stopPolling() {
   if(_pollingTimer) { clearTimeout(_pollingTimer); _pollingTimer = null; }
@@ -8534,25 +8581,43 @@ function stopPolling() {
 }
 
 function scheduleNextPoll() {
-  if(!serverConfigured()) return;
+  if(!serverConfigured() || !_syncEnabled) return;
+  clearTimeout(_pollingTimer);
   // ユーザー操作直後は少し待つ（自分の保存と競合しないよう）
-  const interval = _pollingInterval * 1000;
-  _pollingTimer = setTimeout(doPoll, interval);
+  const interval = (_pollingInterval || 15) * 1000;
+  _pollingTimer = setTimeout(() => {
+    doPoll();
+  }, interval);
 }
 
 async function doPoll() {
   if(!serverConfigured()) return;
   try {
-    const r = await fetch(_serverUrl + '/data', {
-      headers: { 'X-Auth-Token': _serverToken },
+    const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
+      method: 'GET',
+      headers: {
+        'X-Auth-Token': _serverToken,
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      },
       cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
     });
     if(!r.ok) throw new Error(r.status);
     const { data } = await r.json();
     if(!data) { scheduleNextPoll(); return; }
 
     // ハッシュで変化チェック（変わってなければ画面更新しない）
-    const hash = JSON.stringify(data).length + '_' + (data.nextCastId||0) + '_' + (data.reservations||[]).length + '_' + (data.salesLog||[]).length;
+    // shiftData/customers の変更も検出するため全データをハッシュ化
+    const hash = JSON.stringify(data).length
+      + '_' + (data.nextCastId||0)
+      + '_' + (data.reservations||[]).length
+      + '_' + (data.salesLog||[]).length
+      + '_' + Object.keys(data.shiftData||{}).length
+      + '_' + (data.customers||[]).length
+      + '_' + (data.casts||[]).length;
     if(hash !== _lastServerHash) {
       _lastServerHash = hash;
       // 自分が最近保存した直後は無視（上書き防止）
