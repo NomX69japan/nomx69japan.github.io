@@ -586,6 +586,39 @@
   }
   .reveal-mask.visible::after { transform: scaleY(0); }
 
+  /* ── CURSOR SPOTLIGHT (デスクトップのみ) ── */
+  @media (hover: hover) and (pointer: fine) {
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,169,110,0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 1;
+      transform: translate(-50%, -50%);
+      transition: opacity 0.3s;
+      opacity: 0;
+      mix-blend-mode: multiply;
+    }
+    body.cursor-active::after {
+      opacity: 1;
+    }
+  }
+
+  /* ── SCROLL PROGRESS BAR ── */
+  .scroll-progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), #e6cfa0);
+    z-index: 1000;
+    width: 0%;
+    transition: width 0.1s ease-out;
+  }
+
   /* ── KEYFRAMES ── */
   @keyframes fadeUp {
     to { opacity: 1; transform: translateY(0); }
@@ -868,9 +901,49 @@
 
   .fee-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.5rem;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.2rem;
     margin-bottom: 2.5rem;
+  }
+
+  .fee-price-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent);
+    margin-left: 0.3rem;
+    letter-spacing: 0.1em;
+    vertical-align: super;
+  }
+
+  .fee-savings {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--accent-dark);
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed rgba(200,169,110,0.3);
+  }
+
+  .fee-recommend {
+    position: absolute;
+    top: -10px;
+    right: 12px;
+    background: var(--accent);
+    color: var(--ink);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    padding: 0.35rem 0.7rem;
+    border-radius: 2px;
+    z-index: 2;
+    animation: pulseBadge 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulseBadge {
+    0%, 100% { transform: translateY(0); box-shadow: 0 0 0 0 rgba(200,169,110,0.4); }
+    50% { transform: translateY(-2px); box-shadow: 0 4px 16px 0 rgba(200,169,110,0.25); }
   }
 
   .fee-card {
@@ -1012,6 +1085,10 @@
   .nav-drawer a:hover { color: var(--accent); }
 
   /* ── RESPONSIVE ── */
+  @media (max-width: 1100px) {
+    .fee-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
   @media (max-width: 900px) {
     nav { padding: 1.2rem 1.5rem; }
     nav ul { display: none; }
@@ -1052,6 +1129,8 @@
 </style>
 </head>
 <body>
+
+<div class="scroll-progress" id="scrollProgress"></div>
 
 <nav>
   <div class="nav-logo">Nom<span class="logo-x">X</span></div>
@@ -1224,28 +1303,37 @@
       <div class="fee-tag">体験</div>
       <div class="fee-name">体験レッスン</div>
       <div class="fee-duration">約90分</div>
-      <div class="fee-price">¥5,000</div>
+      <div class="fee-price">¥6,000</div>
       <div class="fee-arrow">→</div>
     </a>
     <a class="fee-card" href="#" target="_blank" rel="noopener">
       <div class="fee-tag">通常</div>
       <div class="fee-name">通常レッスン</div>
       <div class="fee-duration">90分</div>
-      <div class="fee-price">¥10,000</div>
+      <div class="fee-price">¥12,000</div>
       <div class="fee-arrow">→</div>
     </a>
     <a class="fee-card" href="#" target="_blank" rel="noopener">
       <div class="fee-tag">オンライン</div>
       <div class="fee-name">オンラインレッスン</div>
       <div class="fee-duration">40分</div>
-      <div class="fee-price">¥6,000</div>
+      <div class="fee-price">¥8,000</div>
+      <div class="fee-arrow">→</div>
+    </a>
+    <a class="fee-card" href="#" target="_blank" rel="noopener">
+      <div class="fee-tag">出張</div>
+      <div class="fee-name">出張レッスン</div>
+      <div class="fee-duration">90分 + 交通費</div>
+      <div class="fee-price">¥12,000<span class="fee-price-sub">+α</span></div>
       <div class="fee-arrow">→</div>
     </a>
     <a class="fee-card fee-card--accent" href="#" target="_blank" rel="noopener">
+      <div class="fee-recommend">RECOMMENDED</div>
       <div class="fee-tag">お得</div>
       <div class="fee-name">チケット</div>
-      <div class="fee-duration">12回</div>
-      <div class="fee-price">¥100,000</div>
+      <div class="fee-duration">20回</div>
+      <div class="fee-price">¥180,000</div>
+      <div class="fee-savings">1回あたり ¥9,000</div>
       <div class="fee-arrow">→</div>
     </a>
   </div>
@@ -1411,6 +1499,30 @@
         navEl.style.borderBottom = '';
       }
     }, { passive: true });
+  }
+
+  // Scroll progress bar
+  const progress = document.getElementById('scrollProgress');
+  if (progress) {
+    window.addEventListener('scroll', () => {
+      const h = document.documentElement;
+      const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+      progress.style.width = scrolled + '%';
+    }, { passive: true });
+  }
+
+  // Cursor spotlight (desktop only)
+  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    document.body.classList.add('cursor-active');
+    document.addEventListener('mousemove', (e) => {
+      document.body.style.setProperty('--mx', e.clientX + 'px');
+      document.body.style.setProperty('--my', e.clientY + 'px');
+      document.body.style.cssText += `;`;
+    });
+    // Update via CSS variables in style tag
+    const style = document.createElement('style');
+    style.textContent = `body.cursor-active::after { left: var(--mx, 50%); top: var(--my, 50%); }`;
+    document.head.appendChild(style);
   }
 </script>
 </body>
