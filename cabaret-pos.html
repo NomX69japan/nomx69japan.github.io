@@ -8422,6 +8422,7 @@ let _serverToken = localStorage.getItem('pos_server_token') || '';
 let _syncEnabled = false;
 let _saveTimer = null;
 let _lastSyncTime = 0;
+let _lastSyncError = null;
 
 function serverConfigured() {
   return !!(_serverUrl && _serverToken);
@@ -8447,15 +8448,30 @@ async function testServerConnection() {
   if(!url || !token) { if(statusEl) statusEl.textContent = '❌ URLとトークンを入力してください'; return; }
   if(statusEl) statusEl.textContent = '接続中…';
   try {
-    const r = await fetch(url + '/data', { headers: { 'X-Auth-Token': token } });
+    const r = await fetch(url + '/data?_=' + Date.now(), {
+      method: 'GET',
+      headers: {
+        'X-Auth-Token': token,
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store',
+      },
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
+    });
     if(r.ok) {
-      if(statusEl) statusEl.textContent = '✅ 接続成功';
+      const json = await r.json();
+      const hasData = json.data && Object.keys(json.data).length > 0;
+      if(statusEl) statusEl.textContent = `✅ 接続成功（データ: ${hasData?'あり':'空'}）`;
       showToast('サーバー接続成功！');
     } else {
-      if(statusEl) statusEl.textContent = `❌ エラー: ${r.status}`;
+      const errText = await r.text().catch(()=>'');
+      if(statusEl) statusEl.textContent = `❌ エラー: ${r.status} ${errText.slice(0,50)}`;
+      console.error('接続エラー:', r.status, errText);
     }
   } catch(e) {
     if(statusEl) statusEl.textContent = `❌ 接続失敗: ${e.message}`;
+    console.error('接続例外:', e);
   }
 }
 
@@ -8510,11 +8526,16 @@ function saveToServer(immediate = false) {
       });
       if(r.ok) {
         _lastSyncTime = Date.now();
+        _lastSyncError = null;
         // ローカルの最終更新時刻を記録（次回 doPoll でサーバーとの新旧比較に使用）
         localStorage.setItem('pos_local_updated_at', String(data._updatedAt));
         // ハッシュをリセット（次回ポーリングで自分のデータを反映するため）
         _lastServerHash = '';
         showSyncBadge('送信');
+        updateSyncIndicator();
+      } else {
+        _lastSyncError = `HTTP ${r.status}`;
+        updateSyncIndicator();
       }
     } catch(e) {
       console.warn('サーバー保存エラー:', e);
@@ -8630,10 +8651,12 @@ async function doPoll() {
     _lastServerHash = hash;
 
     // サーバー側が新しい → 受信して反映
+    _lastSyncError = null;
     if(serverUpdatedAt >= localUpdatedAt) {
       applyServerData(data);
       showSyncBadge('受信');
       _lastSyncTime = Date.now();
+      updateSyncIndicator();
     } else {
       // ローカルの方が新しい → 送り返し（マージは applyServerData がIDベースでやる）
       applyServerData(data);
@@ -8643,7 +8666,9 @@ async function doPoll() {
     }
   } catch(e) {
     console.warn('ポーリングエラー:', e);
+    _lastSyncError = e.message || 'ネットワークエラー';
     showSyncBadge('エラー', true);
+    updateSyncIndicator();
   }
   scheduleNextPoll();
 }
@@ -8761,9 +8786,14 @@ function updateSyncIndicator() {
   const el2 = document.getElementById('sync-indicator-settings');
   let text, color;
   if(!serverConfigured()) {
-    text = '⚫ オフライン'; color = '#aaa';
+    text = '⚫ オフライン（サーバー未設定）'; color = '#aaa';
+  } else if(_lastSyncError) {
+    text = `❌ エラー: ${_lastSyncError}`; color = '#c0294e';
+  } else if(_syncEnabled && _lastSyncTime > 0) {
+    const sec = Math.floor((Date.now() - _lastSyncTime) / 1000);
+    text = `🟢 ${_pollingInterval}秒ごと自動同期（${sec}秒前に同期）`; color = '#1a7a3e';
   } else if(_syncEnabled) {
-    text = `🟢 ${_pollingInterval}秒ごと自動同期`; color = '#1a7a3e';
+    text = `🟢 ${_pollingInterval}秒ごと自動同期（接続中…）`; color = '#1a7a3e';
   } else {
     text = '🔴 未接続'; color = '#c0294e';
   }
@@ -8771,6 +8801,17 @@ function updateSyncIndicator() {
   if(el2) { el2.textContent = text; el2.style.color = color; }
   const qs = document.getElementById('quick-sync-status');
   if(qs) { qs.textContent = text; qs.style.color = color; }
+
+  // 最終同期時刻も表示
+  const lastEl = document.getElementById('sync-last-time');
+  if(lastEl) {
+    if(_lastSyncTime > 0) {
+      const d = new Date(_lastSyncTime);
+      lastEl.textContent = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+    } else {
+      lastEl.textContent = '-';
+    }
+  }
 }
 
 async function initServerSync() {
