@@ -6072,7 +6072,7 @@ function renderSettings() {
   loadGithubConfig();
 
   // ポーリング間隔の読み込み
-  const savedInterval = parseInt(localStorage.getItem('pos_polling_interval')) || 30;
+  const savedInterval = parseInt(localStorage.getItem('pos_polling_interval')) || 15;
   _pollingInterval = savedInterval;
   const piEl = document.getElementById('polling-interval');
   const piLbl = document.getElementById('polling-interval-label');
@@ -6084,12 +6084,8 @@ function renderSettings() {
   const srvTokenEl = document.getElementById('srv-token');
   if(srvUrlEl)   srvUrlEl.value   = _serverUrl;
   if(srvTokenEl) srvTokenEl.value = _serverToken;
+  // 同期インジケーター更新（updateSyncIndicator 内で sync-indicator-settings も更新される）
   updateSyncIndicator();
-  // 設定ページ用インジケーター
-  const si2 = document.getElementById('sync-indicator-settings');
-  if(si2) si2.textContent = document.getElementById('sync-indicator')?.textContent || '確認中';
-  const lst = document.getElementById('last-sync-time');
-  if(lst) lst.textContent = _lastSyncTime ? new Date(_lastSyncTime).toLocaleTimeString('ja-JP') : '−';
   // PIN読み込み
   const savedPins = getPins();
   ['admin','cashier','boy','kitchen'].forEach(r=>{ const el=document.getElementById('pin-'+r); if(el) el.placeholder=savedPins[r]?'設定済':'未設定'; });
@@ -8429,7 +8425,7 @@ function serverConfigured() {
 }
 
 // ── 設定を保存 ──
-function saveServerConfig() {
+async function saveServerConfig() {
   const url   = document.getElementById('srv-url')?.value.trim().replace(/\/$/, '');
   const token = document.getElementById('srv-token')?.value.trim();
   if(!url || !token) { showToast('URLとトークンを入力してください'); return; }
@@ -8437,8 +8433,35 @@ function saveServerConfig() {
   _serverToken = token;
   localStorage.setItem('pos_server_url',   url);
   localStorage.setItem('pos_server_token', token);
-  showToast('サーバー設定を保存しました');
-  initServerSync();
+
+  showToast('サーバーに接続中…');
+
+  // ① サーバーから最新データを取得
+  _lastSyncTime = 0;
+  _lastServerHash = '';
+  _lastSyncError = null;
+  const ok = await loadFromServer();
+  if(ok) {
+    // テーブル等を再描画
+    try {
+      tables = TABLE_DEFS.map(def => {
+        const existing = tables.find(t => t.id === def.id);
+        return existing || makeEmptyTable(def);
+      });
+      syncCastsToStaff();
+      renderTables();
+    } catch(e) { console.warn(e); }
+
+    // ② ポーリング開始
+    startPolling();
+    _lastSyncTime = Date.now();
+    updateSyncIndicator();
+    showToast('✅ 接続＆同期成功');
+  } else {
+    _lastSyncError = '接続失敗';
+    updateSyncIndicator();
+    showToast('❌ 接続失敗。URL/トークンを確認してください');
+  }
 }
 
 async function testServerConnection() {
