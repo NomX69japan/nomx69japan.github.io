@@ -8510,7 +8510,9 @@ function saveToServer(immediate = false) {
       });
       if(r.ok) {
         _lastSyncTime = Date.now();
-        // 自分の保存後はハッシュをリセット（次回ポーリングで無視しないよう）
+        // ローカルの最終更新時刻を記録（次回 doPoll でサーバーとの新旧比較に使用）
+        localStorage.setItem('pos_local_updated_at', String(data._updatedAt));
+        // ハッシュをリセット（次回ポーリングで自分のデータを反映するため）
         _lastServerHash = '';
         showSyncBadge('送信');
       }
@@ -8523,7 +8525,7 @@ function saveToServer(immediate = false) {
 
 // ── ポーリングによる自動同期 ──
 let _pollingTimer  = null;
-let _pollingInterval = 30; // 秒（設定可能）
+let _pollingInterval = 15; // 秒（設定可能）
 let _lastServerHash  = ''; // 前回取得データのハッシュ（変化検知）
 let _userActive = true;     // ユーザー操作中フラグ
 
@@ -8591,7 +8593,7 @@ function scheduleNextPoll() {
 }
 
 async function doPoll() {
-  if(!serverConfigured()) return;
+  if(!serverConfigured()) { scheduleNextPoll(); return; }
   try {
     const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
       method: 'GET',
@@ -8609,35 +8611,39 @@ async function doPoll() {
     const { data } = await r.json();
     if(!data) { scheduleNextPoll(); return; }
 
-    // ハッシュで変化チェック（変わってなければ画面更新しない）
-    // shiftData/customers の変更も検出するため全データをハッシュ化
+    // タイムスタンプで判定（_updatedAt があればそれを使う）
+    const serverUpdatedAt = data._updatedAt || 0;
+    const localUpdatedAt = parseInt(localStorage.getItem('pos_local_updated_at')||'0');
+
+    // 受信した内容が前回と同じならスキップ（軽い判定）
     const hash = JSON.stringify(data).length
-      + '_' + (data.nextCastId||0)
-      + '_' + (data.reservations||[]).length
-      + '_' + (data.salesLog||[]).length
+      + '_' + (data._updatedAt||0)
       + '_' + Object.keys(data.shiftData||{}).length
-      + '_' + (data.customers||[]).length
-      + '_' + (data.casts||[]).length;
-    if(hash !== _lastServerHash) {
-      _lastServerHash = hash;
-      // 自分が最近保存した直後は無視（上書き防止）
-      if(Date.now() - _lastSyncTime > 10000) {
-        // ローカルが新しい可能性があれば、双方向マージで適用
-        // （applyServerData がIDベースでマージするので自分の追加は保持される）
-        applyServerData(data);
-        showSyncBadge('受信');
-        _lastSyncTime = Date.now();
-        // ローカルが新しかった場合はサーバーに送り返す
-        const serverCastCount = (data.casts||[]).length;
-        const serverNextCastId = data.nextCastId || 0;
-        if(serverCastCount < casts.length || serverNextCastId < nextCastId) {
-          console.log('ローカルにマージ優先分があるのでサーバーに送信');
-          saveToServer(true);
-        }
-      }
+      + '_' + (data.reservations||[]).length
+      + '_' + (data.casts||[]).length
+      + '_' + (data.customers||[]).length;
+    if(hash === _lastServerHash) {
+      _lastSyncTime = Date.now();
+      scheduleNextPoll();
+      return;
+    }
+    _lastServerHash = hash;
+
+    // サーバー側が新しい → 受信して反映
+    if(serverUpdatedAt >= localUpdatedAt) {
+      applyServerData(data);
+      showSyncBadge('受信');
+      _lastSyncTime = Date.now();
+    } else {
+      // ローカルの方が新しい → 送り返し（マージは applyServerData がIDベースでやる）
+      applyServerData(data);
+      showSyncBadge('受信');
+      console.log('ローカルが新しいので送り返し');
+      saveToServer(true);
     }
   } catch(e) {
     console.warn('ポーリングエラー:', e);
+    showSyncBadge('エラー', true);
   }
   scheduleNextPoll();
 }
@@ -8723,6 +8729,7 @@ function applyServerData(data) {
 
 function buildSaveData() {
   return {
+    _updatedAt: Date.now(),
     config,
     drinks,
     casts: casts.map(c => ({...c, sales:0, time:0})),
