@@ -8471,16 +8471,8 @@ async function testServerConnection() {
   if(!url || !token) { if(statusEl) statusEl.textContent = '❌ URLとトークンを入力してください'; return; }
   if(statusEl) statusEl.textContent = '接続中…';
   try {
-    const r = await fetch(url + '/data?_=' + Date.now(), {
-      method: 'GET',
-      headers: {
-        'X-Auth-Token': token,
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store',
-      },
-      cache: 'no-store',
-      mode: 'cors',
-      credentials: 'omit',
+    const r = await fetch(url + '/data', {
+      headers: { 'X-Auth-Token': token },
     });
     if(r.ok) {
       const json = await r.json();
@@ -8503,16 +8495,8 @@ async function loadFromServer() {
   if(!serverConfigured()) return false;
   try {
     const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
-      method: 'GET',
-      headers: {
-        'X-Auth-Token': _serverToken,
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      },
+      headers: { 'X-Auth-Token': _serverToken },
       cache: 'no-store',
-      mode: 'cors',
-      credentials: 'omit',
     });
     if(!r.ok) return false;
     const { data } = await r.json();
@@ -8534,17 +8518,9 @@ function saveToServer(immediate = false) {
   _saveTimer = setTimeout(async () => {
     try {
       const data = buildSaveData();
-      const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
+      const r = await fetch(_serverUrl + '/data', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': _serverToken,
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        },
-        cache: 'no-store',
-        mode: 'cors',
-        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': _serverToken },
         body: JSON.stringify(data),
       });
       if(r.ok) {
@@ -8640,15 +8616,8 @@ async function doPoll() {
   if(!serverConfigured()) { scheduleNextPoll(); return; }
   try {
     const r = await fetch(_serverUrl + '/data?_=' + Date.now(), {
-      method: 'GET',
-      headers: {
-        'X-Auth-Token': _serverToken,
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store',
-      },
+      headers: { 'X-Auth-Token': _serverToken },
       cache: 'no-store',
-      mode: 'cors',
-      credentials: 'omit',
     });
     if(!r.ok) throw new Error(r.status);
     const { data } = await r.json();
