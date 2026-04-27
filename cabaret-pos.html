@@ -8644,8 +8644,7 @@ async function doPoll() {
       headers: {
         'X-Auth-Token': _serverToken,
         'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
+        'Cache-Control': 'no-cache, no-store',
       },
       cache: 'no-store',
       mode: 'cors',
@@ -8653,40 +8652,32 @@ async function doPoll() {
     });
     if(!r.ok) throw new Error(r.status);
     const { data } = await r.json();
-    if(!data) { scheduleNextPoll(); return; }
+    if(!data) {
+      _lastSyncTime = Date.now();
+      _lastSyncError = null;
+      updateSyncIndicator();
+      scheduleNextPoll();
+      return;
+    }
 
-    // タイムスタンプで判定（_updatedAt があればそれを使う）
-    const serverUpdatedAt = data._updatedAt || 0;
-    const localUpdatedAt = parseInt(localStorage.getItem('pos_local_updated_at')||'0');
-
-    // 受信した内容が前回と同じならスキップ（軽い判定）
+    // 変化検知：データの内容＋件数で判定
     const hash = JSON.stringify(data).length
       + '_' + (data._updatedAt||0)
       + '_' + Object.keys(data.shiftData||{}).length
       + '_' + (data.reservations||[]).length
       + '_' + (data.casts||[]).length
       + '_' + (data.customers||[]).length;
-    if(hash === _lastServerHash) {
-      _lastSyncTime = Date.now();
-      scheduleNextPoll();
-      return;
-    }
-    _lastServerHash = hash;
 
-    // サーバー側が新しい → 受信して反映
     _lastSyncError = null;
-    if(serverUpdatedAt >= localUpdatedAt) {
+    _lastSyncTime  = Date.now();
+
+    if(hash !== _lastServerHash) {
+      _lastServerHash = hash;
+      // 変化あり → IDベースマージで反映（自分の新規追加は保持される）
       applyServerData(data);
       showSyncBadge('受信');
-      _lastSyncTime = Date.now();
-      updateSyncIndicator();
-    } else {
-      // ローカルの方が新しい → 送り返し（マージは applyServerData がIDベースでやる）
-      applyServerData(data);
-      showSyncBadge('受信');
-      console.log('ローカルが新しいので送り返し');
-      saveToServer(true);
     }
+    updateSyncIndicator();
   } catch(e) {
     console.warn('ポーリングエラー:', e);
     _lastSyncError = e.message || 'ネットワークエラー';
