@@ -1,0 +1,3367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>club 道〜TAO〜 管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ====== Theme variables (Light + Logo accent) ====== */
+  :root {
+    --bg: #f5f1ea;            /* メイン背景：オフホワイトベージュ */
+    --bg-alt: #2a2520;        /* サイドバー：ロゴの濃い茶〜黒 */
+    --bg-alt-text: #f5f1ea;   /* サイドバー上の文字色 */
+    --surface: #ffffff;       /* カード背景 */
+    --surface-alt: #faf6ef;   /* セクション背景 */
+    --border: #d6cfc1;        /* 標準ボーダー */
+    --border-strong: #b8ad99;
+    --text: #2a2520;          /* 本文 */
+    --text-sub: #6b5f50;      /* 補助テキスト */
+    --text-muted: #9a8e7c;    /* かなり薄い文字 */
+    --accent: #2a2520;        /* ロゴと同じ濃いブラウンブラック（見出し用） */
+    --accent-bg: #2a2520;     /* ボタン用：ロゴ色 */
+    --accent-text: #f5f1ea;   /* ロゴ色上の文字（オフホワイト） */
+    --accent-line: #b8860b;   /* 装飾用ゴールド（控えめ） */
+    --danger: #c0392b;
+    --warn-bg: #fff4d6;
+    --warn-border: #e0a800;
+    --critical-bg: #ffe5e0;
+    --critical-border: #c0392b;
+    --occupied-bg: #fdf5e2;
+    --on-bg: #d4ebd4;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: "Noto Serif JP", "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", serif;
+    background: var(--bg); color: var(--text);
+    -webkit-text-size-adjust: 100%;
+  }
+  body { overflow-x: hidden; }
+  /* 数字や英字はサンセリフ系のほうが視認しやすい */
+  input, select, textarea, button, .timer, .cust-card .meta, table.shift {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+
+  /* ====== Login ====== */
+  #login {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(135deg, #2a2520, #3a342d);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+  }
+  #login .logo-circle {
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    border: 3px solid #f5f1ea;
+    background: #2a2520;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  #login .logo-circle::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(245,241,234,0.6);
+    pointer-events: none;
+  }
+  #login .logo-circle .logo-club {
+    font-size: 14px; color: #f5f1ea; letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+  #login .logo-circle .logo-kanji {
+    font-size: 60px; color: #f5f1ea;
+    line-height: 1;
+    font-weight: 400;
+  }
+  #login .logo-circle .logo-tao {
+    font-size: 13px; color: #f5f1ea; letter-spacing: 4px;
+    margin-top: 6px;
+  }
+  #login .pin-box {
+    background: #f5f1ea; padding: 24px; border-radius: 12px;
+    border: 1px solid var(--border); min-width: 280px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  #login .pin-box label {
+    display: block; font-size: 11px; color: var(--text-sub);
+    margin-bottom: 8px; letter-spacing: 2px; text-align: center;
+  }
+  #login input {
+    width: 100%; padding: 14px; font-size: 20px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; text-align: center; letter-spacing: 8px;
+    box-sizing: border-box;
+    -webkit-appearance: none; appearance: none;
+  }
+  #login button {
+    width: 100%; margin-top: 12px; padding: 14px;
+    background: #2a2520; color: #f5f1ea; border: none;
+    border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; letter-spacing: 4px;
+    font-family: inherit;
+  }
+  #login .err { color: var(--danger); font-size: 12px; margin-top: 8px; text-align: center; min-height: 16px; }
+
+  /* ====== Layout ====== */
+  #app { display: none; min-height: 100vh; }
+  #app.active { display: flex; }
+  .sidebar {
+    width: 180px; background: var(--bg-alt); border-right: 1px solid var(--bg-alt);
+    padding: 16px 0; flex-shrink: 0;
+    min-height: 100vh;
+    color: var(--bg-alt-text);
+  }
+  .sidebar .brand {
+    text-align: center; padding: 0 16px 16px;
+    border-bottom: 1px solid rgba(245,241,234,0.15); margin-bottom: 16px;
+  }
+  .sidebar .brand h2 {
+    margin: 0; color: var(--bg-alt-text); font-size: 18px; letter-spacing: 4px;
+    font-weight: 500;
+  }
+  .sidebar .brand .kanji {
+    font-size: 32px;
+    margin: 6px 0 4px;
+    color: var(--bg-alt-text);
+    font-weight: 400;
+    letter-spacing: 2px;
+  }
+  .sidebar .brand p {
+    margin: 4px 0 0; font-size: 10px; color: rgba(245,241,234,0.6);
+    letter-spacing: 3px;
+  }
+  .sidebar nav button {
+    width: 100%; padding: 14px 16px; background: transparent;
+    color: rgba(245,241,234,0.75); border: none; text-align: left; cursor: pointer;
+    font-size: 14px; border-left: 3px solid transparent;
+    font-family: inherit;
+  }
+  .sidebar nav button:hover { background: rgba(245,241,234,0.06); color: var(--bg-alt-text); }
+  .sidebar nav button.active {
+    background: rgba(245,241,234,0.1); color: var(--bg-alt-text);
+    border-left-color: var(--accent-line);
+    font-weight: 600;
+  }
+  .sidebar .sync-status {
+    padding: 12px 16px; font-size: 11px; color: rgba(245,241,234,0.6);
+    border-top: 1px solid rgba(245,241,234,0.15); margin-top: 16px;
+  }
+  .sidebar .sync-status .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(245,241,234,0.4); margin-right: 6px; vertical-align: middle;
+  }
+  .sidebar .sync-status .dot.ok { background: #6fbf6f; }
+  .sidebar .sync-status .dot.err { background: #e57373; }
+
+  main { flex: 1; padding: 20px; overflow-x: auto; min-width: 0; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  h2.page-title {
+    margin: 0 0 16px; font-size: 22px; color: var(--accent);
+    border-bottom: 2px solid var(--accent-line); padding-bottom: 8px;
+    letter-spacing: 2px;
+    font-weight: 500;
+  }
+
+  button.btn {
+    background: var(--accent-bg); color: var(--accent-text); border: none;
+    padding: 8px 14px; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 600;
+    font-family: inherit;
+    letter-spacing: 1px;
+  }
+  button.btn:hover { background: #3a342d; }
+  button.btn-sub {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+    padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    font-family: inherit;
+  }
+  button.btn-sub:hover { background: var(--surface-alt); }
+  button.btn-danger {
+    background: var(--danger); color: #fff; border: none;
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    font-family: inherit;
+  }
+  button.btn-sm { padding: 5px 9px; font-size: 12px; }
+  button.btn-success {
+    background: #5a7c5a; color: #fff; border: none;
+    padding: 8px 14px; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 600;
+    font-family: inherit;
+    letter-spacing: 1px;
+  }
+  button.btn-success:hover { background: #6a8c6a; }
+
+  input, select, textarea {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  label.field {
+    display: block; margin-bottom: 12px; font-size: 13px; color: var(--text-sub);
+  }
+  label.field span.lab { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 11px; }
+  label.field input, label.field select, label.field textarea { width: 100%; }
+
+  /* ====== Floor ====== */
+  .floor-toolbar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  /* PC/タブレット：通常卓と個室を横並び、左右の高さを揃える */
+  .floor-layout {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .floor-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .floor-section h3 {
+    margin: 0 0 10px; font-size: 14px; color: var(--accent);
+    letter-spacing: 1px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  /* 通常卓：3列×4行、各セルが残り高さを均等分割 */
+  .table-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: minmax(130px, 1fr);
+    flex: 1;
+    min-height: 0;
+  }
+  /* 個室：1列×2行、通常卓2行分の高さに自然に揃う */
+  .table-grid.private {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(130px, 1fr) minmax(130px, 1fr);
+    flex: 1;
+    min-height: 0;
+  }
+
+  .table-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; min-height: 130px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 4px;
+    position: relative; transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .table-card:hover { border-color: var(--accent); }
+  .table-card.occupied {
+    background: var(--occupied-bg);
+    border-color: var(--accent);
+  }
+  .table-card.warn {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+  }
+  .table-card.critical {
+    background: var(--critical-bg);
+    border-color: var(--critical-border);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(192,57,43,0); }
+  }
+  .table-card .name {
+    font-size: 14px; font-weight: bold; color: var(--accent);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .table-card .badge-empty {
+    font-size: 10px; color: var(--text-muted); background: var(--bg);
+    padding: 2px 6px; border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .table-card .badge-on {
+    font-size: 10px; color: #fff; background: var(--danger);
+    padding: 2px 6px; border-radius: 10px;
+  }
+  .table-card .info {
+    font-size: 12px; color: var(--text-sub); line-height: 1.5;
+  }
+  .table-card .info b { color: var(--text); }
+  .table-card .timer {
+    font-size: 16px; font-weight: bold; color: var(--text);
+    margin-top: auto;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+  }
+  .table-card .timer.warn { color: #b8860b; }
+  .table-card .timer.critical { color: var(--danger); }
+  .table-card .timer.expired { color: var(--danger); }
+  .table-card .set-badge {
+    display: inline-block;
+    background: var(--accent-bg); color: var(--accent-text);
+    padding: 1px 5px; border-radius: 8px; font-size: 10px;
+    margin-left: 6px; font-weight: bold;
+  }
+  .table-card .memo-pre {
+    font-size: 11px; color: var(--text-sub); white-space: pre-wrap;
+    border-top: 1px dashed var(--border); padding-top: 4px; margin-top: 4px;
+    max-height: 38px; overflow: hidden;
+  }
+  .table-card .quick-row {
+    display: flex; gap: 6px; margin-top: 4px;
+    flex-wrap: wrap;
+  }
+  .table-card .quick-row button {
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+  .checkin-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: auto;
+  }
+  .checkin-btn:active { opacity: 0.8; }
+
+  /* ====== Modal ====== */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+  }
+  .modal-bg.active { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: 12px; border: 1px solid var(--border);
+    padding: 20px; max-width: 500px; width: 100%;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  }
+  .modal h3 { margin: 0 0 16px; color: var(--accent); font-size: 16px; }
+  .modal .row-buttons {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .modal .extend-grid {
+    display: grid; gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    margin: 16px 0;
+  }
+  .modal .extend-grid button {
+    padding: 16px;
+    font-size: 14px;
+  }
+
+  /* ====== Shift table ====== */
+  .shift-toolbar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .week-label {
+    background: var(--accent-bg); color: var(--accent-text); padding: 3px 8px;
+    border-radius: 4px; font-size: 11px; font-weight: bold;
+    margin-left: 4px;
+  }
+  .week-label.past { background: var(--text-muted); color: #fff; }
+
+  .shift-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--surface);
+  }
+  table.shift {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-size: 13px;
+    background: var(--surface);
+  }
+  table.shift th, table.shift td {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: center;
+    white-space: nowrap;
+    background: var(--surface);
+    color: var(--text);
+  }
+  table.shift thead th {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    background: #ebe5da !important;  /* 薄ベージュ */
+    color: var(--text);
+    z-index: 10;
+    transform: translate3d(0,0,0);
+    contain: layout;
+    font-weight: 600;
+  }
+  table.shift th.cast-col,
+  table.shift td.cast-col {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
+    background: #f5f1ea !important;  /* メイン背景と同じオフホワイト */
+    text-align: left;
+    min-width: 120px;
+    z-index: 5;
+    transform: translate3d(0,0,0);
+    contain: layout;
+    color: var(--text);
+    font-weight: 500;
+  }
+  table.shift thead th.cast-col {
+    z-index: 15;
+    background: #d6cfc1 !important;  /* 左上交差セルだけ少し濃い */
+    color: var(--text);
+  }
+  table.shift tr.trial td.cast-col {
+    background: #f5e8c5 !important;
+    color: #8a6d2a;
+  }
+  /* スタッフ行：ブルー系で区別 */
+  table.shift tr.staff-row td {
+    background: #e8eef5 !important;
+  }
+  table.shift tr.staff-row td.cast-col {
+    background: #d4dde8 !important;
+    color: #2a4068;
+    font-weight: 500;
+  }
+  table.shift tr.staff-row td.shift-cell.on {
+    background: #c4d8e8 !important;
+    color: #1a3a68;
+  }
+  /* スタッフセクションの仕切り見出し行 */
+  table.shift tr.section-header td {
+    background: #d6cfc1 !important;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-align: left;
+    padding: 4px 10px;
+    cursor: default;
+  }
+  table.shift tr.section-header td.cast-col {
+    background: #d6cfc1 !important;
+  }
+  table.shift td.shift-cell {
+    cursor: pointer;
+    min-width: 70px;
+    position: relative;
+  }
+  table.shift td.shift-cell.on {
+    background: var(--on-bg) !important;
+    color: #2a6a2a;
+    font-weight: bold;
+  }
+  table.shift td.shift-cell.off {
+    color: var(--text-muted);
+  }
+  /* シフトセルが予約日 */
+  table.shift td.shift-cell.has-resv {
+    background: #fff4d6 !important;
+  }
+  table.shift td.shift-cell.on.has-resv {
+    background: #e8e8b8 !important;
+  }
+  /* セル上の予約マーカー（小バッジ） */
+  .resv-marks {
+    display: flex;
+    gap: 2px;
+    justify-content: center;
+    margin-top: 2px;
+    flex-wrap: wrap;
+  }
+  .resv-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    font-size: 9px;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .resv-mark.dohan { background: #d4af37; }
+  .resv-mark.visit { background: #5a8ec4; }
+  .resv-mark.shimei { background: #c4659a; }
+  .resv-mark.event { background: #c0392b; }
+  .resv-mark.multi {
+    background: #2a2520; font-size: 9px;
+    width: auto; padding: 0 4px;
+  }
+  /* 体験キャスト行＋予約マーカー */
+  .trial-badge {
+    background: var(--accent-bg); color: var(--accent-text);
+    padding: 1px 5px; border-radius: 8px; font-size: 10px;
+    margin-left: 4px;
+  }
+  /* 予約凡例 */
+  .resv-legend {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    font-size: 11px; color: var(--text-sub);
+    margin-top: 8px;
+  }
+  .resv-legend-item {
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  /* ====== Customer ====== */
+  .cust-toolbar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .cust-toolbar input.search {
+    flex: 1; min-width: 150px;
+  }
+  .cust-list {
+    display: grid; gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  .cust-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; cursor: pointer; transition: border-color 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .cust-card:hover { border-color: var(--accent); }
+  .cust-card .nm { font-size: 15px; font-weight: bold; color: var(--accent); }
+  .cust-card .meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .cust-card .last-visit { font-size: 11px; color: var(--text-sub); margin-top: 4px; }
+  .cust-card .bottles { font-size: 11px; color: #5a9c5a; margin-top: 4px; }
+
+  .cust-detail-section {
+    background: var(--surface-alt); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .cust-detail-section h4 {
+    margin: 0 0 8px; color: var(--accent); font-size: 13px;
+  }
+  .visit-row, .bottle-row {
+    display: flex; gap: 8px; align-items: center; padding: 6px 0;
+    border-bottom: 1px dashed var(--border); font-size: 12px;
+  }
+  .visit-row:last-child, .bottle-row:last-child { border-bottom: none; }
+  .visit-row .date { color: var(--text-sub); min-width: 90px; }
+  .visit-row .cast { color: var(--accent); flex: 1; }
+  .bottle-row .name { flex: 1; color: var(--text); }
+  .bottle-row .tag { color: var(--text-sub); font-size: 11px; }
+
+  /* ====== Reservations ====== */
+  .resv-toolbar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .resv-section {
+    margin-bottom: 20px;
+  }
+  .resv-section h3 {
+    margin: 0 0 10px; font-size: 14px; color: var(--accent);
+    letter-spacing: 1px; font-weight: 500;
+    border-left: 3px solid var(--accent-line);
+    padding-left: 8px;
+  }
+  .resv-list {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .resv-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 4px solid var(--accent-line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .resv-card:hover { border-color: var(--accent); }
+  .resv-card.done {
+    opacity: 0.55;
+    border-left-color: #999;
+  }
+  .resv-card.cancelled {
+    opacity: 0.45;
+    border-left-color: var(--danger);
+    text-decoration: line-through;
+  }
+  .resv-card.dohan { border-left-color: #d4af37; }
+  .resv-card.shimei { border-left-color: #c4659a; }
+  .resv-card.visit { border-left-color: #5a8ec4; }
+
+  .resv-row-top {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .resv-time {
+    font-size: 18px; font-weight: 700; color: var(--accent);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .resv-date {
+    font-size: 13px; color: var(--text-sub);
+  }
+  .resv-tags {
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .resv-tag {
+    font-size: 10px; padding: 2px 7px; border-radius: 10px;
+    font-weight: 600; letter-spacing: 1px;
+  }
+  .resv-tag.dohan { background: #fff4d6; color: #8a6a0a; border: 1px solid #e0c060; }
+  .resv-tag.shimei { background: #fde8f1; color: #a04675; border: 1px solid #e0a8c4; }
+  .resv-tag.visit { background: #e0ecf8; color: #3a6a9a; border: 1px solid #a8c4e0; }
+  .resv-tag.event { background: #ffe5e0; color: #c0392b; border: 1px solid #e0a0a0; }
+  .resv-tag.warn-shift {
+    background: #ffe5e0; color: #c0392b; border: 1px solid #e0a0a0;
+  }
+  .resv-tag.ok-shift {
+    background: #e0f0d8; color: #4a7a2a; border: 1px solid #a0c890;
+  }
+
+  .resv-row-mid {
+    font-size: 13px; color: var(--text); line-height: 1.5;
+  }
+  .resv-row-mid b { color: var(--accent); }
+  .resv-memo {
+    font-size: 12px; color: var(--text-sub);
+    background: var(--surface-alt);
+    padding: 6px 8px; border-radius: 4px;
+    white-space: pre-wrap;
+  }
+  .resv-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .resv-empty {
+    text-align: center; color: var(--text-muted);
+    font-size: 13px; padding: 20px;
+    background: var(--surface-alt); border-radius: 8px;
+    border: 1px dashed var(--border);
+  }
+  .resv-warn-block {
+    background: #fff4d6; border: 1px solid var(--warn-border);
+    border-radius: 6px; padding: 8px 10px;
+    font-size: 12px; color: #8a6a0a;
+    margin: 6px 0;
+  }
+
+  /* ====== Settings ====== */
+  .settings-section {
+    background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 12px;
+  }
+  .settings-section > summary {
+    padding: 12px; cursor: pointer; color: var(--accent); font-weight: 600;
+    user-select: none;
+  }
+  .settings-section[open] > summary { border-bottom: 1px solid var(--border); }
+  .settings-section .body { padding: 12px; }
+
+  .cast-list-item, .staff-list-item {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px; background: var(--surface); border-radius: 6px;
+    margin-bottom: 6px; font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .cast-list-item.trial, .staff-list-item.trial {
+    background: #f5e8c5;
+  }
+  .cast-list-item .nm, .staff-list-item .nm { flex: 1; color: var(--text); }
+  .cast-list-item input.rename, .staff-list-item input.rename {
+    flex: 1; padding: 4px 8px; font-size: 12px;
+  }
+  .small-label {
+    font-size: 11px; color: var(--text-sub); display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  /* ====== Alert toast ====== */
+  #alertHost {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 2000;
+    display: flex; flex-direction: column; gap: 8px;
+    pointer-events: none;
+  }
+  .alert-toast {
+    background: var(--warn-bg);
+    border: 2px solid var(--warn-border);
+    color: #6a4a00;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    pointer-events: auto;
+    cursor: pointer;
+    max-width: 90vw;
+  }
+  .alert-toast.critical {
+    background: var(--critical-bg);
+    border-color: var(--critical-border);
+    color: var(--danger);
+  }
+
+  /* ====== Mobile ====== */
+  @media (max-width: 680px) {
+    #app.active { flex-direction: column; height: 100vh; height: 100dvh; }
+    .sidebar {
+      width: 100%; min-height: auto; padding: 0;
+      border-right: none; border-bottom: 2px solid var(--accent-line);
+      display: flex; flex-wrap: wrap; align-items: stretch;
+      flex-shrink: 0;
+    }
+    .sidebar .brand {
+      width: 100%; padding: 3px 10px; border-bottom: 1px solid rgba(245,241,234,0.15);
+      margin-bottom: 0; text-align: center;
+      display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    }
+    .sidebar .brand h2 { font-size: 10px; letter-spacing: 1px; }
+    .sidebar .brand .kanji { font-size: 14px; margin: 0; }
+    .sidebar .brand p { display: inline; font-size: 9px; letter-spacing: 1px; }
+    .sidebar nav {
+      display: flex; width: 100%; overflow-x: visible;
+    }
+    .sidebar nav button {
+      flex: 1; padding: 8px 4px; font-size: 11px;
+      border-left: none; border-bottom: 2px solid transparent;
+      text-align: center;
+      min-width: 0;
+    }
+    .sidebar nav button.active {
+      border-left-color: transparent; border-bottom-color: var(--accent-line);
+    }
+    .sidebar .sync-status {
+      display: none;
+    }
+    main {
+      padding: 8px;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    /* フロアページのみ：1画面に収める */
+    .page#page-floor {
+      display: flex; flex-direction: column; height: 100%;
+    }
+    .page#page-floor:not(.active) { display: none; }
+    .page#page-floor h2.page-title {
+      font-size: 13px; margin: 0 0 4px; padding-bottom: 4px;
+      border-bottom-width: 1px;
+      letter-spacing: 1px;
+    }
+    .page#page-floor .floor-toolbar {
+      margin-bottom: 4px; gap: 4px;
+    }
+    .page#page-floor .floor-toolbar button {
+      padding: 3px 6px; font-size: 10px;
+    }
+    .page#page-floor .floor-toolbar > span {
+      font-size: 10px;
+    }
+    .page#page-floor .floor-layout {
+      flex: 1;
+      grid-template-columns: 3fr 1fr;
+      gap: 6px;
+      align-items: stretch;
+      min-height: 0;
+    }
+    .page#page-floor .floor-section {
+      display: flex; flex-direction: column; min-height: 0;
+    }
+    .page#page-floor .floor-section h3 {
+      font-size: 10px; margin: 0 0 4px;
+      letter-spacing: 1px;
+    }
+    .page#page-floor .table-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      flex: 1;
+      grid-auto-rows: 1fr;
+    }
+    .page#page-floor .table-grid.private {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+    .table-card {
+      min-height: 0;
+      padding: 5px 6px;
+      gap: 1px;
+      border-radius: 5px;
+    }
+    .table-card .name {
+      font-size: 11px;
+    }
+    .table-card .badge-empty,
+    .table-card .badge-on {
+      font-size: 8px; padding: 1px 4px;
+    }
+    .table-card .info {
+      font-size: 9px; line-height: 1.3;
+    }
+    .table-card .timer {
+      font-size: 11px; letter-spacing: 0;
+    }
+    .table-card .set-badge {
+      font-size: 8px; padding: 0 3px; margin-left: 3px;
+    }
+    .table-card .memo-pre {
+      font-size: 8px; line-height: 1.2;
+      max-height: 18px; padding-top: 1px; margin-top: 1px;
+    }
+    /* スマホ時、空席カードのヒント文字は非表示 */
+    .page#page-floor .table-card:not(.occupied) .info {
+      display: none;
+    }
+
+    /* 他のページ用：通常レイアウト */
+    .page:not(#page-floor) h2.page-title { font-size: 16px; }
+    .page:not(#page-floor) .table-grid {
+      grid-template-columns: repeat(2, 1fr); gap: 8px;
+    }
+    .page:not(#page-floor) .table-grid.private {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .page:not(#page-floor) .table-card {
+      min-height: 100px; padding: 10px;
+    }
+    .page:not(#page-floor) .table-card .name { font-size: 13px; }
+
+    /* モバイル：シフト表をコンパクトに */
+    .page#page-shift table.shift {
+      font-size: 12px;
+    }
+    .page#page-shift table.shift th,
+    .page#page-shift table.shift td {
+      padding: 6px 4px;
+    }
+    .page#page-shift table.shift th.cast-col,
+    .page#page-shift table.shift td.cast-col {
+      min-width: 64px;
+      max-width: 80px;
+      font-size: 12px;
+      padding: 6px 6px;
+    }
+    .page#page-shift table.shift td.shift-cell {
+      min-width: 44px;
+      font-size: 13px;
+    }
+    .page#page-shift .resv-mark {
+      width: 13px; height: 13px;
+      font-size: 8px;
+    }
+    .page#page-shift .resv-marks {
+      gap: 1px; margin-top: 1px;
+    }
+    .page#page-shift .trial-badge {
+      font-size: 8px; padding: 0 3px; margin-left: 2px;
+    }
+    .page#page-shift .shift-toolbar button {
+      padding: 5px 8px; font-size: 11px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Alerts (toasts) -->
+<div id="alertHost"></div>
+
+<!-- ========== LOGIN ========== -->
+<div id="login">
+  <div class="logo-circle">
+    <div class="logo-club">club</div>
+    <div class="logo-kanji">道</div>
+    <div class="logo-tao">〜TAO〜</div>
+  </div>
+  <div class="pin-box">
+    <label>STAFF LOGIN</label>
+    <input type="password" inputmode="numeric" id="pinInput" placeholder="PIN" maxlength="8" autocomplete="off">
+    <button onclick="tryLogin()">LOGIN</button>
+    <div class="err" id="pinErr"></div>
+  </div>
+</div>
+
+<!-- ========== APP ========== -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h2>club</h2>
+      <div class="kanji">道</div>
+      <p>〜 T A O 〜</p>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-page="floor">🪑 フロア</button>
+      <button class="nav-btn" data-page="shift">📅 シフト</button>
+      <button class="nav-btn" data-page="reservations">📖 予約</button>
+      <button class="nav-btn" data-page="customers">👤 顧客</button>
+      <button class="nav-btn" data-page="settings">⚙️ 設定</button>
+    </nav>
+    <div class="sync-status">
+      <span class="dot" id="syncDot"></span>
+      <span id="syncMsg">未接続</span>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ===== FLOOR PAGE ===== -->
+    <section class="page active" id="page-floor">
+      <h2 class="page-title">🪑 フロア</h2>
+      <div class="floor-toolbar">
+        <button class="btn-sub btn-sm" onclick="renderFloor()">🔄 更新</button>
+        <span style="color:#888; font-size:12px;" id="floorClock"></span>
+      </div>
+
+      <div class="floor-layout">
+        <div class="floor-section">
+          <h3>通常卓</h3>
+          <div class="table-grid" id="tablesNormal"></div>
+        </div>
+        <div class="floor-section">
+          <h3>個室</h3>
+          <div class="table-grid private" id="tablesPrivate"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SHIFT PAGE ===== -->
+    <section class="page" id="page-shift">
+      <h2 class="page-title">📅 シフト</h2>
+      <div class="shift-toolbar">
+        <button class="btn-sub btn-sm" onclick="changeWeek(-1)">◀ 前週</button>
+        <button class="btn-sub btn-sm" onclick="changeWeek(0)">今週</button>
+        <button class="btn-sub btn-sm" onclick="changeWeek(1)">次週 ▶</button>
+        <span id="weekRangeLabel" style="margin-left:8px; color:#ccc; font-size:13px;"></span>
+      </div>
+      <div class="shift-wrap">
+        <table class="shift" id="shiftTable"></table>
+      </div>
+      <div class="resv-legend">
+        <span class="resv-legend-item"><span class="resv-mark dohan">同</span>同伴</span>
+        <span class="resv-legend-item"><span class="resv-mark visit">予</span>来店予約</span>
+        <span class="resv-legend-item"><span class="resv-mark shimei">指</span>指名</span>
+        <span class="resv-legend-item"><span class="resv-mark event">記</span>記念日</span>
+        <span class="resv-legend-item" style="margin-left:12px;">
+          <span style="display:inline-block; width:14px; height:14px; background:#d4dde8; border:1px solid #2a4068; border-radius:2px;"></span>
+          スタッフ
+        </span>
+      </div>
+      <p style="color:#888; font-size:11px; margin-top:6px;">
+        セルをタップで出勤/休みを切替。予約マーカーはキャストのみ表示。
+      </p>
+    </section>
+
+    <!-- ===== RESERVATIONS PAGE ===== -->
+    <section class="page" id="page-reservations">
+      <h2 class="page-title">📖 予約</h2>
+      <div class="resv-toolbar">
+        <button class="btn" id="addResvBtn">+ 新規予約</button>
+        <span id="resvTodayCount" style="margin-left:8px; color:var(--text-sub); font-size:13px;"></span>
+      </div>
+
+      <div class="resv-section">
+        <h3>📅 本日の予約</h3>
+        <div id="resvToday" class="resv-list"></div>
+      </div>
+
+      <div class="resv-section">
+        <h3>🗓 今後の予約</h3>
+        <div id="resvUpcoming" class="resv-list"></div>
+      </div>
+
+      <details class="settings-section" style="margin-top:16px;">
+        <summary>📋 過去の予約（履歴）</summary>
+        <div class="body">
+          <div id="resvPast" class="resv-list"></div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ===== CUSTOMERS PAGE ===== -->
+    <section class="page" id="page-customers">
+      <h2 class="page-title">👤 顧客管理</h2>
+      <div class="cust-toolbar">
+        <input type="text" class="search" id="custSearch" placeholder="名前で検索…" oninput="renderCustomerList()">
+        <button class="btn" onclick="openCustomerModal(null)">+ 新規追加</button>
+      </div>
+      <div class="cust-list" id="custList"></div>
+    </section>
+
+    <!-- ===== SETTINGS PAGE ===== -->
+    <section class="page" id="page-settings">
+      <h2 class="page-title">⚙️ 設定</h2>
+
+      <details class="settings-section">
+        <summary>🔐 PINコード</summary>
+        <div class="body">
+          <label class="field">
+            <span class="lab">現在のPIN（変更する場合のみ入力）</span>
+            <input type="text" id="pinNew" placeholder="新しいPIN">
+          </label>
+          <button class="btn btn-sm" onclick="savePin()">保存</button>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>👥 キャスト管理</summary>
+        <div class="body">
+          <div style="display:flex; gap:6px; margin-bottom:10px;">
+            <input type="text" id="newCastName" placeholder="キャスト名" style="flex:1;">
+            <label class="small-label">
+              <input type="checkbox" id="newCastTrial"> 体験
+            </label>
+            <button class="btn btn-sm" onclick="addCast()">追加</button>
+          </div>
+          <div id="castListUI"></div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>👔 スタッフ管理（フロア・ボーイ等）</summary>
+        <div class="body">
+          <div style="display:flex; gap:6px; margin-bottom:10px;">
+            <input type="text" id="newStaffName" placeholder="スタッフ名" style="flex:1;">
+            <button class="btn btn-sm" onclick="addStaff()">追加</button>
+          </div>
+          <div id="staffListUI"></div>
+          <p style="color:#888; font-size:11px; margin-top:8px;">スタッフはシフト表のキャスト下にブルー背景で表示されます。</p>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>🌐 サーバー同期 (Cloudflare Worker)</summary>
+        <div class="body">
+          <label class="field">
+            <span class="lab">Worker URL</span>
+            <input type="text" id="srvUrl" placeholder="https://xxx.workers.dev">
+          </label>
+          <label class="field">
+            <span class="lab">認証トークン</span>
+            <input type="text" id="srvToken" placeholder="AUTH_TOKEN">
+          </label>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick="saveServerConfig()">接続して同期</button>
+            <button class="btn-sub btn-sm" onclick="forceSync()">🔄 今すぐ同期</button>
+            <button class="btn-sub btn-sm" onclick="disconnectServer()">切断</button>
+          </div>
+          <p id="srvStatus" style="font-size:11px; color:#aaa; margin-top:8px;"></p>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>💾 バックアップ・復元</summary>
+        <div class="body">
+          <button class="btn btn-sm" onclick="exportBackup()">📥 バックアップDL</button>
+          <button class="btn-sub btn-sm" onclick="document.getElementById('importFile').click()">📤 復元</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(event)">
+          <p style="color:#888; font-size:11px; margin-top:8px;">JSON形式で全データを保存・復元できます。</p>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>⚠️ データリセット</summary>
+        <div class="body">
+          <button class="btn-danger" onclick="resetAllData()">全データを削除</button>
+          <p style="color:#888; font-size:11px; margin-top:8px;">復旧できません。バックアップを取ってから実行してください。</p>
+        </div>
+      </details>
+    </section>
+  </main>
+</div>
+
+<!-- ========== Modals ========== -->
+<div class="modal-bg" id="tableModalBg">
+  <div class="modal">
+    <h3 id="tableModalTitle">テーブル</h3>
+    <div id="tableModalBody"></div>
+    <div class="row-buttons" id="tableModalFooter"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="custModalBg">
+  <div class="modal">
+    <h3 id="custModalTitle">顧客</h3>
+    <div id="custModalBody"></div>
+    <div class="row-buttons">
+      <button class="btn-sub btn-sm" onclick="closeCustomerModal()">閉じる</button>
+      <button class="btn-danger btn-sm" id="custDeleteBtn" onclick="deleteCustomer()">削除</button>
+      <button class="btn btn-sm" onclick="saveCustomer()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 予約モーダル -->
+<div class="modal-bg" id="resvModalBg">
+  <div class="modal">
+    <h3 id="resvModalTitle">予約</h3>
+    <div id="resvModalBody"></div>
+    <div class="row-buttons" id="resvModalFooter"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   club 道〜TAO〜 STAFF MANAGER (Lite)
+   Floor / Shift / Customer のみ
+   ============================================================ */
+
+// ---------- Storage ----------
+const LS_KEY = 'tao_lite_main';
+const LS_SRV = 'tao_lite_server';
+
+function persistSave() {
+  const data = {
+    pin: state.pin,
+    casts: state.casts,
+    staff: state.staff,
+    customers: state.customers,
+    tables: state.tables,
+    shiftData: state.shiftData,
+    reservations: state.reservations,
+    _updatedAt: Date.now()
+  };
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  } catch(e) {
+    console.error('persistSave failed', e);
+  }
+  // サーバー同期があれば送信
+  scheduleServerSave();
+}
+
+function persistLoad() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.pin) state.pin = data.pin;
+    if (Array.isArray(data.casts)) state.casts = data.casts;
+    if (Array.isArray(data.staff)) state.staff = data.staff;
+    if (Array.isArray(data.customers)) state.customers = data.customers;
+    if (data.tables) state.tables = data.tables;
+    if (data.shiftData) state.shiftData = data.shiftData;
+    if (Array.isArray(data.reservations)) state.reservations = data.reservations;
+  } catch(e) {
+    console.error('persistLoad failed', e);
+  }
+}
+
+// ---------- Default state ----------
+const DEFAULT_TABLES = [
+  // 通常卓4列×3
+  ...['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'].map(id=>({ id, name:id, type:'normal' })),
+  // 個室
+  { id:'WASHITSU', name:'和室', type:'private' },
+  { id:'YOSHITSU', name:'洋室', type:'private' },
+];
+const SET_MINUTES = 60;            // 1セット = 60分
+const ALERT_15_MIN = 15;           // 残りこの分数で1次アラート
+const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
+
+const state = {
+  pin: '0000',
+  casts: [],          // {id, name, trial:false, trialCount:0, removed:false}
+  staff: [],          // {id, name, removed:false}
+  customers: [],      // {id, name, phone, birthday, memo, visits:[], bottles:[], _created, _updated, removed:false}
+  tables: {},         // { tableId: { occupied, guests, castIds:[], startedAt, endsAt, setCount, memo } }
+  shiftData: {},      // { 'YYYY-MM-DD_castId': true/false }
+  reservations: [],   // [{id, customerId, customerName, guests, castIds:[], castFree, datetime, types:['dohan','shimei','visit','event'], tableId, memo, status:'pending'/'done'/'cancelled', _created, _updated, removed:false}]
+  weekOffset: 0,
+};
+
+// ---------- Date helpers ----------
+function localDateStr(d) {
+  if (!(d instanceof Date)) d = new Date(d);
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function parseDateLocal(str) {
+  // "YYYY-MM-DD" を正午基準でローカルDateに
+  const [y,m,d] = str.split('-').map(Number);
+  return new Date(y, m-1, d, 12, 0, 0, 0);
+}
+function getWeekMonday(offset = 0) {
+  const now = new Date();
+  // 正午基準
+  now.setHours(12,0,0,0);
+  const day = now.getDay(); // 0(日)..6(土)
+  const diffToMon = (day === 0 ? -6 : 1 - day);
+  now.setDate(now.getDate() + diffToMon + offset*7);
+  return now;
+}
+function shiftKey(dateStr, castId) {
+  return `${dateStr}_${castId}`;
+}
+function getShift(dateStr, castId) {
+  return !!state.shiftData[shiftKey(dateStr, castId)];
+}
+function setShift(dateStr, castId, val) {
+  const k = shiftKey(dateStr, castId);
+  if (val) state.shiftData[k] = true;
+  else delete state.shiftData[k];
+}
+
+// ---------- ID generators ----------
+function genId(prefix) {
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+// ---------- Login ----------
+function tryLogin() {
+  const v = document.getElementById('pinInput').value;
+  if (v === state.pin) {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').classList.add('active');
+    document.getElementById('pinErr').textContent = '';
+    initApp();
+  } else {
+    document.getElementById('pinErr').textContent = 'PINが違います';
+  }
+}
+document.getElementById('pinInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryLogin();
+});
+
+// ---------- Page nav ----------
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const target = btn.getAttribute('data-page');
+    document.getElementById('page-' + target).classList.add('active');
+    if (target === 'floor') renderFloor();
+    if (target === 'shift') renderShift();
+    if (target === 'reservations') renderReservations();
+    if (target === 'customers') renderCustomerList();
+    if (target === 'settings') renderSettings();
+  });
+});
+
+// ---------- Init ----------
+function initApp() {
+  // 旧データのマイグレーション（P1/P2 → WASHITSU/YOSHITSU）
+  if (state.tables && state.tables.P1 && !state.tables.WASHITSU) {
+    state.tables.WASHITSU = state.tables.P1;
+    delete state.tables.P1;
+  }
+  if (state.tables && state.tables.P2 && !state.tables.YOSHITSU) {
+    state.tables.YOSHITSU = state.tables.P2;
+    delete state.tables.P2;
+  }
+  // テーブル初期化（不足分のみ追加）
+  if (!state.tables) state.tables = {};
+  DEFAULT_TABLES.forEach(t => {
+    if (!state.tables[t.id]) {
+      state.tables[t.id] = { occupied:false, guests:0, castIds:[], startedAt:null, endsAt:null, setCount:0, memo:'' };
+    }
+  });
+  renderFloor();
+  // サーバー設定があれば自動接続
+  loadServerConfigUI();
+  if (server.url && server.token) {
+    initServerSync();
+  }
+  // 1秒ごとにタイマー更新（フロアが表示中の時のみ動作）
+  setInterval(() => {
+    if (document.getElementById('page-floor').classList.contains('active')) {
+      updateTableTimers();
+    }
+  }, 1000);
+  // 1分ごとに時計
+  setInterval(updateFloorClock, 60000);
+  updateFloorClock();
+}
+
+function updateFloorClock() {
+  const el = document.getElementById('floorClock');
+  if (!el) return;
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  el.textContent = `現在 ${h}:${m}`;
+}
+
+// ---------- FLOOR ----------
+function renderFloor() {
+  const normal = document.getElementById('tablesNormal');
+  const priv = document.getElementById('tablesPrivate');
+  normal.innerHTML = '';
+  priv.innerHTML = '';
+  DEFAULT_TABLES.forEach(t => {
+    const tdata = state.tables[t.id] || { occupied:false, guests:0, castIds:[], startedAt:null, memo:'' };
+    const card = buildTableCard(t, tdata);
+    if (t.type === 'private') priv.appendChild(card);
+    else normal.appendChild(card);
+  });
+}
+
+function buildTableCard(t, tdata) {
+  const card = document.createElement('div');
+  let cls = 'table-card';
+  if (tdata.occupied) cls += ' occupied';
+
+  // タイマー状態判定
+  let timerInfo = null;
+  if (tdata.occupied && tdata.endsAt) {
+    const remainMs = tdata.endsAt - Date.now();
+    const remainMin = Math.ceil(remainMs / 60000);
+    let stage = 'normal';
+    if (remainMs <= 0) stage = 'expired';
+    else if (remainMin <= ALERT_10_MIN) stage = 'critical';
+    else if (remainMin <= ALERT_15_MIN) stage = 'warn';
+    timerInfo = { remainMs, remainMin, stage };
+    if (stage === 'warn') cls += ' warn';
+    else if (stage === 'critical') cls += ' critical';
+  }
+
+  card.className = cls;
+
+  const castNames = (tdata.castIds || [])
+    .map(cid => {
+      const c = state.casts.find(x => x.id === cid);
+      return c ? c.name : '';
+    })
+    .filter(Boolean)
+    .join('・');
+
+  // フリー入力キャスト名（castIds に存在しない名前）
+  const freeCast = tdata.castFree || '';
+  const allCastDisp = [castNames, freeCast].filter(Boolean).join('・');
+
+  const customerName = tdata.customerId
+    ? (state.customers.find(c => c.id === tdata.customerId)?.name || '')
+    : (tdata.customerName || '');
+
+  // 空席カード
+  if (!tdata.occupied) {
+    card.innerHTML = `
+      <div class="name">
+        <span>${escapeHtml(t.name)}</span>
+        <span class="badge-empty">空席</span>
+      </div>
+      <div class="info" style="color:var(--text-muted); font-size:12px; margin-top:auto;">
+        タップして入店登録
+      </div>
+    `;
+    card.addEventListener('click', () => openTableModal(t.id));
+    return card;
+  }
+
+  // 使用中カード
+  const setNum = tdata.setCount || 1;
+  const setBadge = setNum > 1 ? `<span class="set-badge">${setNum}セット目</span>` : '';
+
+  let timerHtml = '';
+  let timerCls = 'timer';
+  let timerTxt = '';
+  if (timerInfo) {
+    if (timerInfo.stage === 'expired') {
+      const overMin = Math.ceil(-timerInfo.remainMs / 60000);
+      timerCls += ' expired';
+      timerTxt = `⚠ 超過 ${overMin}分`;
+    } else {
+      const m = Math.floor(timerInfo.remainMs / 60000);
+      const s = Math.floor((timerInfo.remainMs % 60000) / 1000);
+      const mm = String(m).padStart(2,'0');
+      const ss = String(s).padStart(2,'0');
+      if (timerInfo.stage === 'critical') timerCls += ' critical';
+      else if (timerInfo.stage === 'warn') timerCls += ' warn';
+      timerTxt = `⏱ 残り ${mm}:${ss}`;
+    }
+    timerHtml = `<div class="${timerCls}" data-timer="${t.id}">${timerTxt}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="name">
+      <span>${escapeHtml(t.name)}${setBadge}</span>
+      <span class="badge-on">使用中</span>
+    </div>
+    <div class="info">
+      ${customerName ? `<b>${escapeHtml(customerName)}</b><br>` : ''}
+      ${tdata.guests ? `👥 ${tdata.guests}名<br>` : ''}
+      ${allCastDisp ? `🌹 ${escapeHtml(allCastDisp)}` : ''}
+    </div>
+    ${tdata.memo ? `<div class="memo-pre">${escapeHtml(tdata.memo)}</div>` : ''}
+    ${timerHtml}
+  `;
+  card.addEventListener('click', () => openTableModal(t.id));
+  return card;
+}
+
+// 入店（モーダルから入力済みデータで開始）
+function checkIn(tableId, opts) {
+  const tdata = state.tables[tableId] || {};
+  if (tdata.occupied) return;
+  opts = opts || {};
+  const now = Date.now();
+
+  let customerId = opts.customerId || tdata.customerId || '';
+  let customerName = opts.customerName || tdata.customerName || '';
+  const guests = opts.guests != null ? opts.guests : (tdata.guests || 1);
+  const castIds = opts.castIds || tdata.castIds || [];
+  const castFree = opts.castFree != null ? opts.castFree : (tdata.castFree || '');
+  const memo = opts.memo != null ? opts.memo : (tdata.memo || '');
+
+  // 「新規顧客として登録」が選ばれた場合
+  if (opts.createNewCustomer && customerName.trim()) {
+    const newCust = {
+      id: genId('cust'),
+      name: customerName.trim(),
+      phone: '',
+      birthday: '',
+      memo: '',
+      visits: [],
+      bottles: [],
+      _created: now,
+      _updated: now,
+      removed: false
+    };
+    state.customers.push(newCust);
+    customerId = newCust.id;
+    customerName = newCust.name;
+  }
+
+  state.tables[tableId] = {
+    occupied: true,
+    guests,
+    castIds,
+    castFree,
+    customerId,
+    customerName: customerId ? '' : customerName, // 顧客IDがあれば未紐付け名称はクリア
+    memo,
+    startedAt: now,
+    endsAt: now + SET_MINUTES * 60000,
+    setCount: 1,
+    alertedWarn: false,
+    alertedCritical: false,
+  };
+  // 顧客の来店履歴
+  if (customerId) {
+    recordVisit(customerId, castIds);
+  }
+  persistSave();
+  renderFloor();
+}
+
+// 延長（quickボタン用）
+function extendTable(tableId, addMin) {
+  const tdata = state.tables[tableId];
+  if (!tdata || !tdata.occupied) return;
+  // すでに過ぎていたら現在時刻基準、まだ残っていたら現在の endsAt 基準
+  const base = (tdata.endsAt && tdata.endsAt > Date.now()) ? tdata.endsAt : Date.now();
+  tdata.endsAt = base + addMin * 60000;
+  tdata.setCount = (tdata.setCount || 1) + 1;
+  // 次セットでもアラートを出すためフラグリセット
+  tdata.alertedWarn = false;
+  tdata.alertedCritical = false;
+  persistSave();
+  renderFloor();
+  showToast(`${getTableName(tableId)} を ${addMin}分延長しました（${tdata.setCount}セット目）`, 'normal');
+}
+
+function getTableName(id) {
+  const t = DEFAULT_TABLES.find(x => x.id === id);
+  return t ? t.name : id;
+}
+
+// 退店
+function checkOut(tableId) {
+  state.tables[tableId] = {
+    occupied: false, guests: 0, castIds: [], castFree: '',
+    customerId: '', customerName: '', memo: '',
+    startedAt: null, endsAt: null, setCount: 0,
+    alertedWarn: false, alertedCritical: false,
+  };
+  persistSave();
+  renderFloor();
+}
+
+// 来店履歴を記録
+function recordVisit(customerId, castIds) {
+  const cust = state.customers.find(c => c.id === customerId);
+  if (!cust) return;
+  if (!Array.isArray(cust.visits)) cust.visits = [];
+  const today = localDateStr(new Date());
+  const dup = cust.visits.find(v => v.date === today);
+  if (!dup) {
+    cust.visits.push({ date: today, castIds: (castIds||[]).slice() });
+  } else {
+    dup.castIds = Array.from(new Set([...(dup.castIds||[]), ...(castIds||[])]));
+  }
+  cust._updated = Date.now();
+}
+
+function updateTableTimers() {
+  // 1秒ごとに呼ばれる：使用中卓のタイマー表示更新＋アラートチェック
+  let needRender = false;
+  DEFAULT_TABLES.forEach(t => {
+    const tdata = state.tables[t.id];
+    if (!tdata || !tdata.occupied || !tdata.endsAt) return;
+    const remainMs = tdata.endsAt - Date.now();
+    const remainMin = Math.ceil(remainMs / 60000);
+
+    // 残り15分アラート（バナー表示のみ）
+    if (!tdata.alertedWarn && remainMs > 0 && remainMin <= ALERT_15_MIN && remainMin > ALERT_10_MIN) {
+      tdata.alertedWarn = true;
+      showToast(`${t.name}：残り15分です`, 'warn');
+      needRender = true;
+    }
+    // 残り10分で延長確認モーダル
+    if (!tdata.alertedCritical && remainMs > 0 && remainMin <= ALERT_10_MIN) {
+      tdata.alertedCritical = true;
+      openExtendDialog(t.id);
+      needRender = true;
+    }
+  });
+  if (needRender) {
+    persistSave();
+  }
+
+  // タイマー表示だけ書き換え（カード全体は再描画しない＝チラつき防止）
+  // ただし stage が切り替わるタイミングでは再描画したいので、簡易チェック
+  let stageChanged = false;
+  document.querySelectorAll('[data-timer]').forEach(el => {
+    const id = el.getAttribute('data-timer');
+    const tdata = state.tables[id];
+    if (!tdata || !tdata.occupied || !tdata.endsAt) return;
+    const remainMs = tdata.endsAt - Date.now();
+    let stage = 'normal';
+    const remainMin = Math.ceil(remainMs / 60000);
+    if (remainMs <= 0) stage = 'expired';
+    else if (remainMin <= ALERT_10_MIN) stage = 'critical';
+    else if (remainMin <= ALERT_15_MIN) stage = 'warn';
+
+    let txt = '';
+    if (stage === 'expired') {
+      const overMin = Math.ceil(-remainMs / 60000);
+      txt = `⚠ 超過 ${overMin}分`;
+    } else {
+      const m = Math.floor(remainMs / 60000);
+      const s = Math.floor((remainMs % 60000) / 1000);
+      txt = `⏱ 残り ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    el.textContent = txt;
+
+    // ステージが変わったら親カードのクラスを書き換え
+    const card = el.closest('.table-card');
+    if (card) {
+      const wasWarn = card.classList.contains('warn');
+      const wasCritical = card.classList.contains('critical');
+      const newWarn = stage === 'warn';
+      const newCritical = stage === 'critical' || stage === 'expired';
+      if (wasWarn !== newWarn || wasCritical !== newCritical) {
+        stageChanged = true;
+      }
+      card.classList.toggle('warn', newWarn);
+      card.classList.toggle('critical', newCritical);
+      el.classList.toggle('warn', stage === 'warn');
+      el.classList.toggle('critical', stage === 'critical');
+      el.classList.toggle('expired', stage === 'expired');
+    }
+  });
+}
+
+// ---- 延長確認モーダル ----
+function openExtendDialog(tableId) {
+  const t = DEFAULT_TABLES.find(x => x.id === tableId);
+  const tdata = state.tables[tableId];
+  if (!t || !tdata) return;
+  const setNum = tdata.setCount || 1;
+
+  // ダイアログをその場で生成
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1500;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <h3>${escapeHtml(t.name)}：残り10分</h3>
+      <p style="color:var(--text-sub); font-size:13px; margin:8px 0;">
+        現在 ${setNum}セット目。延長しますか？
+      </p>
+      <div class="extend-grid">
+        <button class="btn" data-ext="30">⏱ 30分延長</button>
+        <button class="btn" data-ext="60">⏱ 60分延長</button>
+      </div>
+      <div class="row-buttons">
+        <button class="btn-sub" data-ext="cancel">そのまま終了</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+
+  bg.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.getAttribute('data-ext');
+      if (v === '30' || v === '60') {
+        extendTable(tableId, parseInt(v, 10));
+      }
+      // cancel は何もしない（タイマーはそのまま0に向かう）
+      bg.remove();
+    });
+  });
+}
+
+// ---- トースト通知 ----
+function showToast(msg, type) {
+  const host = document.getElementById('alertHost');
+  if (!host) return;
+  const el = document.createElement('div');
+  el.className = 'alert-toast' + (type === 'critical' ? ' critical' : '');
+  el.textContent = msg;
+  el.addEventListener('click', () => el.remove());
+  host.appendChild(el);
+  setTimeout(() => {
+    if (el.parentNode) el.remove();
+  }, 6000);
+}
+
+// ---------- Table Modal ----------
+let editingTableId = null;
+function openTableModal(tableId) {
+  editingTableId = tableId;
+  const t = DEFAULT_TABLES.find(x => x.id === tableId);
+  const tdata = state.tables[tableId] || { occupied:false, guests:0, castIds:[], startedAt:null, memo:'', customerId:'', customerName:'', castFree:'' };
+  document.getElementById('tableModalTitle').textContent = `${t.name}`;
+
+  const castOptions = state.casts
+    .filter(c => !c.removed)
+    .map(c => {
+      const checked = (tdata.castIds || []).includes(c.id) ? 'checked' : '';
+      return `<label class="small-label" style="margin:4px 8px 4px 0;">
+        <input type="checkbox" value="${c.id}" ${checked} class="cast-pick"> ${escapeHtml(c.name)}${c.trial?'<span class="trial-badge">体験</span>':''}
+      </label>`;
+    }).join('');
+
+  const custOptions = ['<option value="">（指定なし）</option>']
+    .concat(state.customers.filter(c=>!c.removed).map(c =>
+      `<option value="${c.id}" ${tdata.customerId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`
+    )).join('');
+
+  // 使用中ならステータス情報＋延長/退店UI
+  let statusBlock = '';
+  if (tdata.occupied) {
+    const setNum = tdata.setCount || 1;
+    const startedStr = tdata.startedAt
+      ? new Date(tdata.startedAt).toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' })
+      : '—';
+    const endsStr = tdata.endsAt
+      ? new Date(tdata.endsAt).toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' })
+      : '—';
+    statusBlock = `
+      <div class="cust-detail-section" style="margin-bottom:12px;">
+        <h4>📍 現在のステータス</h4>
+        <div style="font-size:13px; color:var(--text); line-height:1.8;">
+          入店時刻：<b>${startedStr}</b>　／　終了予定：<b>${endsStr}</b><br>
+          現在 <b>${setNum}セット目</b>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm" data-extend-modal="30">+30分延長</button>
+          <button type="button" class="btn btn-sm" data-extend-modal="60">+60分延長</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // 顧客選択UI（既存 / 新規 切替）
+  // tdata.customerName があり customerId がない＝過去の入店時に新規記入されたが未登録のケース
+  const initialMode = (tdata.customerName && !tdata.customerId) ? 'new' : 'existing';
+  const customerBlock = `
+    <div class="field">
+      <span class="lab">お客様</span>
+      <div style="display:flex; gap:6px; margin-bottom:6px;">
+        <label class="small-label">
+          <input type="radio" name="custMode" value="existing" ${initialMode==='existing'?'checked':''} data-custmode> 既存
+        </label>
+        <label class="small-label">
+          <input type="radio" name="custMode" value="new" ${initialMode==='new'?'checked':''} data-custmode> 新規
+        </label>
+      </div>
+      <div id="custModeExisting" style="display:${initialMode==='existing'?'block':'none'};">
+        <select id="tblCustomer">${custOptions}</select>
+      </div>
+      <div id="custModeNew" style="display:${initialMode==='new'?'block':'none'};">
+        <input type="text" id="tblCustomerName" value="${escapeHtml(tdata.customerName||'')}" placeholder="お客様の名前（フリー入力）">
+        <label class="small-label" style="margin-top:6px; display:block;">
+          <input type="checkbox" id="tblRegisterNew" checked> 入店と同時に顧客リストへ登録する
+        </label>
+      </div>
+    </div>
+  `;
+
+  // 担当キャスト：チェックボックス＋フリー入力
+  const castBlock = `
+    <div class="field">
+      <span class="lab">指名キャスト</span>
+      <div style="display:flex; flex-wrap:wrap;">
+        ${castOptions || '<span style="color:var(--text-muted);font-size:12px;">設定からキャストを追加してください</span>'}
+      </div>
+      <input type="text" id="tblCastFree" value="${escapeHtml(tdata.castFree||'')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px;">
+    </div>
+  `;
+
+  document.getElementById('tableModalBody').innerHTML = `
+    ${statusBlock}
+    ${customerBlock}
+    <label class="field">
+      <span class="lab">人数</span>
+      <input type="number" id="tblGuests" value="${tdata.guests||1}" min="0" max="20">
+    </label>
+    ${castBlock}
+    <label class="field">
+      <span class="lab">メモ（指名/同伴/ボトル等）</span>
+      <textarea id="tblMemo" rows="3" placeholder="例：同伴、ドンペリ入った など">${escapeHtml(tdata.memo||'')}</textarea>
+    </label>
+  `;
+
+  // モーダル本文内のイベントバインド
+  // 顧客モードの切替
+  document.querySelectorAll('#tableModalBody [data-custmode]').forEach(el => {
+    el.addEventListener('change', toggleCustomerMode);
+  });
+  // 延長ボタン
+  document.querySelectorAll('#tableModalBody [data-extend-modal]').forEach(el => {
+    el.addEventListener('click', () => {
+      const min = parseInt(el.getAttribute('data-extend-modal'), 10);
+      extendFromModal(min);
+    });
+  });
+
+  // ボタン領域を状況に応じて切り替え
+  buildTableModalFooter(tdata.occupied);
+  document.getElementById('tableModalBg').classList.add('active');
+}
+
+function buildTableModalFooter(isOccupied) {
+  const footer = document.getElementById('tableModalFooter');
+  if (!footer) return;
+  // クリア
+  footer.innerHTML = '';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn-sub btn-sm';
+  closeBtn.type = 'button';
+  closeBtn.textContent = '閉じる';
+  closeBtn.addEventListener('click', closeTableModal);
+  footer.appendChild(closeBtn);
+
+  if (isOccupied) {
+    // 使用中：閉じる・退店・保存
+    const exitBtn = document.createElement('button');
+    exitBtn.className = 'btn-danger btn-sm';
+    exitBtn.type = 'button';
+    exitBtn.textContent = '退店';
+    exitBtn.addEventListener('click', clearTable);
+    footer.appendChild(exitBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm';
+    saveBtn.type = 'button';
+    saveBtn.textContent = '保存';
+    saveBtn.addEventListener('click', saveTable);
+    footer.appendChild(saveBtn);
+  } else {
+    // 空席：閉じる・入店
+    const inBtn = document.createElement('button');
+    inBtn.className = 'btn-success';
+    inBtn.type = 'button';
+    inBtn.textContent = '▶ 入店（60分）';
+    inBtn.style.fontSize = '14px';
+    inBtn.style.padding = '10px 20px';
+    inBtn.addEventListener('click', checkInFromModal);
+    footer.appendChild(inBtn);
+  }
+}
+
+function toggleCustomerMode() {
+  const mode = document.querySelector('input[name="custMode"]:checked')?.value || 'existing';
+  document.getElementById('custModeExisting').style.display = (mode==='existing') ? 'block' : 'none';
+  document.getElementById('custModeNew').style.display = (mode==='new') ? 'block' : 'none';
+}
+
+function closeTableModal() {
+  document.getElementById('tableModalBg').classList.remove('active');
+  editingTableId = null;
+}
+
+// 入店ボタン（モーダルから）
+function checkInFromModal() {
+  if (!editingTableId) return;
+  const data = readTableModalForm();
+  // 入店時の必須チェックは特になし（全部空でもOKだが空すぎたら警告のみ）
+  if (!data.customerId && !data.customerName && !data.castIds.length && !data.castFree && !data.guests) {
+    if (!confirm('入力情報がほとんどありません。このまま入店しますか？')) return;
+  }
+  checkIn(editingTableId, {
+    customerId: data.customerId,
+    customerName: data.customerName,
+    createNewCustomer: data.createNewCustomer,
+    guests: data.guests,
+    castIds: data.castIds,
+    castFree: data.castFree,
+    memo: data.memo,
+  });
+  closeTableModal();
+}
+
+// モーダル内の延長ボタン
+function extendFromModal(min) {
+  if (!editingTableId) return;
+  // 入力中の人数/メモ等を保存してから延長
+  saveTableInternal(false);
+  extendTable(editingTableId, min);
+  // モーダルを開き直して新しいセット数を反映
+  openTableModal(editingTableId);
+}
+
+// モーダル「保存」ボタン（使用中の編集のみ）
+function saveTable() {
+  saveTableInternal(true);
+}
+
+function readTableModalForm() {
+  const mode = document.querySelector('input[name="custMode"]:checked')?.value || 'existing';
+  let customerId = '';
+  let customerName = '';
+  let createNewCustomer = false;
+  if (mode === 'existing') {
+    customerId = document.getElementById('tblCustomer')?.value || '';
+  } else {
+    customerName = (document.getElementById('tblCustomerName')?.value || '').trim();
+    createNewCustomer = !!(document.getElementById('tblRegisterNew')?.checked);
+  }
+  const guests = parseInt(document.getElementById('tblGuests')?.value || '0') || 0;
+  const castIds = Array.from(document.querySelectorAll('#tableModalBody .cast-pick:checked')).map(el => el.value);
+  const castFree = (document.getElementById('tblCastFree')?.value || '').trim();
+  const memo = document.getElementById('tblMemo')?.value || '';
+  return { customerId, customerName, createNewCustomer, guests, castIds, castFree, memo };
+}
+
+function saveTableInternal(closeAfter) {
+  if (!editingTableId) return;
+  const data = readTableModalForm();
+  const prev = state.tables[editingTableId] || {};
+  const prevCustomerId = prev.customerId || '';
+  const wasOccupied = !!prev.occupied;
+
+  // 「新規登録」が選ばれていてまだ顧客IDがない場合は登録
+  let customerId = data.customerId;
+  let customerName = data.customerName;
+  if (data.createNewCustomer && customerName && !customerId) {
+    const now = Date.now();
+    const newCust = {
+      id: genId('cust'),
+      name: customerName,
+      phone: '',
+      birthday: '',
+      memo: '',
+      visits: [],
+      bottles: [],
+      _created: now,
+      _updated: now,
+      removed: false
+    };
+    state.customers.push(newCust);
+    customerId = newCust.id;
+  }
+
+  state.tables[editingTableId] = {
+    ...prev,
+    guests: data.guests,
+    castIds: data.castIds,
+    castFree: data.castFree,
+    customerId,
+    customerName: customerId ? '' : customerName,
+    memo: data.memo,
+  };
+
+  // 使用中で、顧客が新たに紐付いたら来店履歴に記録
+  if (wasOccupied && customerId && customerId !== prevCustomerId) {
+    recordVisit(customerId, data.castIds);
+  }
+
+  persistSave();
+  if (closeAfter) closeTableModal();
+  renderFloor();
+}
+
+function clearTable() {
+  if (!editingTableId) return;
+  const tname = getTableName(editingTableId);
+  if (!confirm(`${tname} を退店扱いにしますか？`)) return;
+  checkOut(editingTableId);
+  closeTableModal();
+}
+
+// ---------- SHIFT ----------
+function changeWeek(delta) {
+  if (delta === 0) state.weekOffset = 0;
+  else state.weekOffset += delta;
+  renderShift();
+}
+function renderShift() {
+  const monday = getWeekMonday(state.weekOffset);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    d.setHours(12,0,0,0);
+    days.push(d);
+  }
+  const dayLabels = ['月','火','水','木','金','土','日'];
+
+  // 週ラベル
+  const range = `${days[0].getMonth()+1}/${days[0].getDate()} 〜 ${days[6].getMonth()+1}/${days[6].getDate()}`;
+  let tag = '';
+  if (state.weekOffset === 0) tag = ' <span class="week-label">今週</span>';
+  else if (state.weekOffset === -1) tag = ' <span class="week-label past">先週</span>';
+  else if (state.weekOffset === -2) tag = ' <span class="week-label past">2週前</span>';
+  else if (state.weekOffset === 1) tag = ' <span class="week-label">次週</span>';
+  else if (state.weekOffset > 0) tag = ` <span class="week-label">${state.weekOffset}週後</span>`;
+  else tag = ` <span class="week-label past">${-state.weekOffset}週前</span>`;
+  document.getElementById('weekRangeLabel').innerHTML = range + tag;
+
+  // 予約インデックス：date(YYYY-MM-DD) → castId → [予約タイプ配列]
+  const resvIndex = buildShiftResvIndex(days);
+
+  // テーブル構築
+  const activeCasts = state.casts.filter(c => !c.removed);
+  const activeStaff = state.staff.filter(s => !s.removed);
+  let html = '<thead><tr><th class="cast-col">名前</th>';
+  days.forEach((d, i) => {
+    const dStr = `${d.getMonth()+1}/${d.getDate()}`;
+    html += `<th>${dayLabels[i]}<br><span style="font-weight:normal; color:#888; font-size:11px;">${dStr}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  if (activeCasts.length === 0 && activeStaff.length === 0) {
+    html += `<tr><td class="cast-col" colspan="8" style="text-align:center; color:#888; padding:24px;">設定からキャストまたはスタッフを追加してください</td></tr>`;
+  } else {
+    // キャスト行
+    if (activeCasts.length > 0) {
+      html += `<tr class="section-header"><td colspan="8">🌹 キャスト</td></tr>`;
+      activeCasts.forEach(c => {
+        const trialMark = c.trial
+          ? ` <span class="trial-badge">体験 ${c.trialCount||0}/3</span>`
+          : '';
+        html += `<tr class="${c.trial?'trial':''}">`;
+        html += `<td class="cast-col">${escapeHtml(c.name)}${trialMark}</td>`;
+        days.forEach(d => {
+          const dStr = localDateStr(d);
+          const on = getShift(dStr, c.id);
+          // 予約マーカー（キャストのみ）
+          const resvTypes = (resvIndex[dStr] && resvIndex[dStr][c.id]) || [];
+          const hasResvCls = resvTypes.length > 0 ? ' has-resv' : '';
+          const marksHtml = buildResvMarks(resvTypes);
+          const cellContent = `${on?'○':'—'}${marksHtml}`;
+          html += `<td class="shift-cell ${on?'on':'off'}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
+        });
+        html += '</tr>';
+      });
+    }
+    // スタッフ行（区切り線付き、ブルー系背景）
+    if (activeStaff.length > 0) {
+      html += `<tr class="section-header"><td colspan="8">👔 スタッフ</td></tr>`;
+      activeStaff.forEach(s => {
+        html += `<tr class="staff-row">`;
+        html += `<td class="cast-col">👔 ${escapeHtml(s.name)}</td>`;
+        days.forEach(d => {
+          const dStr = localDateStr(d);
+          const on = getShift(dStr, s.id);
+          // 予約マーカーは表示しない
+          html += `<td class="shift-cell ${on?'on':'off'}" data-date="${dStr}" data-cast="${s.id}" onclick="toggleShift('${dStr}','${s.id}')">${on?'○':'—'}</td>`;
+        });
+        html += '</tr>';
+      });
+    }
+  }
+
+  html += '</tbody>';
+  document.getElementById('shiftTable').innerHTML = html;
+}
+
+// 指定週の予約をキャスト×日付でインデックス化
+function buildShiftResvIndex(days) {
+  const idx = {};
+  days.forEach(d => {
+    const dStr = localDateStr(d);
+    idx[dStr] = {};
+  });
+  (state.reservations || []).forEach(r => {
+    if (r.removed) return;
+    if (r.status === 'cancelled') return;
+    if (!r.datetime) return;
+    const dStr = r.datetime.slice(0, 10);
+    if (!idx[dStr]) return; // 表示週外
+    (r.castIds || []).forEach(cid => {
+      if (!idx[dStr][cid]) idx[dStr][cid] = [];
+      (r.types || []).forEach(t => {
+        if (!idx[dStr][cid].includes(t)) idx[dStr][cid].push(t);
+      });
+    });
+  });
+  return idx;
+}
+
+// 予約タイプ配列から小バッジHTMLを生成
+function buildResvMarks(types) {
+  if (!types || types.length === 0) return '';
+  // 種別ごとに頭文字
+  const map = {
+    dohan: { cls: 'dohan', ch: '同' },
+    visit: { cls: 'visit', ch: '予' },
+    shimei: { cls: 'shimei', ch: '指' },
+    event: { cls: 'event', ch: '記' },
+  };
+  const marks = types.map(t => map[t]).filter(Boolean);
+  if (marks.length === 0) return '';
+  // 表示は最大3つまで
+  const shown = marks.slice(0, 3);
+  let html = '<div class="resv-marks">';
+  shown.forEach(m => {
+    html += `<span class="resv-mark ${m.cls}">${m.ch}</span>`;
+  });
+  html += '</div>';
+  return html;
+}
+function toggleShift(dateStr, castId) {
+  const cur = getShift(dateStr, castId);
+  setShift(dateStr, castId, !cur);
+  recalcAllTrialCounts();
+  persistSave();
+  renderShift();
+}
+function recalcAllTrialCounts() {
+  state.casts.forEach(c => {
+    if (c.trial) {
+      let count = 0;
+      Object.keys(state.shiftData).forEach(k => {
+        const [, cid] = k.split('_').slice(0,2).length === 2 ? [null, k.split('_')[1]] : [];
+        // shiftKey は YYYY-MM-DD_castId
+        const lastUnderscore = k.lastIndexOf('_');
+        const cidPart = k.slice(lastUnderscore+1);
+        if (cidPart === c.id && state.shiftData[k]) count++;
+      });
+      c.trialCount = count;
+    }
+  });
+}
+
+// ---------- CUSTOMERS ----------
+function renderCustomerList() {
+  const q = (document.getElementById('custSearch').value || '').toLowerCase().trim();
+  const list = document.getElementById('custList');
+  const filtered = state.customers
+    .filter(c => !c.removed)
+    .filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.phone||'').includes(q))
+    .sort((a,b) => (b._updated||b._created||0) - (a._updated||a._created||0));
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<p style="color:#888; grid-column:1/-1; text-align:center; padding:24px;">顧客がまだいません</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(c => {
+    const lastVisit = (c.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const lastVisitStr = lastVisit ? lastVisit.date : '—';
+    const visitCount = (c.visits||[]).length;
+    const bottleCount = (c.bottles||[]).length;
+    return `<div class="cust-card" onclick="openCustomerModal('${c.id}')">
+      <div class="nm">${escapeHtml(c.name||'(無名)')}</div>
+      <div class="meta">
+        ${c.phone ? `📞 ${escapeHtml(c.phone)}` : ''}
+        ${c.birthday ? `🎂 ${escapeHtml(c.birthday)}` : ''}
+      </div>
+      <div class="last-visit">最終来店: ${lastVisitStr}（来店${visitCount}回）</div>
+      ${bottleCount > 0 ? `<div class="bottles">🍾 ボトル ${bottleCount}本</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ---------- Customer Modal ----------
+let editingCustId = null;
+function openCustomerModal(id) {
+  editingCustId = id;
+  let cust;
+  if (id) {
+    cust = state.customers.find(c => c.id === id);
+    if (!cust) return;
+    document.getElementById('custModalTitle').textContent = '顧客編集';
+    document.getElementById('custDeleteBtn').style.display = '';
+  } else {
+    cust = { id:null, name:'', phone:'', birthday:'', memo:'', visits:[], bottles:[] };
+    document.getElementById('custModalTitle').textContent = '顧客新規追加';
+    document.getElementById('custDeleteBtn').style.display = 'none';
+  }
+
+  const visitsHtml = (cust.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)).map((v, idx) => {
+    const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
+    return `<div class="visit-row">
+      <span class="date">${escapeHtml(v.date)}</span>
+      <span class="cast">${escapeHtml(castNames || '—')}</span>
+      <button class="btn-danger btn-sm" onclick="removeVisit(${idx})">×</button>
+    </div>`;
+  }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
+
+  const bottlesHtml = (cust.bottles||[]).map((b, idx) => `
+    <div class="bottle-row">
+      <span class="name">🍾 ${escapeHtml(b.name||'')}</span>
+      ${b.tag ? `<span class="tag">🏷 ${escapeHtml(b.tag)}</span>` : ''}
+      ${b.location ? `<span class="tag">📍 ${escapeHtml(b.location)}</span>` : ''}
+      ${b.openedDate ? `<span class="tag">${escapeHtml(b.openedDate)}〜</span>` : ''}
+      <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
+    </div>
+  `).join('') || '<p style="color:#888; font-size:12px; margin:0;">ボトルキープなし</p>';
+
+  document.getElementById('custModalBody').innerHTML = `
+    <div class="cust-detail-section">
+      <h4>基本情報</h4>
+      <label class="field">
+        <span class="lab">名前 *</span>
+        <input type="text" id="cstName" value="${escapeHtml(cust.name||'')}">
+      </label>
+      <label class="field">
+        <span class="lab">連絡先（電話/LINE等）</span>
+        <input type="text" id="cstPhone" value="${escapeHtml(cust.phone||'')}">
+      </label>
+      <label class="field">
+        <span class="lab">誕生日</span>
+        <input type="text" id="cstBday" value="${escapeHtml(cust.birthday||'')}" placeholder="例: 1990-04-15 / 4月15日">
+      </label>
+    </div>
+
+    <div class="cust-detail-section">
+      <h4>来店履歴</h4>
+      <div id="visitsList">${visitsHtml}</div>
+      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+        <input type="date" id="newVisitDate" style="flex:1; min-width:140px;">
+        <button class="btn btn-sm" onclick="addVisitToEditing()">+ 履歴追加</button>
+      </div>
+    </div>
+
+    <div class="cust-detail-section">
+      <h4>ボトルキープ</h4>
+      <div id="bottlesList">${bottlesHtml}</div>
+      <div style="display:grid; gap:6px; margin-top:8px; grid-template-columns: 1fr 1fr;">
+        <input type="text" id="newBottleName" placeholder="ボトル名（必須）">
+        <input type="text" id="newBottleTag" placeholder="🏷 ネームタグ">
+        <input type="text" id="newBottleLoc" placeholder="📍 保管場所">
+        <input type="date" id="newBottleDate">
+      </div>
+      <button class="btn btn-sm" style="margin-top:6px;" onclick="addBottleToEditing()">+ ボトル追加</button>
+    </div>
+
+    <div class="cust-detail-section">
+      <h4>フリーメモ</h4>
+      <textarea id="cstMemo" rows="4" style="width:100%;" placeholder="好きな飲み物、話題、注意点など…">${escapeHtml(cust.memo||'')}</textarea>
+    </div>
+  `;
+  document.getElementById('custModalBg').classList.add('active');
+
+  // 編集中の一時データ
+  custEditing = JSON.parse(JSON.stringify(cust));
+}
+let custEditing = null;
+function closeCustomerModal() {
+  document.getElementById('custModalBg').classList.remove('active');
+  editingCustId = null;
+  custEditing = null;
+}
+function addVisitToEditing() {
+  const dateInput = document.getElementById('newVisitDate').value;
+  if (!dateInput) { alert('日付を選択してください'); return; }
+  if (!custEditing.visits) custEditing.visits = [];
+  custEditing.visits.push({ date: dateInput, castIds: [] });
+  // モーダル再描画（フォーム入力値を保持）
+  preserveAndReopen();
+}
+function removeVisit(idx) {
+  if (!custEditing) return;
+  if (!confirm('この来店記録を削除しますか？')) return;
+  custEditing.visits.splice(idx, 1);
+  preserveAndReopen();
+}
+function addBottleToEditing() {
+  const name = document.getElementById('newBottleName').value.trim();
+  if (!name) { alert('ボトル名を入力してください'); return; }
+  const tag = document.getElementById('newBottleTag').value.trim();
+  const loc = document.getElementById('newBottleLoc').value.trim();
+  const date = document.getElementById('newBottleDate').value;
+  if (!custEditing.bottles) custEditing.bottles = [];
+  custEditing.bottles.push({ name, tag, location:loc, openedDate:date });
+  preserveAndReopen();
+}
+function removeBottle(idx) {
+  if (!custEditing) return;
+  if (!confirm('このボトルを削除しますか？')) return;
+  custEditing.bottles.splice(idx, 1);
+  preserveAndReopen();
+}
+function preserveAndReopen() {
+  // 入力中のフォーム値を custEditing に反映してから再描画
+  const n = document.getElementById('cstName')?.value;
+  const p = document.getElementById('cstPhone')?.value;
+  const b = document.getElementById('cstBday')?.value;
+  const m = document.getElementById('cstMemo')?.value;
+  if (n !== undefined) custEditing.name = n;
+  if (p !== undefined) custEditing.phone = p;
+  if (b !== undefined) custEditing.birthday = b;
+  if (m !== undefined) custEditing.memo = m;
+  // 一時的に state に書かず、編集中データをそのままモーダルに再表示
+  reopenWithEditing();
+}
+function reopenWithEditing() {
+  // editingCustId は維持しつつ、custEditing を元に再描画
+  const id = editingCustId;
+  if (id) {
+    // 既存IDで再描画する際、state を一時上書きはせず custEditing をそのまま渡したい
+    // openCustomerModal は state から読むので、ここでは state を使わずに自前で描画する
+  }
+  // シンプルに：state の対象を一時的に置き換えず、新規モード扱いで再描画する代替策として、
+  // openCustomerModal を再呼び出しすると state ベースで読まれてしまうため、
+  // 軽量に再構築する：
+  const tmpId = editingCustId;
+  // state に下書きを書き戻して再描画（保存は saveCustomer まで反映しない）
+  // → ただしここでは state を汚さないため、ローカル replace で行う
+  // 一番簡単：custEditing の内容で state の一時項目を作って、再描画させる方式に統一
+  // やり方：state.customers から探して上書き、ただしオリジナルを別に保持
+  if (tmpId) {
+    const idx = state.customers.findIndex(c => c.id === tmpId);
+    if (idx >= 0) {
+      // 元データを保存していないので、編集中ビューのみ書き換え
+      state.customers[idx] = { ...state.customers[idx], ...custEditing, id: tmpId };
+    }
+  }
+  // モーダル本体だけ再構築（state からは読まず、custEditing をそのまま使う）
+  rebuildCustomerModalBody(custEditing);
+}
+function rebuildCustomerModalBody(cust) {
+  const visitsHtml = (cust.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)).map((v) => {
+    // 並び替え後のインデックスではなく、元配列のインデックスで操作したいので map 前に index を付与
+    return v;
+  });
+  // インデックス対応のため、元の順で表示する
+  const visitsRowsHtml = (cust.visits||[]).map((v, idx) => {
+    const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
+    return `<div class="visit-row">
+      <span class="date">${escapeHtml(v.date)}</span>
+      <span class="cast">${escapeHtml(castNames || '—')}</span>
+      <button class="btn-danger btn-sm" onclick="removeVisit(${idx})">×</button>
+    </div>`;
+  }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
+
+  const bottlesHtml = (cust.bottles||[]).map((b, idx) => `
+    <div class="bottle-row">
+      <span class="name">🍾 ${escapeHtml(b.name||'')}</span>
+      ${b.tag ? `<span class="tag">🏷 ${escapeHtml(b.tag)}</span>` : ''}
+      ${b.location ? `<span class="tag">📍 ${escapeHtml(b.location)}</span>` : ''}
+      ${b.openedDate ? `<span class="tag">${escapeHtml(b.openedDate)}〜</span>` : ''}
+      <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
+    </div>
+  `).join('') || '<p style="color:#888; font-size:12px; margin:0;">ボトルキープなし</p>';
+
+  document.getElementById('custModalBody').innerHTML = `
+    <div class="cust-detail-section">
+      <h4>基本情報</h4>
+      <label class="field">
+        <span class="lab">名前 *</span>
+        <input type="text" id="cstName" value="${escapeHtml(cust.name||'')}">
+      </label>
+      <label class="field">
+        <span class="lab">連絡先（電話/LINE等）</span>
+        <input type="text" id="cstPhone" value="${escapeHtml(cust.phone||'')}">
+      </label>
+      <label class="field">
+        <span class="lab">誕生日</span>
+        <input type="text" id="cstBday" value="${escapeHtml(cust.birthday||'')}" placeholder="例: 1990-04-15 / 4月15日">
+      </label>
+    </div>
+    <div class="cust-detail-section">
+      <h4>来店履歴</h4>
+      <div id="visitsList">${visitsRowsHtml}</div>
+      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+        <input type="date" id="newVisitDate" style="flex:1; min-width:140px;">
+        <button class="btn btn-sm" onclick="addVisitToEditing()">+ 履歴追加</button>
+      </div>
+    </div>
+    <div class="cust-detail-section">
+      <h4>ボトルキープ</h4>
+      <div id="bottlesList">${bottlesHtml}</div>
+      <div style="display:grid; gap:6px; margin-top:8px; grid-template-columns: 1fr 1fr;">
+        <input type="text" id="newBottleName" placeholder="ボトル名（必須）">
+        <input type="text" id="newBottleTag" placeholder="🏷 ネームタグ">
+        <input type="text" id="newBottleLoc" placeholder="📍 保管場所">
+        <input type="date" id="newBottleDate">
+      </div>
+      <button class="btn btn-sm" style="margin-top:6px;" onclick="addBottleToEditing()">+ ボトル追加</button>
+    </div>
+    <div class="cust-detail-section">
+      <h4>フリーメモ</h4>
+      <textarea id="cstMemo" rows="4" style="width:100%;">${escapeHtml(cust.memo||'')}</textarea>
+    </div>
+  `;
+}
+
+function saveCustomer() {
+  if (!custEditing) return;
+  const n = document.getElementById('cstName').value.trim();
+  if (!n) { alert('名前を入力してください'); return; }
+  custEditing.name = n;
+  custEditing.phone = document.getElementById('cstPhone').value.trim();
+  custEditing.birthday = document.getElementById('cstBday').value.trim();
+  custEditing.memo = document.getElementById('cstMemo').value;
+  custEditing._updated = Date.now();
+
+  if (editingCustId) {
+    // 既存
+    const idx = state.customers.findIndex(c => c.id === editingCustId);
+    if (idx >= 0) state.customers[idx] = { ...state.customers[idx], ...custEditing, id: editingCustId };
+  } else {
+    // 新規
+    custEditing.id = genId('cust');
+    custEditing._created = Date.now();
+    custEditing._updated = Date.now();
+    custEditing.removed = false;
+    state.customers.push(custEditing);
+  }
+  persistSave();
+  closeCustomerModal();
+  renderCustomerList();
+}
+function deleteCustomer() {
+  if (!editingCustId) return;
+  if (!confirm('この顧客を削除しますか？')) return;
+  const idx = state.customers.findIndex(c => c.id === editingCustId);
+  if (idx >= 0) {
+    state.customers[idx].removed = true;
+    state.customers[idx]._updated = Date.now();
+  }
+  persistSave();
+  closeCustomerModal();
+  renderCustomerList();
+}
+
+// ---------- RESERVATIONS ----------
+
+// 予約タイプ定義
+const RESV_TYPES = [
+  { key: 'dohan',  label: '同伴',         cls: 'dohan' },
+  { key: 'visit',  label: '来店予約',     cls: 'visit' },
+  { key: 'shimei', label: 'キャスト指名', cls: 'shimei' },
+  { key: 'event',  label: '記念日',       cls: 'event' },
+];
+
+// 予約変更後、シフトページが表示されていれば再描画（マーカー反映）
+function refreshShiftIfVisible() {
+  if (document.getElementById('page-shift')?.classList.contains('active')) {
+    renderShift();
+  }
+}
+
+function renderReservations() {
+  const root = document.getElementById('page-reservations');
+  if (!root) return;
+
+  // 並び替え：日時順
+  const all = (state.reservations || []).filter(r => !r.removed);
+
+  const now = Date.now();
+  const todayStr = localDateStr(new Date());
+
+  // 本日の予約：本日の日付（datetime の YYYY-MM-DD 部分が today と一致）かつ未キャンセル
+  const todayList = all.filter(r => {
+    if (!r.datetime) return false;
+    return r.datetime.startsWith(todayStr) && r.status !== 'cancelled';
+  }).sort((a,b) => (a.datetime||'').localeCompare(b.datetime||''));
+
+  // 今後の予約：今日より後（明日以降）かつ未キャンセル
+  const upcomingList = all.filter(r => {
+    if (!r.datetime) return false;
+    const dStr = r.datetime.slice(0,10);
+    return dStr > todayStr && r.status !== 'cancelled';
+  }).sort((a,b) => (a.datetime||'').localeCompare(b.datetime||''));
+
+  // 過去の予約：今日より前 or キャンセル済み
+  const pastList = all.filter(r => {
+    if (!r.datetime) return r.status === 'cancelled';
+    const dStr = r.datetime.slice(0,10);
+    return (dStr < todayStr) || r.status === 'cancelled' || r.status === 'done';
+  }).filter(r => {
+    // 「今日のもので done」は本日タブに残しても良いが、シンプルに過去側へ
+    if (!r.datetime) return true;
+    if (r.datetime.startsWith(todayStr) && r.status === 'done') return true;
+    if (r.datetime.startsWith(todayStr) && r.status !== 'cancelled' && r.status !== 'done') return false;
+    return true;
+  }).sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+
+  // 本日件数表示
+  const cntEl = document.getElementById('resvTodayCount');
+  if (cntEl) {
+    const pending = todayList.filter(r => r.status !== 'done').length;
+    cntEl.textContent = pending > 0 ? `本日 ${pending}件の予約` : '本日の予約なし';
+  }
+
+  // レンダー
+  document.getElementById('resvToday').innerHTML = todayList.length
+    ? todayList.map(r => buildReservationCardHTML(r)).join('')
+    : '<div class="resv-empty">本日の予約はありません</div>';
+
+  document.getElementById('resvUpcoming').innerHTML = upcomingList.length
+    ? upcomingList.map(r => buildReservationCardHTML(r)).join('')
+    : '<div class="resv-empty">今後の予約はありません</div>';
+
+  document.getElementById('resvPast').innerHTML = pastList.length
+    ? pastList.slice(0, 30).map(r => buildReservationCardHTML(r)).join('')
+    : '<div class="resv-empty">履歴なし</div>';
+
+  // クリック・アクションのバインド
+  bindReservationCardEvents();
+
+  // 新規予約ボタン
+  const addBtn = document.getElementById('addResvBtn');
+  if (addBtn && !addBtn._bound) {
+    addBtn.addEventListener('click', () => openReservationModal(null));
+    addBtn._bound = true;
+  }
+}
+
+function buildReservationCardHTML(r) {
+  // 顧客名表示
+  const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
+  const customerName = cust ? cust.name : (r.customerName || '(未登録)');
+
+  // キャスト名表示
+  const castNames = (r.castIds || [])
+    .map(cid => state.casts.find(c => c.id === cid)?.name || '')
+    .filter(Boolean);
+  const castFreeStr = (r.castFree || '').trim();
+  const castDisplay = [castNames.join('・'), castFreeStr].filter(Boolean).join('・');
+
+  // 日時
+  const dt = r.datetime ? new Date(r.datetime) : null;
+  let timeStr = '—';
+  let dateStr = '';
+  if (dt && !isNaN(dt.getTime())) {
+    const h = String(dt.getHours()).padStart(2,'0');
+    const m = String(dt.getMinutes()).padStart(2,'0');
+    timeStr = `${h}:${m}`;
+    const mo = dt.getMonth()+1;
+    const dd = dt.getDate();
+    const dayLabels = ['日','月','火','水','木','金','土'];
+    dateStr = `${mo}/${dd}(${dayLabels[dt.getDay()]})`;
+  }
+
+  // タグ
+  const types = r.types || [];
+  const tagsHtml = RESV_TYPES
+    .filter(t => types.includes(t.key))
+    .map(t => `<span class="resv-tag ${t.cls}">${t.label}</span>`)
+    .join('');
+
+  // テーブル
+  let tableLabel = '';
+  if (r.tableId) {
+    const t = DEFAULT_TABLES.find(x => x.id === r.tableId);
+    if (t) tableLabel = t.name;
+  }
+
+  // シフト連携：指名キャスト全員が予約日に出勤予定か
+  let shiftWarn = '';
+  if (r.datetime && (r.castIds || []).length > 0) {
+    const dStr = r.datetime.slice(0,10);
+    const offShiftCasts = (r.castIds || []).filter(cid => !getShift(dStr, cid))
+      .map(cid => state.casts.find(c => c.id === cid)?.name || '')
+      .filter(Boolean);
+    if (offShiftCasts.length > 0) {
+      shiftWarn = `<div class="resv-warn-block">⚠ ${escapeHtml(offShiftCasts.join('・'))} は ${dateStr} のシフト未登録</div>`;
+    } else {
+      shiftWarn = `<span class="resv-tag ok-shift">✓ シフトOK</span>`;
+    }
+  }
+
+  // ステータスごとのカード装飾
+  let cardCls = 'resv-card';
+  if (types.length > 0) {
+    cardCls += ' ' + RESV_TYPES.find(t => types.includes(t.key))?.cls;
+  }
+  if (r.status === 'done') cardCls += ' done';
+  if (r.status === 'cancelled') cardCls += ' cancelled';
+
+  // アクションボタン
+  let actionsHtml = '';
+  if (r.status === 'cancelled') {
+    actionsHtml = `
+      <button class="btn-sub btn-sm" data-resv-restore="${r.id}">復活</button>
+      <button class="btn-danger btn-sm" data-resv-delete="${r.id}">完全削除</button>
+    `;
+  } else if (r.status === 'done') {
+    actionsHtml = `
+      <button class="btn-sub btn-sm" data-resv-edit="${r.id}">編集</button>
+      <button class="btn-danger btn-sm" data-resv-cancel="${r.id}">キャンセル</button>
+    `;
+  } else {
+    actionsHtml = `
+      <button class="btn btn-sm" data-resv-checkin="${r.id}">▶ 来店確認</button>
+      <button class="btn-sub btn-sm" data-resv-edit="${r.id}">編集</button>
+      <button class="btn-danger btn-sm" data-resv-cancel="${r.id}">キャンセル</button>
+    `;
+  }
+
+  return `
+    <div class="${cardCls}" data-resv-id="${r.id}">
+      <div class="resv-row-top">
+        <span class="resv-time">${timeStr}</span>
+        ${dateStr ? `<span class="resv-date">${dateStr}</span>` : ''}
+        <div class="resv-tags">${tagsHtml}${shiftWarn.startsWith('<span') ? shiftWarn : ''}</div>
+      </div>
+      <div class="resv-row-mid">
+        <b>${escapeHtml(customerName)}</b>
+        ${r.guests ? ` / 👥 ${r.guests}名` : ''}
+        ${castDisplay ? ` / 🌹 ${escapeHtml(castDisplay)}` : ''}
+        ${tableLabel ? ` / 🪑 ${escapeHtml(tableLabel)}` : ''}
+      </div>
+      ${shiftWarn.startsWith('<div') ? shiftWarn : ''}
+      ${r.memo ? `<div class="resv-memo">${escapeHtml(r.memo)}</div>` : ''}
+      <div class="resv-actions">${actionsHtml}</div>
+    </div>
+  `;
+}
+
+function bindReservationCardEvents() {
+  document.querySelectorAll('[data-resv-edit]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openReservationModal(el.getAttribute('data-resv-edit'));
+    });
+  });
+  document.querySelectorAll('[data-resv-cancel]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cancelReservation(el.getAttribute('data-resv-cancel'));
+    });
+  });
+  document.querySelectorAll('[data-resv-restore]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      restoreReservation(el.getAttribute('data-resv-restore'));
+    });
+  });
+  document.querySelectorAll('[data-resv-delete]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteReservation(el.getAttribute('data-resv-delete'));
+    });
+  });
+  document.querySelectorAll('[data-resv-checkin]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      checkInFromReservation(el.getAttribute('data-resv-checkin'));
+    });
+  });
+  // カード自体クリックで編集
+  document.querySelectorAll('.resv-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // ボタン以外のクリックで編集
+      if (e.target.closest('button')) return;
+      const id = card.getAttribute('data-resv-id');
+      if (id) openReservationModal(id);
+    });
+  });
+}
+
+// 予約のキャンセル
+function cancelReservation(id) {
+  const r = state.reservations.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('この予約をキャンセルしますか？')) return;
+  r.status = 'cancelled';
+  r._updated = Date.now();
+  persistSave();
+  renderReservations();
+  refreshShiftIfVisible();
+}
+function restoreReservation(id) {
+  const r = state.reservations.find(x => x.id === id);
+  if (!r) return;
+  r.status = 'pending';
+  r._updated = Date.now();
+  persistSave();
+  renderReservations();
+  refreshShiftIfVisible();
+}
+function deleteReservation(id) {
+  const r = state.reservations.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('この予約を完全に削除しますか？')) return;
+  r.removed = true;
+  r._updated = Date.now();
+  persistSave();
+  renderReservations();
+  refreshShiftIfVisible();
+}
+
+// 予約から来店確認 → 該当テーブルに入店登録
+function checkInFromReservation(id) {
+  const r = state.reservations.find(x => x.id === id);
+  if (!r) return;
+
+  // テーブル選択
+  let tableId = r.tableId;
+  if (!tableId) {
+    // 空席のテーブルから選んでもらう
+    const empty = DEFAULT_TABLES.filter(t => !state.tables[t.id]?.occupied);
+    if (empty.length === 0) {
+      alert('空席がありません');
+      return;
+    }
+    const list = empty.map((t, i) => `${i+1}. ${t.name}`).join('\n');
+    const picked = prompt(`どのテーブルに案内しますか？番号を入力:\n${list}`);
+    if (!picked) return;
+    const idx = parseInt(picked, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= empty.length) {
+      alert('無効な選択です');
+      return;
+    }
+    tableId = empty[idx].id;
+  } else {
+    // 指定テーブルが既に使用中なら警告
+    if (state.tables[tableId]?.occupied) {
+      if (!confirm(`${getTableName(tableId)} は既に使用中です。別の空席に案内しますか？`)) return;
+      const empty = DEFAULT_TABLES.filter(t => !state.tables[t.id]?.occupied);
+      if (empty.length === 0) {
+        alert('空席がありません');
+        return;
+      }
+      const list = empty.map((t, i) => `${i+1}. ${t.name}`).join('\n');
+      const picked = prompt(`空席:\n${list}`);
+      if (!picked) return;
+      const idx = parseInt(picked, 10) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= empty.length) return;
+      tableId = empty[idx].id;
+    }
+  }
+
+  // 顧客情報取得
+  let customerId = r.customerId || '';
+  let customerName = r.customerName || '';
+  let createNew = false;
+  if (!customerId && customerName) {
+    if (confirm(`「${customerName}」を顧客リストに新規登録しますか？`)) {
+      createNew = true;
+    }
+  }
+
+  // 入店処理
+  checkIn(tableId, {
+    customerId,
+    customerName,
+    createNewCustomer: createNew,
+    guests: r.guests || 1,
+    castIds: r.castIds || [],
+    castFree: r.castFree || '',
+    memo: r.memo || '',
+  });
+
+  // 予約をdone扱い
+  r.status = 'done';
+  r._updated = Date.now();
+  persistSave();
+  renderReservations();
+  refreshShiftIfVisible();
+  alert(`${getTableName(tableId)} に入店登録しました`);
+}
+
+// 予約モーダル
+let editingResvId = null;
+function openReservationModal(id) {
+  editingResvId = id;
+  let r;
+  if (id) {
+    r = state.reservations.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('resvModalTitle').textContent = '予約編集';
+  } else {
+    // 新規：デフォルトで本日18:00
+    const now = new Date();
+    now.setHours(18, 0, 0, 0);
+    if (now < new Date()) {
+      now.setDate(now.getDate() + 1);
+    }
+    const defDate = localDateStr(now);
+    const defTime = '18:00';
+    r = {
+      id: null,
+      customerId: '',
+      customerName: '',
+      guests: 1,
+      castIds: [],
+      castFree: '',
+      datetime: `${defDate}T${defTime}`,
+      types: ['visit'],
+      tableId: '',
+      memo: '',
+      status: 'pending',
+    };
+    document.getElementById('resvModalTitle').textContent = '新規予約';
+  }
+
+  // 顧客選択肢
+  const custOptions = ['<option value="">（未登録 or 新規）</option>']
+    .concat(state.customers.filter(c => !c.removed).map(c =>
+      `<option value="${c.id}" ${r.customerId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+    )).join('');
+
+  // キャスト選択肢
+  const castOptions = state.casts.filter(c => !c.removed).map(c => {
+    const checked = (r.castIds || []).includes(c.id) ? 'checked' : '';
+    return `<label class="small-label" style="margin:4px 8px 4px 0;">
+      <input type="checkbox" value="${c.id}" ${checked} class="resv-cast-pick"> ${escapeHtml(c.name)}${c.trial?'<span class="trial-badge">体験</span>':''}
+    </label>`;
+  }).join('');
+
+  // テーブル選択肢
+  const tableOptions = ['<option value="">（指定なし）</option>']
+    .concat(DEFAULT_TABLES.map(t =>
+      `<option value="${t.id}" ${r.tableId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`
+    )).join('');
+
+  // 種別チェックボックス
+  const typeChecks = RESV_TYPES.map(t => {
+    const checked = (r.types || []).includes(t.key) ? 'checked' : '';
+    return `<label class="small-label" style="margin:4px 8px 4px 0;">
+      <input type="checkbox" value="${t.key}" ${checked} class="resv-type-pick"> ${t.label}
+    </label>`;
+  }).join('');
+
+  // 日時パース
+  let dateVal = '', timeVal = '';
+  if (r.datetime && r.datetime.length >= 16) {
+    dateVal = r.datetime.slice(0, 10);
+    timeVal = r.datetime.slice(11, 16);
+  }
+
+  document.getElementById('resvModalBody').innerHTML = `
+    <label class="field">
+      <span class="lab">予約日時</span>
+      <div style="display:flex; gap:6px;">
+        <input type="date" id="resvDate" value="${dateVal}" style="flex:1;">
+        <input type="time" id="resvTime" value="${timeVal}" style="flex:1;">
+      </div>
+    </label>
+
+    <div class="field">
+      <span class="lab">予約種別（複数選択可）</span>
+      <div style="display:flex; flex-wrap:wrap;">${typeChecks}</div>
+    </div>
+
+    <label class="field">
+      <span class="lab">お客様（既存から選択）</span>
+      <select id="resvCustomer">${custOptions}</select>
+    </label>
+    <label class="field">
+      <span class="lab">お客様（フリー入力 / 新規）</span>
+      <input type="text" id="resvCustomerName" value="${escapeHtml(r.customerName || '')}" placeholder="既存を選択しない場合の名前">
+    </label>
+
+    <label class="field">
+      <span class="lab">人数</span>
+      <input type="number" id="resvGuests" value="${r.guests || 1}" min="1" max="20">
+    </label>
+
+    <div class="field">
+      <span class="lab">指名キャスト</span>
+      <div style="display:flex; flex-wrap:wrap;">
+        ${castOptions || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
+      </div>
+      <input type="text" id="resvCastFree" value="${escapeHtml(r.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px;">
+    </div>
+
+    <label class="field">
+      <span class="lab">テーブル希望</span>
+      <select id="resvTable">${tableOptions}</select>
+    </label>
+
+    <label class="field">
+      <span class="lab">メモ</span>
+      <textarea id="resvMemo" rows="3" placeholder="例：ボトル1本キープ、誕生日サプライズ、など">${escapeHtml(r.memo || '')}</textarea>
+    </label>
+  `;
+
+  // フッター
+  buildResvModalFooter(!!id);
+  document.getElementById('resvModalBg').classList.add('active');
+}
+
+function buildResvModalFooter(isEdit) {
+  const footer = document.getElementById('resvModalFooter');
+  footer.innerHTML = '';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn-sub btn-sm';
+  closeBtn.textContent = '閉じる';
+  closeBtn.addEventListener('click', closeReservationModal);
+  footer.appendChild(closeBtn);
+
+  if (isEdit) {
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-danger btn-sm';
+    delBtn.textContent = '削除';
+    delBtn.addEventListener('click', () => {
+      if (editingResvId) {
+        deleteReservation(editingResvId);
+        closeReservationModal();
+      }
+    });
+    footer.appendChild(delBtn);
+  }
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'btn btn-sm';
+  saveBtn.textContent = '保存';
+  saveBtn.addEventListener('click', saveReservation);
+  footer.appendChild(saveBtn);
+}
+
+function closeReservationModal() {
+  document.getElementById('resvModalBg').classList.remove('active');
+  editingResvId = null;
+}
+
+function saveReservation() {
+  const dateVal = document.getElementById('resvDate').value;
+  const timeVal = document.getElementById('resvTime').value;
+  if (!dateVal || !timeVal) {
+    alert('予約日時を入力してください');
+    return;
+  }
+  const datetime = `${dateVal}T${timeVal}`;
+
+  const types = Array.from(document.querySelectorAll('.resv-type-pick:checked')).map(el => el.value);
+  if (types.length === 0) {
+    alert('予約種別を1つ以上選択してください');
+    return;
+  }
+
+  const customerId = document.getElementById('resvCustomer').value || '';
+  const customerName = (document.getElementById('resvCustomerName').value || '').trim();
+  if (!customerId && !customerName) {
+    alert('お客様情報（既存選択またはフリー入力）が必要です');
+    return;
+  }
+
+  const guests = parseInt(document.getElementById('resvGuests').value, 10) || 1;
+  const castIds = Array.from(document.querySelectorAll('.resv-cast-pick:checked')).map(el => el.value);
+  const castFree = (document.getElementById('resvCastFree').value || '').trim();
+  const tableId = document.getElementById('resvTable').value || '';
+  const memo = document.getElementById('resvMemo').value || '';
+
+  const now = Date.now();
+  if (editingResvId) {
+    const r = state.reservations.find(x => x.id === editingResvId);
+    if (r) {
+      r.customerId = customerId;
+      r.customerName = customerId ? '' : customerName;
+      r.guests = guests;
+      r.castIds = castIds;
+      r.castFree = castFree;
+      r.datetime = datetime;
+      r.types = types;
+      r.tableId = tableId;
+      r.memo = memo;
+      r._updated = now;
+    }
+  } else {
+    state.reservations.push({
+      id: genId('resv'),
+      customerId,
+      customerName: customerId ? '' : customerName,
+      guests,
+      castIds,
+      castFree,
+      datetime,
+      types,
+      tableId,
+      memo,
+      status: 'pending',
+      _created: now,
+      _updated: now,
+      removed: false,
+    });
+  }
+
+  persistSave();
+  closeReservationModal();
+  renderReservations();
+  refreshShiftIfVisible();
+}
+
+// ---------- SETTINGS ----------
+function renderSettings() {
+  document.getElementById('pinNew').value = '';
+  renderCastListUI();
+  renderStaffListUI();
+  loadServerConfigUI();
+}
+function savePin() {
+  const v = document.getElementById('pinNew').value.trim();
+  if (!v) { alert('PINを入力してください'); return; }
+  if (!/^\d{4,8}$/.test(v)) { alert('PINは4〜8桁の数字にしてください'); return; }
+  state.pin = v;
+  persistSave();
+  alert('PINを変更しました');
+}
+
+// --- Casts ---
+function addCast() {
+  const name = document.getElementById('newCastName').value.trim();
+  if (!name) { alert('キャスト名を入力'); return; }
+  const trial = document.getElementById('newCastTrial').checked;
+  state.casts.push({
+    id: genId('cast'),
+    name,
+    trial,
+    trialCount: 0,
+    removed: false
+  });
+  document.getElementById('newCastName').value = '';
+  document.getElementById('newCastTrial').checked = false;
+  persistSave();
+  renderCastListUI();
+}
+function renderCastListUI() {
+  const root = document.getElementById('castListUI');
+  const list = state.casts.filter(c => !c.removed);
+  if (list.length === 0) {
+    root.innerHTML = '<p style="color:#888; font-size:12px;">キャスト未登録</p>';
+    return;
+  }
+  root.innerHTML = list.map(c => `
+    <div class="cast-list-item ${c.trial?'trial':''}">
+      <input type="text" class="rename" value="${escapeHtml(c.name)}" onchange="renameCast('${c.id}', this.value)">
+      <label class="small-label">
+        <input type="checkbox" ${c.trial?'checked':''} onchange="toggleTrial('${c.id}', this.checked)"> 体験
+      </label>
+      ${c.trial ? `<span class="trial-badge">${c.trialCount||0}/3</span>` : ''}
+      ${c.trial ? `<button class="btn btn-sm" onclick="convertToMember('${c.id}')">本採用</button>` : ''}
+      <button class="btn-danger btn-sm" onclick="removeCast('${c.id}')">削除</button>
+    </div>
+  `).join('');
+}
+function renameCast(id, name) {
+  const c = state.casts.find(x => x.id === id);
+  if (c) { c.name = name.trim() || c.name; persistSave(); }
+}
+function toggleTrial(id, val) {
+  const c = state.casts.find(x => x.id === id);
+  if (c) {
+    c.trial = val;
+    if (!val) c.trialCount = 0;
+    persistSave();
+    renderCastListUI();
+  }
+}
+function convertToMember(id) {
+  const c = state.casts.find(x => x.id === id);
+  if (c) {
+    if (!confirm(`${c.name}を本採用に変更しますか？`)) return;
+    c.trial = false;
+    c.trialCount = 0;
+    persistSave();
+    renderCastListUI();
+  }
+}
+function removeCast(id) {
+  const c = state.casts.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`${c.name}を削除しますか？\n（シフト履歴は残ります）`)) return;
+  c.removed = true;
+  persistSave();
+  renderCastListUI();
+}
+
+// --- Staff ---
+function addStaff() {
+  const name = document.getElementById('newStaffName').value.trim();
+  if (!name) { alert('スタッフ名を入力'); return; }
+  state.staff.push({ id: genId('staff'), name, removed:false });
+  document.getElementById('newStaffName').value = '';
+  persistSave();
+  renderStaffListUI();
+}
+function renderStaffListUI() {
+  const root = document.getElementById('staffListUI');
+  const list = state.staff.filter(s => !s.removed);
+  if (list.length === 0) {
+    root.innerHTML = '<p style="color:#888; font-size:12px;">スタッフ未登録</p>';
+    return;
+  }
+  root.innerHTML = list.map(s => `
+    <div class="staff-list-item">
+      <input type="text" class="rename" value="${escapeHtml(s.name)}" onchange="renameStaff('${s.id}', this.value)">
+      <button class="btn-danger btn-sm" onclick="removeStaff('${s.id}')">削除</button>
+    </div>
+  `).join('');
+}
+function renameStaff(id, name) {
+  const s = state.staff.find(x => x.id === id);
+  if (s) { s.name = name.trim() || s.name; persistSave(); }
+}
+function removeStaff(id) {
+  const s = state.staff.find(x => x.id === id);
+  if (!s) return;
+  if (!confirm(`${s.name}を削除しますか？`)) return;
+  s.removed = true;
+  persistSave();
+  renderStaffListUI();
+}
+
+// ---------- Backup / Restore ----------
+function exportBackup() {
+  const data = {
+    pin: state.pin,
+    casts: state.casts,
+    staff: state.staff,
+    customers: state.customers,
+    tables: state.tables,
+    shiftData: state.shiftData,
+    _exportedAt: Date.now()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = localDateStr(new Date());
+  a.href = url;
+  a.download = `tao-lite-backup-${today}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importBackup(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!confirm('現在のデータを上書きします。よろしいですか？')) return;
+      if (data.pin) state.pin = data.pin;
+      if (Array.isArray(data.casts)) state.casts = data.casts;
+      if (Array.isArray(data.staff)) state.staff = data.staff;
+      if (Array.isArray(data.customers)) state.customers = data.customers;
+      if (data.tables) state.tables = data.tables;
+      if (data.shiftData) state.shiftData = data.shiftData;
+      persistSave();
+      alert('復元しました');
+      location.reload();
+    } catch(err) {
+      alert('ファイルの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function resetAllData() {
+  if (!confirm('全データを削除します。本当によろしいですか？\nバックアップを取りましたか？')) return;
+  if (!confirm('最終確認：本当に全削除しますか？')) return;
+  localStorage.removeItem(LS_KEY);
+  localStorage.removeItem(LS_SRV);
+  location.reload();
+}
+
+// ---------- Server Sync ----------
+const server = {
+  url: '',
+  token: '',
+  pollTimer: null,
+  saveTimer: null,
+  lastHash: '',
+  connected: false,
+};
+function loadServerConfigUI() {
+  try {
+    const raw = localStorage.getItem(LS_SRV);
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      server.url = cfg.url || '';
+      server.token = cfg.token || '';
+    }
+  } catch(e) {}
+  const u = document.getElementById('srvUrl');
+  const t = document.getElementById('srvToken');
+  if (u) u.value = server.url;
+  if (t) t.value = server.token;
+}
+async function saveServerConfig() {
+  const url = document.getElementById('srvUrl').value.trim();
+  const token = document.getElementById('srvToken').value.trim();
+  if (!url || !token) { alert('URLとトークンを入力してください'); return; }
+  server.url = url;
+  server.token = token;
+  localStorage.setItem(LS_SRV, JSON.stringify({ url, token }));
+  setSrvStatus('接続中…');
+  setSyncDot(null, '同期中…');
+  try {
+    await loadFromServer();
+    server.connected = true;
+    setSrvStatus('✅ 接続成功・同期開始');
+    setSyncDot(true, '同期OK');
+    startPolling();
+  } catch(e) {
+    server.connected = false;
+    setSrvStatus('❌ 接続失敗: ' + e.message);
+    setSyncDot(false, '同期エラー');
+  }
+}
+function disconnectServer() {
+  server.url = ''; server.token = ''; server.connected = false;
+  localStorage.removeItem(LS_SRV);
+  if (server.pollTimer) clearInterval(server.pollTimer);
+  loadServerConfigUI();
+  setSrvStatus('切断しました');
+  setSyncDot(null, '未接続');
+}
+function setSrvStatus(s) {
+  const el = document.getElementById('srvStatus');
+  if (el) el.textContent = s;
+}
+function setSyncDot(state, msg) {
+  const dot = document.getElementById('syncDot');
+  const m = document.getElementById('syncMsg');
+  if (!dot || !m) return;
+  dot.classList.remove('ok','err');
+  if (state === true) dot.classList.add('ok');
+  else if (state === false) dot.classList.add('err');
+  m.textContent = msg;
+}
+async function loadFromServer() {
+  if (!server.url || !server.token) throw new Error('未設定');
+  const res = await fetch(server.url + '/get', {
+    method: 'GET',
+    headers: { 'X-Auth-Token': server.token }
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (data && data.payload) {
+    applyServerData(data.payload);
+    server.lastHash = simpleHash(JSON.stringify(data.payload));
+  }
+}
+function applyServerData(payload) {
+  // IDベースマージ
+  if (payload.pin) state.pin = payload.pin;
+  if (payload.tables) state.tables = payload.tables;
+  if (payload.shiftData) {
+    // 全置換（削除も反映するため）
+    Object.keys(state.shiftData).forEach(k => delete state.shiftData[k]);
+    Object.assign(state.shiftData, payload.shiftData);
+  }
+  if (Array.isArray(payload.casts)) {
+    payload.casts.forEach(rc => {
+      const idx = state.casts.findIndex(c => c.id === rc.id);
+      if (idx >= 0) state.casts[idx] = rc;
+      else state.casts.push(rc);
+    });
+  }
+  if (Array.isArray(payload.staff)) {
+    payload.staff.forEach(rs => {
+      const idx = state.staff.findIndex(s => s.id === rs.id);
+      if (idx >= 0) state.staff[idx] = rs;
+      else state.staff.push(rs);
+    });
+  }
+  if (Array.isArray(payload.customers)) {
+    payload.customers.forEach(rc => {
+      const idx = state.customers.findIndex(c => c.id === rc.id);
+      if (idx >= 0) {
+        // _updated が新しい方を採用
+        if ((rc._updated||0) >= (state.customers[idx]._updated||0)) {
+          state.customers[idx] = rc;
+        }
+      } else {
+        state.customers.push(rc);
+      }
+    });
+  }
+  if (Array.isArray(payload.reservations)) {
+    payload.reservations.forEach(rr => {
+      const idx = state.reservations.findIndex(r => r.id === rr.id);
+      if (idx >= 0) {
+        if ((rr._updated||0) >= (state.reservations[idx]._updated||0)) {
+          state.reservations[idx] = rr;
+        }
+      } else {
+        state.reservations.push(rr);
+      }
+    });
+  }
+  // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
+  try { localStorage.setItem(LS_KEY, JSON.stringify({
+    pin: state.pin, casts: state.casts, staff: state.staff,
+    customers: state.customers, tables: state.tables, shiftData: state.shiftData,
+    reservations: state.reservations,
+    _updatedAt: Date.now()
+  })); } catch(e) {}
+  // 表示更新
+  if (document.getElementById('page-floor').classList.contains('active')) renderFloor();
+  if (document.getElementById('page-shift').classList.contains('active')) renderShift();
+  if (document.getElementById('page-customers').classList.contains('active')) renderCustomerList();
+  if (document.getElementById('page-reservations').classList.contains('active')) renderReservations();
+  if (document.getElementById('page-settings').classList.contains('active')) renderSettings();
+}
+function buildSaveData() {
+  return {
+    pin: state.pin,
+    casts: state.casts,
+    staff: state.staff,
+    customers: state.customers,
+    tables: state.tables,
+    shiftData: state.shiftData,
+    reservations: state.reservations,
+    _updatedAt: Date.now()
+  };
+}
+async function saveToServer() {
+  if (!server.url || !server.token) return;
+  const payload = buildSaveData();
+  try {
+    const res = await fetch(server.url + '/set', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Auth-Token': server.token
+      },
+      body: JSON.stringify({ payload })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    server.lastHash = simpleHash(JSON.stringify(payload));
+    setSyncDot(true, '同期OK ' + nowHHMM());
+  } catch(e) {
+    setSyncDot(false, '送信エラー');
+    console.error('saveToServer', e);
+  }
+}
+function scheduleServerSave() {
+  if (!server.url || !server.token) return;
+  if (server.saveTimer) clearTimeout(server.saveTimer);
+  server.saveTimer = setTimeout(() => {
+    saveToServer();
+  }, 800);
+}
+function forceSync() {
+  if (!server.url || !server.token) { alert('サーバー未設定'); return; }
+  setSyncDot(null, '同期中…');
+  loadFromServer().then(() => {
+    saveToServer();
+  }).catch(e => {
+    setSyncDot(false, '同期エラー');
+    setSrvStatus('❌ ' + e.message);
+  });
+}
+function initServerSync() {
+  setSyncDot(null, '接続中…');
+  loadFromServer().then(() => {
+    server.connected = true;
+    setSyncDot(true, '同期OK');
+    setSrvStatus('✅ 接続済み');
+    startPolling();
+  }).catch(e => {
+    server.connected = false;
+    setSyncDot(false, '同期エラー');
+    setSrvStatus('❌ ' + e.message);
+  });
+}
+function startPolling() {
+  if (server.pollTimer) clearInterval(server.pollTimer);
+  server.pollTimer = setInterval(doPoll, 15000);
+}
+async function doPoll() {
+  if (!server.url || !server.token) return;
+  try {
+    const res = await fetch(server.url + '/get', {
+      method: 'GET',
+      headers: { 'X-Auth-Token': server.token }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data && data.payload) {
+      const h = simpleHash(JSON.stringify(data.payload));
+      if (h !== server.lastHash) {
+        applyServerData(data.payload);
+        server.lastHash = h;
+        setSyncDot(true, '更新受信 ' + nowHHMM());
+      } else {
+        setSyncDot(true, '同期OK ' + nowHHMM());
+      }
+    }
+  } catch(e) {
+    setSyncDot(false, '取得エラー');
+  }
+}
+window.addEventListener('visibilitychange', () => {
+  if (!document.hidden && server.url && server.token) doPoll();
+});
+window.addEventListener('online', () => {
+  if (server.url && server.token) doPoll();
+});
+function simpleHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i);
+    h |= 0;
+  }
+  return String(h);
+}
+function nowHHMM() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+// ---------- Util ----------
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+// ---------- Boot ----------
+persistLoad();
+// PIN初期化（未設定なら 0000）
+if (!state.pin) state.pin = '0000';
+// ログイン画面表示中はPIN入力にフォーカス
+setTimeout(() => {
+  document.getElementById('pinInput').focus();
+}, 100);
+
+</script>
+</body>
+</html>
