@@ -1251,6 +1251,13 @@
 const LS_KEY = 'tao_lite_main';
 const LS_SRV = 'tao_lite_server';
 
+// 自分発の変更を識別するためのフラグ（同期時の通知抑制用）
+// persistSave より前に定義する必要がある
+const localChangeMarker = { lastChangeAt: 0 };
+function markLocalChange() {
+  localChangeMarker.lastChangeAt = Date.now();
+}
+
 function persistSave() {
   // 自分発の変更マーカー（同期時の通知抑制用）
   markLocalChange();
@@ -1333,13 +1340,6 @@ function loadNotifPrefs() {
 }
 function saveNotifPrefs() {
   try { localStorage.setItem(LS_NOTIF, JSON.stringify(notifPrefs)); } catch(e) {}
-}
-
-// 自分発の変更を識別するためのフラグ
-// 自分が操作した直後のサーバー応答では通知を出さない
-const localChangeMarker = { lastChangeAt: 0 };
-function markLocalChange() {
-  localChangeMarker.lastChangeAt = Date.now();
 }
 
 // ---------- Date helpers ----------
