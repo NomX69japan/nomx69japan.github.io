@@ -1181,12 +1181,26 @@
             <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckin"> 🟢 入店</label>
             <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckout"> 🔴 退店</label>
             <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifResv"> 📖 新規予約</label>
-            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifTimer"> ⏱ タイマー警告</label>
+            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifTimer"> ⏱ タイマー警告（バナーのみ）</label>
           </div>
           <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn-sub btn-sm" onclick="testNotification()">🔊 テスト通知</button>
           </div>
           <p style="color:#888; font-size:11px; margin-top:8px;">他端末で操作があった時に画面上部にバナーで通知。設定はこの端末にのみ保存されます。</p>
+
+          <div style="margin-top:14px; padding-top:10px; border-top:1px dashed var(--border);">
+            <p style="font-size:12px; font-weight:bold; margin:0 0 6px;">📱 アプリ閉じてても通知（Web Push）</p>
+            <p style="color:#666; font-size:11px; margin:0 0 8px; line-height:1.5;">
+              ブラウザを閉じてても、入店・退店・新規予約があるとスマホに通知が届きます。<br>
+              ※iPhoneは「ホーム画面に追加」してから許可してください。
+            </p>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-sm" id="btnEnablePush" onclick="enableWebPush()">🔔 通知を許可する</button>
+              <button class="btn-sub btn-sm" id="btnDisablePush" onclick="disableWebPush()" style="display:none;">通知を解除</button>
+              <button class="btn-sub btn-sm" onclick="testPushNotification()">📨 テストPush送信</button>
+            </div>
+            <p id="pushStatus" style="font-size:11px; color:#aaa; margin-top:6px;"></p>
+          </div>
         </div>
       </details>
 
@@ -1610,6 +1624,7 @@ function checkIn(tableId, opts) {
     setCount: 1,
     alertedWarn: false,
     alertedCritical: false,
+    _updated: now,
   };
   // 顧客の来店履歴
   if (customerId) {
@@ -1618,6 +1633,26 @@ function checkIn(tableId, opts) {
 
   persistSave();
   renderFloor();
+
+  // Web Push通知発火（他端末向け）
+  if (notifPrefs.events.checkin) {
+    const tName = getTableName(tableId);
+    const custDisplay = customerId
+      ? (state.customers.find(c => c.id === customerId)?.name || customerName || 'お客様')
+      : (customerName || 'お客様');
+    const castNames = (castIds || [])
+      .map(cid => state.casts.find(c => c.id === cid)?.name || '')
+      .filter(Boolean);
+    const allCasts = [...castNames, (castFree || '').trim()].filter(Boolean).join('・');
+    let body = `${custDisplay}様`;
+    if (guests) body += ` (${guests}名)`;
+    if (allCasts) body += ` 担当:${allCasts}`;
+    dispatchPushNotification({
+      title: `🟢 ${tName} 入店`,
+      body: body,
+      type: 'checkin',
+    });
+  }
 }
 
 // 延長（quickボタン用）
@@ -1631,6 +1666,7 @@ function extendTable(tableId, addMin) {
   // 次セットでもアラートを出すためフラグリセット
   tdata.alertedWarn = false;
   tdata.alertedCritical = false;
+  tdata._updated = Date.now();
   persistSave();
   renderFloor();
   showToast(`${getTableName(tableId)} を ${addMin}分延長しました（${tdata.setCount}セット目）`, 'normal');
@@ -1643,14 +1679,24 @@ function getTableName(id) {
 
 // 退店
 function checkOut(tableId) {
+  const tName = getTableName(tableId);
   state.tables[tableId] = {
     occupied: false, guests: 0, castIds: [], castFree: '',
     customerId: '', customerName: '', memo: '',
     startedAt: null, endsAt: null, setCount: 0,
     alertedWarn: false, alertedCritical: false,
+    _updated: Date.now(),
   };
   persistSave();
   renderFloor();
+  // Web Push 通知
+  if (notifPrefs.events.checkout) {
+    dispatchPushNotification({
+      title: `🔴 ${tName} 退店`,
+      body: '',
+      type: 'checkout',
+    });
+  }
 }
 
 // 来店履歴を記録
@@ -2009,16 +2055,24 @@ function checkInFromModal() {
   if (!data.customerId && !data.customerName && !data.castIds.length && !data.castFree && !data.guests) {
     if (!confirm('入力情報がほとんどありません。このまま入店しますか？')) return;
   }
-  checkIn(editingTableId, {
-    customerId: data.customerId,
-    customerName: data.customerName,
-    createNewCustomer: data.createNewCustomer,
-    guests: data.guests,
-    castIds: data.castIds,
-    castFree: data.castFree,
-    memo: data.memo,
-  });
+  const targetTableId = editingTableId;
+  // 先にモーダルを閉じる（処理中エラーが出ても画面が固まらないように）
   closeTableModal();
+  // 入店処理（防御的）
+  try {
+    checkIn(targetTableId, {
+      customerId: data.customerId,
+      customerName: data.customerName,
+      createNewCustomer: data.createNewCustomer,
+      guests: data.guests,
+      castIds: data.castIds,
+      castFree: data.castFree,
+      memo: data.memo,
+    });
+  } catch(e) {
+    console.error('checkIn failed:', e);
+    alert('入店処理でエラーが発生しました: ' + e.message);
+  }
 }
 
 // モーダル内の延長ボタン
@@ -2090,6 +2144,7 @@ function saveTableInternal(closeAfter) {
     customerId,
     customerName: customerId ? '' : customerName,
     memo: data.memo,
+    _updated: Date.now(),
   };
 
   // 使用中で、顧客が新たに紐付いたら来店履歴に記録
@@ -3107,6 +3162,28 @@ function saveReservation() {
       _updated: now,
       removed: false,
     });
+    // 新規予約のみPush発火
+    if (notifPrefs.events.resv) {
+      const dt = new Date(datetime);
+      let timeStr = '';
+      if (!isNaN(dt.getTime())) {
+        const mo = dt.getMonth()+1;
+        const d = dt.getDate();
+        const h = String(dt.getHours()).padStart(2,'0');
+        const m = String(dt.getMinutes()).padStart(2,'0');
+        timeStr = `${mo}/${d} ${h}:${m}`;
+      }
+      const cust = customerId ? state.customers.find(c => c.id === customerId) : null;
+      const custName = cust ? cust.name : (customerName || 'お客様');
+      let body = `${custName}様`;
+      if (timeStr) body = `${timeStr} ${body}`;
+      if (guests) body += ` (${guests}名)`;
+      dispatchPushNotification({
+        title: '📖 新規予約',
+        body: body,
+        type: 'resv',
+      });
+    }
   }
 
   persistSave();
@@ -3122,6 +3199,7 @@ function renderSettings() {
   renderStaffListUI();
   loadServerConfigUI();
   loadNotifPrefsUI();
+  updatePushUI();
 }
 // 通知設定UIにロード＆バインド
 function loadNotifPrefsUI() {
@@ -3152,6 +3230,274 @@ function loadNotifPrefsUI() {
 function testNotification() {
   showToast('🔔 テスト通知：これは通知の動作確認です', 'info');
 }
+
+// =====================================================
+// Web Push 通知 (Service Worker + Push API)
+// =====================================================
+const LS_PUSH = 'tao_lite_push';
+const pushState = {
+  deviceId: '',
+  subscribed: false,
+  subscription: null,
+};
+
+function loadPushState() {
+  try {
+    const raw = localStorage.getItem(LS_PUSH);
+    if (raw) {
+      const p = JSON.parse(raw);
+      pushState.deviceId = p.deviceId || '';
+      pushState.subscribed = !!p.subscribed;
+      pushState.subscription = p.subscription || null;
+    }
+  } catch(e) {}
+  if (!pushState.deviceId) {
+    pushState.deviceId = 'd_' + Math.random().toString(36).slice(2, 11) + '_' + Date.now().toString(36);
+    savePushState();
+  }
+}
+function savePushState() {
+  try {
+    localStorage.setItem(LS_PUSH, JSON.stringify({
+      deviceId: pushState.deviceId,
+      subscribed: pushState.subscribed,
+      subscription: pushState.subscription,
+    }));
+  } catch(e) {}
+}
+
+// Service Worker登録
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service Worker not supported');
+    return null;
+  }
+  try {
+    const reg = await navigator.serviceWorker.register('./sw.js');
+    return reg;
+  } catch(e) {
+    console.error('SW register failed', e);
+    return null;
+  }
+}
+
+// Web Push 購読開始
+async function enableWebPush() {
+  const status = document.getElementById('pushStatus');
+  if (!status) return;
+
+  // 環境チェック
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    status.textContent = '❌ このブラウザは Web Push 非対応です';
+    status.style.color = '#c54';
+    return;
+  }
+  if (!server.url || !server.token) {
+    status.textContent = '❌ 先にサーバー同期を設定してください';
+    status.style.color = '#c54';
+    return;
+  }
+
+  status.textContent = '⏳ 設定中...';
+  status.style.color = '#888';
+
+  try {
+    // 通知許可
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      status.textContent = '❌ 通知が許可されませんでした';
+      status.style.color = '#c54';
+      return;
+    }
+
+    // SW 登録
+    const reg = await registerServiceWorker();
+    if (!reg) {
+      status.textContent = '❌ Service Worker 登録失敗';
+      status.style.color = '#c54';
+      return;
+    }
+    // SW がアクティブになるまで待つ
+    if (!reg.active) {
+      await new Promise((resolve) => {
+        const sw = reg.installing || reg.waiting;
+        if (!sw) { resolve(); return; }
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'activated') resolve();
+        });
+      });
+    }
+
+    // VAPID 公開鍵取得
+    const vapidRes = await fetch(server.url.replace(/\/$/, '') + '/vapid-key');
+    const vapidJson = await vapidRes.json();
+    if (!vapidJson.publicKey) {
+      status.textContent = '❌ VAPID鍵取得失敗';
+      status.style.color = '#c54';
+      return;
+    }
+
+    // 既存購読解除
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      try { await existing.unsubscribe(); } catch(e) {}
+    }
+
+    // Push購読
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidJson.publicKey),
+    });
+
+    // サブスクリプションをサーバーに送信
+    const subJson = sub.toJSON();
+    const deviceName = navigator.userAgent.includes('Mobile') ? 'Mobile' : 'PC';
+    const res = await fetch(server.url.replace(/\/$/, '') + '/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Auth-Token': server.token,
+      },
+      body: JSON.stringify({
+        deviceId: pushState.deviceId,
+        deviceName: deviceName + ' ' + (new Date()).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+        subscription: subJson,
+      }),
+    });
+    if (!res.ok) {
+      status.textContent = '❌ サーバー登録失敗 (' + res.status + ')';
+      status.style.color = '#c54';
+      return;
+    }
+
+    pushState.subscribed = true;
+    pushState.subscription = subJson;
+    savePushState();
+    updatePushUI();
+    status.textContent = '✅ 通知有効（端末ID: ' + pushState.deviceId.slice(0, 12) + '...）';
+    status.style.color = '#3a8';
+  } catch(e) {
+    console.error('enableWebPush failed', e);
+    status.textContent = '❌ エラー: ' + e.message;
+    status.style.color = '#c54';
+  }
+}
+
+// Web Push 解除
+async function disableWebPush() {
+  const status = document.getElementById('pushStatus');
+  if (!status) return;
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+      }
+    }
+    if (server.url && server.token) {
+      await fetch(server.url.replace(/\/$/, '') + '/unsubscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': server.token,
+        },
+        body: JSON.stringify({ deviceId: pushState.deviceId }),
+      });
+    }
+    pushState.subscribed = false;
+    pushState.subscription = null;
+    savePushState();
+    updatePushUI();
+    status.textContent = '通知を解除しました';
+    status.style.color = '#888';
+  } catch(e) {
+    status.textContent = '❌ 解除エラー: ' + e.message;
+    status.style.color = '#c54';
+  }
+}
+
+// テストPush送信
+async function testPushNotification() {
+  const status = document.getElementById('pushStatus');
+  if (!status) return;
+  if (!server.url || !server.token) {
+    status.textContent = '❌ サーバー未設定';
+    status.style.color = '#c54';
+    return;
+  }
+  try {
+    const res = await fetch(server.url.replace(/\/$/, '') + '/notify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Auth-Token': server.token,
+      },
+      body: JSON.stringify({
+        title: '📨 テストPush',
+        body: 'Web Push通知のテストです（自分以外の端末に届きます）',
+        type: 'info',
+        senderId: pushState.deviceId,
+        url: '/club-tao.html',
+      }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      status.textContent = '✅ 送信完了 (' + (json.sentTo ? json.sentTo.length : 0) + '台に配信)';
+      status.style.color = '#3a8';
+    } else {
+      status.textContent = '❌ 送信失敗: ' + (json.error || res.status);
+      status.style.color = '#c54';
+    }
+  } catch(e) {
+    status.textContent = '❌ エラー: ' + e.message;
+    status.style.color = '#c54';
+  }
+}
+
+// 入退店・予約追加時にWeb Pushを発火（バックグラウンド配信）
+function dispatchPushNotification(payload) {
+  if (!server.url || !server.token) return;
+  // payload: { title, body, type, url }
+  fetch(server.url.replace(/\/$/, '') + '/notify', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Auth-Token': server.token,
+    },
+    body: JSON.stringify({
+      title: payload.title,
+      body: payload.body || '',
+      type: payload.type || 'info',
+      senderId: pushState.deviceId,
+      url: payload.url || '/club-tao.html',
+    }),
+  }).catch(e => console.warn('push dispatch failed', e));
+}
+
+// VAPID公開鍵 (Base64URL) を Uint8Array に変換
+function urlBase64ToUint8Array(b64) {
+  const padding = '='.repeat((4 - b64.length % 4) % 4);
+  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+function updatePushUI() {
+  const btnE = document.getElementById('btnEnablePush');
+  const btnD = document.getElementById('btnDisablePush');
+  if (!btnE || !btnD) return;
+  if (pushState.subscribed) {
+    btnE.style.display = 'none';
+    btnD.style.display = '';
+  } else {
+    btnE.style.display = '';
+    btnD.style.display = 'none';
+  }
+}
+
 function savePin() {
   const v = document.getElementById('pinNew').value.trim();
   if (!v) { alert('PINを入力してください'); return; }
@@ -3405,7 +3751,23 @@ function applyServerData(payload) {
 
   // IDベースマージ
   if (payload.pin) state.pin = payload.pin;
-  if (payload.tables) state.tables = payload.tables;
+  // テーブル：オブジェクト単位でマージ（_updated タイムスタンプで判定）
+  if (payload.tables && typeof payload.tables === 'object') {
+    Object.keys(payload.tables).forEach(tid => {
+      const incoming = payload.tables[tid];
+      const current = state.tables[tid];
+      if (!current) {
+        state.tables[tid] = incoming;
+        return;
+      }
+      // _updated が新しい方を採用、無ければ incoming を採用
+      const incomingTs = incoming._updated || 0;
+      const currentTs = current._updated || 0;
+      if (incomingTs >= currentTs) {
+        state.tables[tid] = incoming;
+      }
+    });
+  }
   if (payload.shiftData) {
     // 全置換（削除も反映するため）
     Object.keys(state.shiftData).forEach(k => delete state.shiftData[k]);
@@ -3666,6 +4028,11 @@ function escapeHtml(s) {
 // ---------- Boot ----------
 persistLoad();
 loadNotifPrefs();
+loadPushState();
+// 既存購読がある場合はSWを再登録しておく（次回以降の通知受信のため）
+if (pushState.subscribed && 'serviceWorker' in navigator) {
+  registerServiceWorker().catch(e => console.warn('SW reregister failed', e));
+}
 // PIN初期化（未設定なら 0000）
 if (!state.pin) state.pin = '0000';
 // ログイン画面表示中はPIN入力にフォーカス
