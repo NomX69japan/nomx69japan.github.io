@@ -581,12 +581,40 @@
   .visit-row, .bottle-row {
     display: flex; gap: 8px; align-items: center; padding: 6px 0;
     border-bottom: 1px dashed var(--border); font-size: 12px;
+    flex-wrap: wrap;
   }
   .visit-row:last-child, .bottle-row:last-child { border-bottom: none; }
   .visit-row .date { color: var(--text-sub); min-width: 90px; }
-  .visit-row .cast { color: var(--accent); flex: 1; }
-  .bottle-row .name { flex: 1; color: var(--text); }
-  .bottle-row .tag { color: var(--text-sub); font-size: 11px; }
+  .visit-row .cast { color: var(--accent); flex: 1; min-width: 0; word-break: break-word; }
+  .bottle-row .name {
+    flex: 1 1 100%;
+    color: var(--text);
+    font-weight: 500;
+    word-break: break-word;
+    min-width: 0;
+  }
+  .bottle-row .tag {
+    color: var(--text-sub);
+    font-size: 11px;
+    word-break: break-word;
+    background: var(--surface-alt);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .bottle-row > button {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .bottle-add-grid {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .bottle-add-grid input {
+    min-width: 0;
+    width: 100%;
+  }
 
   /* ====== Reservations ====== */
   .resv-toolbar {
@@ -738,6 +766,16 @@
     background: var(--critical-bg);
     border-color: var(--critical-border);
     color: var(--danger);
+  }
+  .alert-toast.warn {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+    color: #6a4a00;
+  }
+  .alert-toast.info {
+    background: #e0ecf8;
+    border-color: #5a8ec4;
+    color: #1a3a68;
   }
 
   /* ====== Mobile ====== */
@@ -896,6 +934,49 @@
     }
     .page#page-shift .shift-toolbar button {
       padding: 5px 8px; font-size: 11px;
+    }
+    /* モバイル：ボトル追加フォームを1列に */
+    .bottle-add-grid {
+      grid-template-columns: 1fr;
+    }
+    /* モバイル：顧客モーダルを画面いっぱいに */
+    #custModalBg .modal {
+      max-width: 100%;
+      padding: 14px;
+    }
+    .cust-detail-section {
+      padding: 10px;
+    }
+    .bottle-row {
+      font-size: 11px;
+      gap: 4px;
+      padding: 6px 0;
+    }
+    .bottle-row .name {
+      font-size: 12px;
+    }
+    .bottle-row .tag {
+      font-size: 10px;
+      padding: 2px 5px;
+    }
+    /* スマホでは2列ではなく1列に */
+    .bottle-add-grid {
+      grid-template-columns: 1fr;
+      gap: 5px;
+    }
+    .bottle-add-grid input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    /* 来店履歴の行も詰める */
+    .visit-row {
+      font-size: 11px;
+      gap: 6px;
+      padding: 6px 0;
+    }
+    .visit-row .date {
+      min-width: 75px;
+      font-size: 11px;
     }
   }
 </style>
@@ -1087,6 +1168,29 @@
       </details>
 
       <details class="settings-section">
+        <summary>🔔 通知設定（端末ごと）</summary>
+        <div class="body">
+          <label class="field" style="margin-bottom:8px;">
+            <input type="checkbox" id="notifEnabled"> 通知バナーを表示する
+          </label>
+          <label class="field" style="margin-bottom:8px;">
+            <input type="checkbox" id="notifSound"> 通知音を鳴らす
+          </label>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border);">
+            <p style="color:var(--text-sub); font-size:11px; margin:0 0 6px;">通知するイベント</p>
+            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckin"> 🟢 入店</label>
+            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckout"> 🔴 退店</label>
+            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifResv"> 📖 新規予約</label>
+            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifTimer"> ⏱ タイマー警告</label>
+          </div>
+          <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn-sub btn-sm" onclick="testNotification()">🔊 テスト通知</button>
+          </div>
+          <p style="color:#888; font-size:11px; margin-top:8px;">他端末で操作があった時に画面上部にバナーで通知。設定はこの端末にのみ保存されます。</p>
+        </div>
+      </details>
+
+      <details class="settings-section">
         <summary>💾 バックアップ・復元</summary>
         <div class="body">
           <button class="btn btn-sm" onclick="exportBackup()">📥 バックアップDL</button>
@@ -1148,6 +1252,8 @@ const LS_KEY = 'tao_lite_main';
 const LS_SRV = 'tao_lite_server';
 
 function persistSave() {
+  // 自分発の変更マーカー（同期時の通知抑制用）
+  markLocalChange();
   const data = {
     pin: state.pin,
     casts: state.casts,
@@ -1198,14 +1304,43 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 
 const state = {
   pin: '0000',
-  casts: [],          // {id, name, trial:false, trialCount:0, removed:false}
-  staff: [],          // {id, name, removed:false}
-  customers: [],      // {id, name, phone, birthday, memo, visits:[], bottles:[], _created, _updated, removed:false}
-  tables: {},         // { tableId: { occupied, guests, castIds:[], startedAt, endsAt, setCount, memo } }
-  shiftData: {},      // { 'YYYY-MM-DD_castId': true/false }
-  reservations: [],   // [{id, customerId, customerName, guests, castIds:[], castFree, datetime, types:['dohan','shimei','visit','event'], tableId, memo, status:'pending'/'done'/'cancelled', _created, _updated, removed:false}]
+  casts: [],
+  staff: [],
+  customers: [],
+  tables: {},
+  shiftData: {},
+  reservations: [],
   weekOffset: 0,
 };
+
+// 通知設定（端末ごとにlocalStorageへ保存。サーバー同期しない）
+const LS_NOTIF = 'tao_lite_notif';
+const notifPrefs = {
+  enabled: true,
+  sound: true,
+  events: { checkin: true, checkout: true, resv: true, timer: true }
+};
+function loadNotifPrefs() {
+  try {
+    const raw = localStorage.getItem(LS_NOTIF);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (typeof p.enabled === 'boolean') notifPrefs.enabled = p.enabled;
+      if (typeof p.sound === 'boolean') notifPrefs.sound = p.sound;
+      if (p.events) Object.assign(notifPrefs.events, p.events);
+    }
+  } catch(e) {}
+}
+function saveNotifPrefs() {
+  try { localStorage.setItem(LS_NOTIF, JSON.stringify(notifPrefs)); } catch(e) {}
+}
+
+// 自分発の変更を識別するためのフラグ
+// 自分が操作した直後のサーバー応答では通知を出さない
+const localChangeMarker = { lastChangeAt: 0 };
+function markLocalChange() {
+  localChangeMarker.lastChangeAt = Date.now();
+}
 
 // ---------- Date helpers ----------
 function localDateStr(d) {
@@ -1480,6 +1615,25 @@ function checkIn(tableId, opts) {
   if (customerId) {
     recordVisit(customerId, castIds);
   }
+
+  // 入店通知を発行（他端末へ）
+  const displayName = customerId
+    ? (state.customers.find(c => c.id === customerId)?.name || customerName || 'お客様')
+    : (customerName || 'お客様');
+  const castNames = (castIds || [])
+    .map(cid => state.casts.find(c => c.id === cid)?.name || '')
+    .filter(Boolean);
+  const castFreeStr = (castFree || '').trim();
+  const allCasts = [...castNames, castFreeStr].filter(Boolean).join('・');
+  pushNotification({
+    type: 'checkin',
+    table: getTableName(tableId),
+    customer: displayName,
+    guests: guests,
+    casts: allCasts,
+    time: now,
+  });
+
   persistSave();
   renderFloor();
 }
@@ -1544,12 +1698,17 @@ function updateTableTimers() {
     // 残り15分アラート（バナー表示のみ）
     if (!tdata.alertedWarn && remainMs > 0 && remainMin <= ALERT_15_MIN && remainMin > ALERT_10_MIN) {
       tdata.alertedWarn = true;
-      showToast(`${t.name}：残り15分です`, 'warn');
+      if (notifPrefs.enabled && notifPrefs.events.timer) {
+        showToast(`⏱ ${t.name}：残り15分です`, 'warn');
+      }
       needRender = true;
     }
     // 残り10分で延長確認モーダル
     if (!tdata.alertedCritical && remainMs > 0 && remainMin <= ALERT_10_MIN) {
       tdata.alertedCritical = true;
+      if (notifPrefs.enabled && notifPrefs.events.timer) {
+        showToast(`⏱ ${t.name}：残り10分（延長確認）`, 'critical');
+      }
       openExtendDialog(t.id);
       needRender = true;
     }
@@ -1647,13 +1806,49 @@ function showToast(msg, type) {
   const host = document.getElementById('alertHost');
   if (!host) return;
   const el = document.createElement('div');
-  el.className = 'alert-toast' + (type === 'critical' ? ' critical' : '');
+  // type: normal/warn/critical/info/checkin/checkout/resv
+  let cls = 'alert-toast';
+  if (type === 'critical') cls += ' critical';
+  else if (type === 'warn') cls += ' warn';
+  else if (type === 'info' || type === 'checkin' || type === 'checkout' || type === 'resv') cls += ' info';
+  el.className = cls;
   el.textContent = msg;
   el.addEventListener('click', () => el.remove());
   host.appendChild(el);
+  // 表示時間（種類別）
+  const lifetime = (type === 'critical' || type === 'warn') ? 8000 : 5000;
   setTimeout(() => {
     if (el.parentNode) el.remove();
-  }, 6000);
+  }, lifetime);
+  // 音を鳴らす（設定がONの場合のみ）
+  if (notifPrefs.sound && type !== 'normal') {
+    playNotifSound(type);
+  }
+}
+
+// 通知音再生（Web Audio APIで簡易ビープ生成、ファイル不要）
+function playNotifSound(type) {
+  try {
+    const ctx = window._notifAudioCtx || (window._notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    // 種別ごとに音程変える
+    let freq1 = 880, freq2 = 1100;
+    if (type === 'critical') { freq1 = 660; freq2 = 880; }
+    else if (type === 'warn') { freq1 = 740; freq2 = 988; }
+    else if (type === 'checkin' || type === 'resv') { freq1 = 880; freq2 = 1320; }
+    osc.frequency.setValueAtTime(freq1, ctx.currentTime);
+    osc.frequency.setValueAtTime(freq2, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {
+    // 音再生失敗してもエラーにしない
+  }
 }
 
 // ---------- Table Modal ----------
@@ -2182,7 +2377,7 @@ function openCustomerModal(id) {
     <div class="cust-detail-section">
       <h4>ボトルキープ</h4>
       <div id="bottlesList">${bottlesHtml}</div>
-      <div style="display:grid; gap:6px; margin-top:8px; grid-template-columns: 1fr 1fr;">
+      <div class="bottle-add-grid">
         <input type="text" id="newBottleName" placeholder="ボトル名（必須）">
         <input type="text" id="newBottleTag" placeholder="🏷 ネームタグ">
         <input type="text" id="newBottleLoc" placeholder="📍 保管場所">
@@ -2327,7 +2522,7 @@ function rebuildCustomerModalBody(cust) {
     <div class="cust-detail-section">
       <h4>ボトルキープ</h4>
       <div id="bottlesList">${bottlesHtml}</div>
-      <div style="display:grid; gap:6px; margin-top:8px; grid-template-columns: 1fr 1fr;">
+      <div class="bottle-add-grid">
         <input type="text" id="newBottleName" placeholder="ボトル名（必須）">
         <input type="text" id="newBottleTag" placeholder="🏷 ネームタグ">
         <input type="text" id="newBottleLoc" placeholder="📍 保管場所">
@@ -2944,6 +3139,36 @@ function renderSettings() {
   renderCastListUI();
   renderStaffListUI();
   loadServerConfigUI();
+  loadNotifPrefsUI();
+}
+// 通知設定UIにロード＆バインド
+function loadNotifPrefsUI() {
+  const enabled = document.getElementById('notifEnabled');
+  const sound = document.getElementById('notifSound');
+  const ci = document.getElementById('notifCheckin');
+  const co = document.getElementById('notifCheckout');
+  const re = document.getElementById('notifResv');
+  const tm = document.getElementById('notifTimer');
+  if (!enabled) return;
+  enabled.checked = notifPrefs.enabled;
+  sound.checked = notifPrefs.sound;
+  ci.checked = notifPrefs.events.checkin;
+  co.checked = notifPrefs.events.checkout;
+  re.checked = notifPrefs.events.resv;
+  tm.checked = notifPrefs.events.timer;
+  // バインド（重複防止）
+  if (!enabled._bound) {
+    enabled.addEventListener('change', () => { notifPrefs.enabled = enabled.checked; saveNotifPrefs(); });
+    sound.addEventListener('change', () => { notifPrefs.sound = sound.checked; saveNotifPrefs(); });
+    ci.addEventListener('change', () => { notifPrefs.events.checkin = ci.checked; saveNotifPrefs(); });
+    co.addEventListener('change', () => { notifPrefs.events.checkout = co.checked; saveNotifPrefs(); });
+    re.addEventListener('change', () => { notifPrefs.events.resv = re.checked; saveNotifPrefs(); });
+    tm.addEventListener('change', () => { notifPrefs.events.timer = tm.checked; saveNotifPrefs(); });
+    enabled._bound = true;
+  }
+}
+function testNotification() {
+  showToast('🔔 テスト通知：これは通知の動作確認です', 'info');
 }
 function savePin() {
   const v = document.getElementById('pinNew').value.trim();
@@ -3189,6 +3414,13 @@ async function loadFromServer() {
   }
 }
 function applyServerData(payload) {
+  // ===== 通知用：適用前のスナップショット =====
+  const snapshot = captureSnapshot();
+  // 自分の操作直後の同期は通知抑制（5秒以内）
+  const suppressNotif = (Date.now() - localChangeMarker.lastChangeAt) < 5000;
+  // 初回同期（lastHashが空のとき）も通知しない
+  const isFirstSync = !server.lastHash;
+
   // IDベースマージ
   if (payload.pin) state.pin = payload.pin;
   if (payload.tables) state.tables = payload.tables;
@@ -3243,12 +3475,92 @@ function applyServerData(payload) {
     reservations: state.reservations,
     _updatedAt: Date.now()
   })); } catch(e) {}
+
+  // ===== 通知判定（自分の操作直後・初回同期・通知OFF時はスキップ） =====
+  if (!suppressNotif && !isFirstSync && notifPrefs.enabled) {
+    detectAndNotifyChanges(snapshot);
+  }
+
   // 表示更新
   if (document.getElementById('page-floor').classList.contains('active')) renderFloor();
   if (document.getElementById('page-shift').classList.contains('active')) renderShift();
   if (document.getElementById('page-customers').classList.contains('active')) renderCustomerList();
   if (document.getElementById('page-reservations').classList.contains('active')) renderReservations();
   if (document.getElementById('page-settings').classList.contains('active')) renderSettings();
+}
+
+// 適用前のスナップショットを取って差分検知に使う
+function captureSnapshot() {
+  const tablesSnap = {};
+  Object.keys(state.tables || {}).forEach(id => {
+    const t = state.tables[id];
+    tablesSnap[id] = {
+      occupied: !!t.occupied,
+      customerId: t.customerId || '',
+      customerName: t.customerName || '',
+      castIds: (t.castIds || []).slice(),
+      guests: t.guests || 0
+    };
+  });
+  const resvIds = (state.reservations || []).filter(r => !r.removed).map(r => r.id);
+  return { tables: tablesSnap, resvIds: new Set(resvIds) };
+}
+
+// 適用前後を比較して通知を発火
+function detectAndNotifyChanges(snap) {
+  // テーブル：入店/退店検知
+  Object.keys(state.tables || {}).forEach(id => {
+    const before = snap.tables[id] || { occupied: false };
+    const after = state.tables[id] || { occupied: false };
+    const tName = getTableName(id);
+
+    // 入店検知（前回空席→今回使用中）
+    if (!before.occupied && after.occupied && notifPrefs.events.checkin) {
+      let custLabel = '';
+      if (after.customerId) {
+        const c = state.customers.find(x => x.id === after.customerId);
+        custLabel = c ? c.name : '';
+      } else if (after.customerName) {
+        custLabel = after.customerName;
+      }
+      const castNames = (after.castIds || [])
+        .map(cid => state.casts.find(x => x.id === cid)?.name || '')
+        .filter(Boolean).join('・');
+      let msg = `🟢 ${tName} 入店`;
+      if (custLabel) msg += `: ${custLabel}様`;
+      if (after.guests) msg += ` (${after.guests}名)`;
+      if (castNames) msg += ` 担当:${castNames}`;
+      showToast(msg, 'checkin');
+    }
+    // 退店検知（前回使用中→今回空席）
+    if (before.occupied && !after.occupied && notifPrefs.events.checkout) {
+      showToast(`🔴 ${tName} 退店`, 'checkout');
+    }
+  });
+
+  // 予約追加検知
+  if (notifPrefs.events.resv) {
+    (state.reservations || []).filter(r => !r.removed).forEach(r => {
+      if (!snap.resvIds.has(r.id)) {
+        // 新規予約
+        const dt = r.datetime ? new Date(r.datetime) : null;
+        let timeStr = '';
+        if (dt && !isNaN(dt.getTime())) {
+          const mo = dt.getMonth()+1;
+          const d = dt.getDate();
+          const h = String(dt.getHours()).padStart(2,'0');
+          const m = String(dt.getMinutes()).padStart(2,'0');
+          timeStr = `${mo}/${d} ${h}:${m}`;
+        }
+        const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
+        const custName = cust ? cust.name : (r.customerName || '');
+        let msg = `📖 新規予約`;
+        if (timeStr) msg += ` ${timeStr}`;
+        if (custName) msg += ` ${custName}様`;
+        showToast(msg, 'resv');
+      }
+    });
+  }
 }
 function buildSaveData() {
   return {
@@ -3371,6 +3683,7 @@ function escapeHtml(s) {
 
 // ---------- Boot ----------
 persistLoad();
+loadNotifPrefs();
 // PIN初期化（未設定なら 0000）
 if (!state.pin) state.pin = '0000';
 // ログイン画面表示中はPIN入力にフォーカス
