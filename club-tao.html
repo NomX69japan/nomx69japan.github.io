@@ -1616,24 +1616,6 @@ function checkIn(tableId, opts) {
     recordVisit(customerId, castIds);
   }
 
-  // 入店通知を発行（他端末へ）
-  const displayName = customerId
-    ? (state.customers.find(c => c.id === customerId)?.name || customerName || 'お客様')
-    : (customerName || 'お客様');
-  const castNames = (castIds || [])
-    .map(cid => state.casts.find(c => c.id === cid)?.name || '')
-    .filter(Boolean);
-  const castFreeStr = (castFree || '').trim();
-  const allCasts = [...castNames, castFreeStr].filter(Boolean).join('・');
-  pushNotification({
-    type: 'checkin',
-    table: getTableName(tableId),
-    customer: displayName,
-    guests: guests,
-    casts: allCasts,
-    time: now,
-  });
-
   persistSave();
   renderFloor();
 }
