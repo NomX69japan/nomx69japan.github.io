@@ -2173,6 +2173,8 @@ function changeWeek(delta) {
   renderShift();
 }
 function renderShift() {
+  // 体験キャストの出勤回数を毎回再計算（表示の整合性確保）
+  recalcAllTrialCounts();
   const monday = getWeekMonday(state.weekOffset);
   const days = [];
   for (let i = 0; i < 7; i++) {
@@ -4061,6 +4063,15 @@ loadNotifPrefs();
 loadPushState();
 // 既存データの体験キャストカウントを再計算（過去のバグで未反映だった分も復旧）
 recalcAllTrialCounts();
+// 再計算結果をローカルストレージに保存（次回起動時から正しい値で起動）
+try {
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    pin: state.pin, casts: state.casts, staff: state.staff,
+    customers: state.customers, tables: state.tables, shiftData: state.shiftData,
+    reservations: state.reservations,
+    _updatedAt: Date.now()
+  }));
+} catch(e) {}
 // 既存購読がある場合はSWを再登録しておく（次回以降の通知受信のため）
 if (pushState.subscribed && 'serviceWorker' in navigator) {
   registerServiceWorker().catch(e => console.warn('SW reregister failed', e));
