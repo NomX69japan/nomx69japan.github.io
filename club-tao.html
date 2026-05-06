@@ -2336,12 +2336,13 @@ function recalcAllTrialCounts() {
   state.casts.forEach(c => {
     if (c.trial) {
       let count = 0;
+      const suffix = '_' + c.id;
       Object.keys(state.shiftData).forEach(k => {
-        const [, cid] = k.split('_').slice(0,2).length === 2 ? [null, k.split('_')[1]] : [];
-        // shiftKey は YYYY-MM-DD_castId
-        const lastUnderscore = k.lastIndexOf('_');
-        const cidPart = k.slice(lastUnderscore+1);
-        if (cidPart === c.id && state.shiftData[k]) count++;
+        // shiftKey は "YYYY-MM-DD_castId" 形式
+        // castId にアンダースコアが含まれる可能性があるため endsWith で判定
+        if (k.endsWith(suffix) && state.shiftData[k]) {
+          count++;
+        }
       });
       c.trialCount = count;
     }
@@ -4058,6 +4059,8 @@ function escapeHtml(s) {
 persistLoad();
 loadNotifPrefs();
 loadPushState();
+// 既存データの体験キャストカウントを再計算（過去のバグで未反映だった分も復旧）
+recalcAllTrialCounts();
 // 既存購読がある場合はSWを再登録しておく（次回以降の通知受信のため）
 if (pushState.subscribed && 'serviceWorker' in navigator) {
   registerServiceWorker().catch(e => console.warn('SW reregister failed', e));
