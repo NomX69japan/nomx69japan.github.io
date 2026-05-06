@@ -1066,7 +1066,7 @@
         </span>
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
-        セルをタップで出勤/休みを切替。予約マーカーはキャストのみ表示。<br>
+        セルをタップで出勤/休みを切替。予約マーカーがある日は ○ や ① ② ③ を省略しマーカーだけ表示。<br>
         ① ② ③ は体験キャストの出勤回数（4回目以降は ○ ）。
       </p>
     </section>
@@ -2232,21 +2232,29 @@ function renderShift() {
           const on = getShift(dStr, c.id);
           // 予約マーカー（キャストのみ）
           const resvTypes = (resvIndex[dStr] && resvIndex[dStr][c.id]) || [];
-          const hasResvCls = resvTypes.length > 0 ? ' has-resv' : '';
+          const hasResv = resvTypes.length > 0;
+          const hasResvCls = hasResv ? ' has-resv' : '';
           const marksHtml = buildResvMarks(resvTypes);
           // 出勤マーク：体験キャストで1〜3回目なら丸数字、それ以外は ○
-          let mark = '—';
-          if (on) {
-            mark = '○';
+          // ただし予約マーカーがある日は ◯/丸数字を省略してマーカーだけ表示（コンパクト化）
+          let cellContent;
+          if (on && hasResv) {
+            // 出勤＋予約あり → マーカーのみ（縦幅節約）
+            cellContent = marksHtml;
+          } else if (on) {
+            // 出勤のみ → ◯ または丸数字
+            let mark = '○';
             if (c.trial && trialShiftDates) {
               const idx = trialShiftDates.indexOf(dStr);
               if (idx === 0) mark = '①';
               else if (idx === 1) mark = '②';
               else if (idx === 2) mark = '③';
-              // 4回目以降は ○ のまま
             }
+            cellContent = mark;
+          } else {
+            // 休み
+            cellContent = '—';
           }
-          const cellContent = `${mark}${marksHtml}`;
           html += `<td class="shift-cell ${on?'on':'off'}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
         });
         html += '</tr>';
