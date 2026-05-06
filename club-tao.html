@@ -1067,7 +1067,7 @@
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
         セルをタップで出勤/休みを切替。予約マーカーがある日は ○ や ① ② ③ を省略しマーカーだけ表示。<br>
-        ① ② ③ は体験キャストの出勤回数（4回目以降は ○ ）。
+        ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ○ ）。
       </p>
     </section>
 
@@ -2215,18 +2215,20 @@ function renderShift() {
     // キャスト行
     if (activeCasts.length > 0) {
       html += `<tr class="section-header"><td colspan="8">🌹 キャスト</td></tr>`;
+      const todayStr = localDateStr(new Date());
       activeCasts.forEach(c => {
         const trialMark = c.trial
           ? ` <span class="trial-badge">体験 ${c.trialCount||0}/3</span>`
           : '';
         html += `<tr class="${c.trial?'trial':''}">`;
         html += `<td class="cast-col">${escapeHtml(c.name)}${trialMark}</td>`;
-        // 体験キャストの場合、全期間の出勤日昇順リストを作成（何回目かの判定用）
-        let trialShiftDates = null;
+        // 体験キャストの場合、「今日以前の出勤日」昇順リストを作成（実績順での何回目かの判定用）
+        let trialPastShiftDates = null;
         if (c.trial) {
-          trialShiftDates = Object.keys(state.shiftData || {})
+          trialPastShiftDates = Object.keys(state.shiftData || {})
             .filter(k => k.endsWith('_' + c.id) && state.shiftData[k])
-            .map(k => k.split('_')[0])
+            .map(k => k.slice(0, 10))
+            .filter(d => d <= todayStr) // 今日以前のみ（実績）
             .sort();
         }
         days.forEach(d => {
@@ -2237,7 +2239,7 @@ function renderShift() {
           const hasResv = resvTypes.length > 0;
           const hasResvCls = hasResv ? ' has-resv' : '';
           const marksHtml = buildResvMarks(resvTypes);
-          // 出勤マーク：体験キャストで1〜3回目なら丸数字、それ以外は ○
+          // 出勤マーク：体験キャストで実績1〜3回目なら丸数字、それ以外は ○
           // ただし予約マーカーがある日は ◯/丸数字を省略してマーカーだけ表示（コンパクト化）
           let cellContent;
           if (on && hasResv) {
@@ -2246,8 +2248,9 @@ function renderShift() {
           } else if (on) {
             // 出勤のみ → ◯ または丸数字
             let mark = '○';
-            if (c.trial && trialShiftDates) {
-              const idx = trialShiftDates.indexOf(dStr);
+            // 体験キャストで、その日が今日以前（実績）なら丸数字を試みる
+            if (c.trial && trialPastShiftDates && dStr <= todayStr) {
+              const idx = trialPastShiftDates.indexOf(dStr);
               if (idx === 0) mark = '①';
               else if (idx === 1) mark = '②';
               else if (idx === 2) mark = '③';
@@ -2335,16 +2338,19 @@ function toggleShift(dateStr, castId) {
   renderShift();
 }
 function recalcAllTrialCounts() {
+  // 実績のみカウント：今日（含む）以前の出勤日のみ
+  const todayStr = localDateStr(new Date());
   state.casts.forEach(c => {
     if (c.trial) {
       let count = 0;
       const suffix = '_' + c.id;
       Object.keys(state.shiftData).forEach(k => {
-        // shiftKey は "YYYY-MM-DD_castId" 形式
-        // castId にアンダースコアが含まれる可能性があるため endsWith で判定
-        if (k.endsWith(suffix) && state.shiftData[k]) {
-          count++;
-        }
+        if (!k.endsWith(suffix)) return;
+        if (!state.shiftData[k]) return;
+        // キーから日付部分（YYYY-MM-DD = 先頭10文字）を抽出
+        const dateStr = k.slice(0, 10);
+        // 今日以前のみカウント
+        if (dateStr <= todayStr) count++;
       });
       c.trialCount = count;
     }
