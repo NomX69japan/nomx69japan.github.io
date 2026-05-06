@@ -608,6 +608,46 @@
     }
   }
 
+  /* ── KEN BURNS effect for hero image ── */
+  @keyframes kenBurns {
+    0% { transform: scale(1) translate(0, 0); }
+    100% { transform: scale(1.08) translate(-1%, -1%); }
+  }
+  .hero-image-area img {
+    animation: fadeIn 1.5s 1s forwards, kenBurns 18s ease-out 2s infinite alternate !important;
+  }
+
+  /* ── SECTION INDICATOR (right side, desktop) ── */
+  .section-indicator {
+    position: fixed;
+    top: 50%;
+    right: 2rem;
+    transform: translateY(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .section-indicator a {
+    display: block;
+    width: 28px;
+    height: 1px;
+    background: rgba(14,13,11,0.2);
+    transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s;
+    cursor: pointer;
+  }
+
+  .section-indicator a.active {
+    width: 44px;
+    background: var(--accent);
+  }
+
+  .section-indicator a:hover {
+    width: 44px;
+    background: var(--ink);
+  }
+
   /* ── SCROLL PROGRESS BAR ── */
   .scroll-progress {
     position: fixed;
@@ -1116,6 +1156,7 @@
     footer { padding: 1.5rem; flex-direction: column; gap: 0.8rem; text-align: center; }
     .scroll-indicator { display: none; }
     .hero-left::before { display: none; }
+    .section-indicator { display: none; }
   }
 
   @media (max-width: 480px) {
@@ -1131,6 +1172,15 @@
 <body>
 
 <div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- Section indicator (desktop) -->
+<div class="section-indicator" id="sectionIndicator">
+  <a href="#" data-target="hero" class="active"></a>
+  <a href="#philosophy" data-target="philosophy"></a>
+  <a href="#about" data-target="about"></a>
+  <a href="#fee" data-target="fee"></a>
+  <a href="#contact" data-target="contact"></a>
+</div>
 
 <nav>
   <div class="nav-logo">Nom<span class="logo-x">X</span></div>
@@ -1172,6 +1222,7 @@
         alt="トレーニング"
         style="width:100%;height:100%;object-fit:cover;display:block;opacity:0;animation:fadeIn 1.5s 1s forwards;"
         id="hero-img"
+        data-photoset="hero"
       >
       <div class="hero-year-marker">NomX</div>
     </div>
@@ -1249,6 +1300,8 @@
           src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&q=80&fit=crop&crop=center"
           alt="野村達也"
           style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;"
+          id="about-img"
+          data-photoset="about"
         >
       </div>
     </div>
@@ -1414,6 +1467,34 @@
 </footer>
 
 <script>
+  // ── Random photo sets (Unsplash free images) ──
+  const photoSets = {
+    hero: [
+      'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?w=900&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=900&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=900&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=900&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1518459031867-a89b944bffe4?w=900&q=80&fit=crop'
+    ],
+    about: [
+      'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=600&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=600&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?w=600&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1593810450967-f9c42742e326?w=600&q=80&fit=crop',
+      'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop'
+    ]
+  };
+
+  document.querySelectorAll('img[data-photoset]').forEach(img => {
+    const set = photoSets[img.dataset.photoset];
+    if (set && set.length) {
+      const random = set[Math.floor(Math.random() * set.length)];
+      img.src = random + '&auto=format';
+    }
+  });
+
   // Hamburger menu
   const hamburger = document.getElementById('hamburger');
   const drawer = document.getElementById('drawer');
@@ -1511,18 +1592,22 @@
     }, { passive: true });
   }
 
-  // Cursor spotlight (desktop only)
-  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    document.body.classList.add('cursor-active');
-    document.addEventListener('mousemove', (e) => {
-      document.body.style.setProperty('--mx', e.clientX + 'px');
-      document.body.style.setProperty('--my', e.clientY + 'px');
-      document.body.style.cssText += `;`;
-    });
-    // Update via CSS variables in style tag
-    const style = document.createElement('style');
-    style.textContent = `body.cursor-active::after { left: var(--mx, 50%); top: var(--my, 50%); }`;
-    document.head.appendChild(style);
+  // Section indicator active state
+  const indicators = document.querySelectorAll('.section-indicator a');
+  const sectionMap = ['hero', 'philosophy', 'about', 'fee', 'contact'];
+  if (indicators.length) {
+    window.addEventListener('scroll', () => {
+      const scrollPos = window.scrollY + window.innerHeight * 0.4;
+      let active = 'hero';
+      sectionMap.forEach(id => {
+        if (id === 'hero') return;
+        const el = document.getElementById(id);
+        if (el && el.offsetTop <= scrollPos) active = id;
+      });
+      indicators.forEach(ind => {
+        ind.classList.toggle('active', ind.dataset.target === active);
+      });
+    }, { passive: true });
   }
 </script>
 </body>
