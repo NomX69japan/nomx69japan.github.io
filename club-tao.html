@@ -1066,7 +1066,8 @@
         </span>
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
-        セルをタップで出勤/休みを切替。予約マーカーはキャストのみ表示。
+        セルをタップで出勤/休みを切替。予約マーカーはキャストのみ表示。<br>
+        ① ② ③ は体験キャストの出勤回数（4回目以降は ○ ）。
       </p>
     </section>
 
@@ -2218,6 +2219,14 @@ function renderShift() {
           : '';
         html += `<tr class="${c.trial?'trial':''}">`;
         html += `<td class="cast-col">${escapeHtml(c.name)}${trialMark}</td>`;
+        // 体験キャストの場合、全期間の出勤日昇順リストを作成（何回目かの判定用）
+        let trialShiftDates = null;
+        if (c.trial) {
+          trialShiftDates = Object.keys(state.shiftData || {})
+            .filter(k => k.endsWith('_' + c.id) && state.shiftData[k])
+            .map(k => k.split('_')[0])
+            .sort();
+        }
         days.forEach(d => {
           const dStr = localDateStr(d);
           const on = getShift(dStr, c.id);
@@ -2225,7 +2234,19 @@ function renderShift() {
           const resvTypes = (resvIndex[dStr] && resvIndex[dStr][c.id]) || [];
           const hasResvCls = resvTypes.length > 0 ? ' has-resv' : '';
           const marksHtml = buildResvMarks(resvTypes);
-          const cellContent = `${on?'○':'—'}${marksHtml}`;
+          // 出勤マーク：体験キャストで1〜3回目なら丸数字、それ以外は ○
+          let mark = '—';
+          if (on) {
+            mark = '○';
+            if (c.trial && trialShiftDates) {
+              const idx = trialShiftDates.indexOf(dStr);
+              if (idx === 0) mark = '①';
+              else if (idx === 1) mark = '②';
+              else if (idx === 2) mark = '③';
+              // 4回目以降は ○ のまま
+            }
+          }
+          const cellContent = `${mark}${marksHtml}`;
           html += `<td class="shift-cell ${on?'on':'off'}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
         });
         html += '</tr>';
