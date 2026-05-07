@@ -397,6 +397,36 @@
   }
   .week-label.past { background: var(--text-muted); color: #fff; }
 
+  /* 本日出勤数バナー */
+  .today-count-banner {
+    background: linear-gradient(135deg, #fff8e7 0%, #f5ebd0 100%);
+    border: 1px solid #d4af37;
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #2a2520;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  .today-count-banner .count-main {
+    font-size: 16px;
+    color: #b8860b;
+    font-weight: bold;
+    margin: 0 4px;
+  }
+  .today-count-banner .count-trial {
+    font-size: 12px;
+    color: #8b6914;
+    margin-left: 8px;
+  }
+  .today-count-banner.empty {
+    background: #f5f1ea;
+    border-color: #ddd6c8;
+    color: #888;
+  }
+
   .shift-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -1030,6 +1060,7 @@
         <button class="btn-sub btn-sm" onclick="renderFloor()">🔄 更新</button>
         <span style="color:#888; font-size:12px;" id="floorClock"></span>
       </div>
+      <div id="todayShiftCountFloor" class="today-count-banner"></div>
 
       <div class="floor-layout">
         <div class="floor-section">
@@ -1052,6 +1083,7 @@
         <button class="btn-sub btn-sm" onclick="changeWeek(1)">次週 ▶</button>
         <span id="weekRangeLabel" style="margin-left:8px; color:#ccc; font-size:13px;"></span>
       </div>
+      <div id="todayShiftCountShift" class="today-count-banner"></div>
       <div class="shift-wrap">
         <table class="shift" id="shiftTable"></table>
       </div>
@@ -1474,6 +1506,8 @@ function updateFloorClock() {
 
 // ---------- FLOOR ----------
 function renderFloor() {
+  // 本日のキャスト出勤数を更新
+  updateTodayShiftCount();
   const normal = document.getElementById('tablesNormal');
   const priv = document.getElementById('tablesPrivate');
   normal.innerHTML = '';
@@ -2177,16 +2211,17 @@ function renderShift() {
   recalcAllTrialCounts();
   const monday = getWeekMonday(state.weekOffset);
   const days = [];
-  for (let i = 0; i < 7; i++) {
+  // 月〜土の6日のみ（日曜は休みのため除外）
+  for (let i = 0; i < 6; i++) {
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
     d.setHours(12,0,0,0);
     days.push(d);
   }
-  const dayLabels = ['月','火','水','木','金','土','日'];
+  const dayLabels = ['月','火','水','木','金','土'];
 
   // 週ラベル
-  const range = `${days[0].getMonth()+1}/${days[0].getDate()} 〜 ${days[6].getMonth()+1}/${days[6].getDate()}`;
+  const range = `${days[0].getMonth()+1}/${days[0].getDate()} 〜 ${days[5].getMonth()+1}/${days[5].getDate()}`;
   let tag = '';
   if (state.weekOffset === 0) tag = ' <span class="week-label">今週</span>';
   else if (state.weekOffset === -1) tag = ' <span class="week-label past">先週</span>';
@@ -2195,6 +2230,9 @@ function renderShift() {
   else if (state.weekOffset > 0) tag = ` <span class="week-label">${state.weekOffset}週後</span>`;
   else tag = ` <span class="week-label past">${-state.weekOffset}週前</span>`;
   document.getElementById('weekRangeLabel').innerHTML = range + tag;
+
+  // 本日の出勤数を集計＆表示
+  updateTodayShiftCount();
 
   // 予約インデックス：date(YYYY-MM-DD) → castId → [予約タイプ配列]
   const resvIndex = buildShiftResvIndex(days);
@@ -2210,11 +2248,11 @@ function renderShift() {
   html += '</tr></thead><tbody>';
 
   if (activeCasts.length === 0 && activeStaff.length === 0) {
-    html += `<tr><td class="cast-col" colspan="8" style="text-align:center; color:#888; padding:24px;">設定からキャストまたはスタッフを追加してください</td></tr>`;
+    html += `<tr><td class="cast-col" colspan="7" style="text-align:center; color:#888; padding:24px;">設定からキャストまたはスタッフを追加してください</td></tr>`;
   } else {
     // キャスト行
     if (activeCasts.length > 0) {
-      html += `<tr class="section-header"><td colspan="8">🌹 キャスト</td></tr>`;
+      html += `<tr class="section-header"><td colspan="7">🌹 キャスト</td></tr>`;
       const todayStr = localDateStr(new Date());
       activeCasts.forEach(c => {
         const trialMark = c.trial
@@ -2267,7 +2305,7 @@ function renderShift() {
     }
     // スタッフ行（区切り線付き、ブルー系背景）
     if (activeStaff.length > 0) {
-      html += `<tr class="section-header"><td colspan="8">👔 スタッフ</td></tr>`;
+      html += `<tr class="section-header"><td colspan="7">👔 スタッフ</td></tr>`;
       activeStaff.forEach(s => {
         html += `<tr class="staff-row">`;
         html += `<td class="cast-col">👔 ${escapeHtml(s.name)}</td>`;
@@ -2355,6 +2393,37 @@ function recalcAllTrialCounts() {
       c.trialCount = count;
     }
   });
+}
+
+// 本日のキャスト出勤数を集計してフロア・シフト両方のバナーに表示
+function updateTodayShiftCount() {
+  const todayStr = localDateStr(new Date());
+  const activeCasts = (state.casts || []).filter(c => !c.removed);
+  let total = 0;
+  let trial = 0;
+  activeCasts.forEach(c => {
+    if (state.shiftData[shiftKey(todayStr, c.id)]) {
+      total++;
+      if (c.trial) trial++;
+    }
+  });
+  // バナーHTML生成
+  let html, cls;
+  if (total === 0) {
+    html = '本日の出勤キャストはまだ登録されていません';
+    cls = 'today-count-banner empty';
+  } else {
+    html = `本日出勤：<span class="count-main">${total}名</span>`;
+    if (trial > 0) {
+      html += `<span class="count-trial">（うち体験：${trial}名）</span>`;
+    }
+    cls = 'today-count-banner';
+  }
+  // フロアタブとシフトタブの両方を更新
+  const fEl = document.getElementById('todayShiftCountFloor');
+  const sEl = document.getElementById('todayShiftCountShift');
+  if (fEl) { fEl.innerHTML = html; fEl.className = cls; }
+  if (sEl) { sEl.innerHTML = html; sEl.className = cls; }
 }
 
 // ---------- CUSTOMERS ----------
