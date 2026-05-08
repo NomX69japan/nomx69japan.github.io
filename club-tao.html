@@ -427,6 +427,45 @@
     color: #888;
   }
 
+  /* テーブル選択グリッド（来店確認用） */
+  .table-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .table-pick-grid button {
+    background: #fff;
+    border: 1.5px solid var(--accent);
+    color: var(--text);
+    padding: 14px 4px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .table-pick-grid button:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+  .table-pick-grid button:disabled {
+    background: #f0ebe0;
+    color: #aaa;
+    border-color: #ddd6c8;
+    cursor: not-allowed;
+  }
+  .table-pick-grid button.private {
+    grid-column: span 2;
+    background: #f5ebd0;
+  }
+  .table-pick-grid button.private:hover:not(:disabled) {
+    background: #b8860b;
+    color: #fff;
+  }
+
   .shift-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -1575,6 +1614,7 @@ function buildTableCard(t, tdata) {
   // 使用中カード
   const setNum = tdata.setCount || 1;
   const setBadge = setNum > 1 ? `<span class="set-badge">${setNum}セット目</span>` : '';
+  const autoExtBadge = tdata.autoExtend ? `<span class="set-badge" style="background:#fff8e7; color:#b8860b; border:1px solid #d4af37;">🔁自動延長</span>` : '';
 
   let timerHtml = '';
   let timerCls = 'timer';
@@ -1598,7 +1638,7 @@ function buildTableCard(t, tdata) {
 
   card.innerHTML = `
     <div class="name">
-      <span>${escapeHtml(t.name)}${setBadge}</span>
+      <span>${escapeHtml(t.name)}${setBadge}${autoExtBadge}</span>
       <span class="badge-on">使用中</span>
     </div>
     <div class="info">
@@ -1646,6 +1686,19 @@ function checkIn(tableId, opts) {
     customerName = newCust.name;
   }
 
+  // 入店時刻：opts.startTime が "HH:MM" で指定されていれば、その時刻を使う
+  let startedAt = now;
+  if (opts.startTime && /^\d{1,2}:\d{2}$/.test(opts.startTime)) {
+    const [hh, mm] = opts.startTime.split(':').map(n => parseInt(n, 10));
+    if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
+      const d = new Date();
+      d.setHours(hh, mm, 0, 0);
+      // 「未来の時刻」を入れた場合は前日扱いに（早朝入店ケース。例：午前2時に入店、現在4時など。原則同日採用）
+      // とりあえず未来側はそのまま、過去側はそのまま、同日として扱う
+      startedAt = d.getTime();
+    }
+  }
+
   state.tables[tableId] = {
     occupied: true,
     guests,
@@ -1654,9 +1707,10 @@ function checkIn(tableId, opts) {
     customerId,
     customerName: customerId ? '' : customerName, // 顧客IDがあれば未紐付け名称はクリア
     memo,
-    startedAt: now,
-    endsAt: now + SET_MINUTES * 60000,
+    startedAt,
+    endsAt: startedAt + SET_MINUTES * 60000,
     setCount: 1,
+    autoExtend: !!opts.autoExtend, // 自動延長フラグ
     alertedWarn: false,
     alertedCritical: false,
     _updated: now,
@@ -1766,13 +1820,18 @@ function updateTableTimers() {
       }
       needRender = true;
     }
-    // 残り10分で延長確認モーダル
+    // 残り10分で延長確認モーダル（または自動延長）
     if (!tdata.alertedCritical && remainMs > 0 && remainMin <= ALERT_10_MIN) {
       tdata.alertedCritical = true;
       if (notifPrefs.enabled && notifPrefs.events.timer) {
-        showToast(`⏱ ${t.name}：残り10分（延長確認）`, 'critical');
+        showToast(`⏱ ${t.name}：残り10分${tdata.autoExtend ? '（自動延長）' : '（延長確認）'}`, 'critical');
       }
-      openExtendDialog(t.id);
+      if (tdata.autoExtend) {
+        // 自動延長（モーダルを出さずに +60分）
+        extendTable(t.id, 60);
+      } else {
+        openExtendDialog(t.id);
+      }
       needRender = true;
     }
   });
@@ -1946,6 +2005,7 @@ function openTableModal(tableId) {
     const endsStr = tdata.endsAt
       ? new Date(tdata.endsAt).toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' })
       : '—';
+    const autoExtChk = tdata.autoExtend ? 'checked' : '';
     statusBlock = `
       <div class="cust-detail-section" style="margin-bottom:12px;">
         <h4>📍 現在のステータス</h4>
@@ -1957,6 +2017,10 @@ function openTableModal(tableId) {
           <button type="button" class="btn btn-sm" data-extend-modal="30">+30分延長</button>
           <button type="button" class="btn btn-sm" data-extend-modal="60">+60分延長</button>
         </div>
+        <label class="small-label" style="margin-top:10px; display:flex; align-items:center; gap:6px; padding:6px 8px; background:#fff8e7; border:1px solid #d4af37; border-radius:6px;">
+          <input type="checkbox" id="tblAutoExtend" ${autoExtChk}> 
+          <span>🔁 自動延長（時間切れで60分自動延長、確認モーダル表示なし）</span>
+        </label>
       </div>
     `;
   }
@@ -1998,6 +2062,21 @@ function openTableModal(tableId) {
     </div>
   `;
 
+  // 入店時刻入力欄（空席時のみ表示、デフォルトは現在時刻）
+  let startTimeBlock = '';
+  if (!tdata.occupied) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    startTimeBlock = `
+      <label class="field">
+        <span class="lab">入店時刻</span>
+        <input type="time" id="tblStartTime" value="${hh}:${mm}" style="font-size:14px; padding:6px 8px;">
+        <span style="color:#888; font-size:11px; display:block; margin-top:3px;">変更すると指定時刻が開始時刻になります（60分後まで）</span>
+      </label>
+    `;
+  }
+
   document.getElementById('tableModalBody').innerHTML = `
     ${statusBlock}
     ${customerBlock}
@@ -2006,6 +2085,7 @@ function openTableModal(tableId) {
       <input type="number" id="tblGuests" value="${tdata.guests||1}" min="0" max="20">
     </label>
     ${castBlock}
+    ${startTimeBlock}
     <label class="field">
       <span class="lab">メモ（指名/同伴/ボトル等）</span>
       <textarea id="tblMemo" rows="3" placeholder="例：同伴、ドンペリ入った など">${escapeHtml(tdata.memo||'')}</textarea>
@@ -2103,6 +2183,7 @@ function checkInFromModal() {
       castIds: data.castIds,
       castFree: data.castFree,
       memo: data.memo,
+      startTime: data.startTime,
     });
   } catch(e) {
     console.error('checkIn failed:', e);
@@ -2140,7 +2221,9 @@ function readTableModalForm() {
   const castIds = Array.from(document.querySelectorAll('#tableModalBody .cast-pick:checked')).map(el => el.value);
   const castFree = (document.getElementById('tblCastFree')?.value || '').trim();
   const memo = document.getElementById('tblMemo')?.value || '';
-  return { customerId, customerName, createNewCustomer, guests, castIds, castFree, memo };
+  // 入店時刻（HH:MM形式の文字列）。空席時のみ存在
+  const startTime = document.getElementById('tblStartTime')?.value || '';
+  return { customerId, customerName, createNewCustomer, guests, castIds, castFree, memo, startTime };
 }
 
 function saveTableInternal(closeAfter) {
@@ -2171,6 +2254,10 @@ function saveTableInternal(closeAfter) {
     customerId = newCust.id;
   }
 
+  // 自動延長チェックボックス（使用中のみ存在）
+  const autoExtendEl = document.getElementById('tblAutoExtend');
+  const autoExtend = autoExtendEl ? !!autoExtendEl.checked : !!prev.autoExtend;
+
   state.tables[editingTableId] = {
     ...prev,
     guests: data.guests,
@@ -2179,6 +2266,7 @@ function saveTableInternal(closeAfter) {
     customerId,
     customerName: customerId ? '' : customerName,
     memo: data.memo,
+    autoExtend,
     _updated: Date.now(),
   };
 
@@ -2984,42 +3072,25 @@ function checkInFromReservation(id) {
   const r = state.reservations.find(x => x.id === id);
   if (!r) return;
 
-  // テーブル選択
-  let tableId = r.tableId;
-  if (!tableId) {
-    // 空席のテーブルから選んでもらう
-    const empty = DEFAULT_TABLES.filter(t => !state.tables[t.id]?.occupied);
-    if (empty.length === 0) {
-      alert('空席がありません');
-      return;
-    }
-    const list = empty.map((t, i) => `${i+1}. ${t.name}`).join('\n');
-    const picked = prompt(`どのテーブルに案内しますか？番号を入力:\n${list}`);
-    if (!picked) return;
-    const idx = parseInt(picked, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= empty.length) {
-      alert('無効な選択です');
-      return;
-    }
-    tableId = empty[idx].id;
-  } else {
-    // 指定テーブルが既に使用中なら警告
-    if (state.tables[tableId]?.occupied) {
-      if (!confirm(`${getTableName(tableId)} は既に使用中です。別の空席に案内しますか？`)) return;
-      const empty = DEFAULT_TABLES.filter(t => !state.tables[t.id]?.occupied);
-      if (empty.length === 0) {
-        alert('空席がありません');
-        return;
-      }
-      const list = empty.map((t, i) => `${i+1}. ${t.name}`).join('\n');
-      const picked = prompt(`空席:\n${list}`);
-      if (!picked) return;
-      const idx = parseInt(picked, 10) - 1;
-      if (isNaN(idx) || idx < 0 || idx >= empty.length) return;
-      tableId = empty[idx].id;
-    }
+  // 指定テーブルがあって空席ならそのまま使う、それ以外はグリッドで選んでもらう
+  if (r.tableId && !state.tables[r.tableId]?.occupied) {
+    // 指定テーブルがそのまま使える
+    proceedCheckInFromReservation(r, r.tableId);
+    return;
   }
 
+  // 指定テーブルが既に使用中、または未指定 → グリッド選択モーダル
+  const reasonMsg = r.tableId
+    ? `${getTableName(r.tableId)} は既に使用中です。別の席へ案内：`
+    : 'どのテーブルに案内しますか？';
+  openTablePickModal(reasonMsg, (chosenTableId) => {
+    if (!chosenTableId) return;
+    proceedCheckInFromReservation(r, chosenTableId);
+  });
+}
+
+// 来店確認の入店処理本体
+function proceedCheckInFromReservation(r, tableId) {
   // 顧客情報取得
   let customerId = r.customerId || '';
   let customerName = r.customerName || '';
@@ -3047,7 +3118,64 @@ function checkInFromReservation(id) {
   persistSave();
   renderReservations();
   refreshShiftIfVisible();
-  alert(`${getTableName(tableId)} に入店登録しました`);
+  showToast(`✅ ${getTableName(tableId)} に入店登録しました`, 'checkin');
+}
+
+// テーブル選択グリッドモーダル
+function openTablePickModal(message, onPick) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1600;
+
+  // 通常卓と個室を分けてレンダリング
+  const normalTables = DEFAULT_TABLES.filter(t => t.type !== 'private');
+  const privateTables = DEFAULT_TABLES.filter(t => t.type === 'private');
+
+  const renderBtn = (t) => {
+    const occupied = !!state.tables[t.id]?.occupied;
+    const cls = t.type === 'private' ? 'private' : '';
+    const dis = occupied ? 'disabled' : '';
+    const status = occupied ? '<br><span style="font-size:10px; font-weight:normal;">使用中</span>' : '';
+    return `<button data-tid="${t.id}" class="${cls}" ${dis}>${escapeHtml(t.name)}${status}</button>`;
+  };
+
+  bg.innerHTML = `
+    <div class="modal" style="max-width:440px;">
+      <h3>🪑 テーブル選択</h3>
+      <p style="color:var(--text-sub); font-size:13px; margin:6px 0 10px;">${escapeHtml(message)}</p>
+      <div style="font-size:12px; color:#888; margin-bottom:4px;">通常卓</div>
+      <div class="table-pick-grid">
+        ${normalTables.map(renderBtn).join('')}
+      </div>
+      <div style="font-size:12px; color:#888; margin-bottom:4px; margin-top:8px;">個室</div>
+      <div class="table-pick-grid">
+        ${privateTables.map(renderBtn).join('')}
+      </div>
+      <div class="row-buttons" style="margin-top:14px;">
+        <button class="btn-sub" data-pick-cancel>キャンセル</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+
+  bg.querySelectorAll('button[data-tid]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tid = btn.getAttribute('data-tid');
+      bg.remove();
+      onPick(tid);
+    });
+  });
+  bg.querySelector('[data-pick-cancel]').addEventListener('click', () => {
+    bg.remove();
+    onPick(null);
+  });
+  // 背景タップで閉じる
+  bg.addEventListener('click', (e) => {
+    if (e.target === bg) {
+      bg.remove();
+      onPick(null);
+    }
+  });
 }
 
 // 予約モーダル
