@@ -466,6 +466,116 @@
     color: #fff;
   }
 
+  /* 本日集計ページ */
+  .today-stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 12px 0 20px 0;
+  }
+  .today-stats-cards .stat-card {
+    background: linear-gradient(135deg, #fff8e7 0%, #f5ebd0 100%);
+    border: 1px solid #d4af37;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .today-stats-cards .stat-card .label {
+    font-size: 11px;
+    color: #8b6914;
+    margin-bottom: 4px;
+  }
+  .today-stats-cards .stat-card .value {
+    font-size: 22px;
+    font-weight: bold;
+    color: #b8860b;
+    line-height: 1.2;
+  }
+  .today-stats-cards .stat-card .sub {
+    font-size: 10px;
+    color: #888;
+    margin-top: 2px;
+  }
+
+  .today-section {
+    margin-bottom: 24px;
+  }
+  .today-section h3 {
+    font-size: 14px;
+    color: var(--text);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 4px;
+    margin: 12px 0 8px 0;
+  }
+  .today-table-block {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .today-table-block .head {
+    background: #faf6ee;
+    padding: 8px 12px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .today-table-block .head .count-badge {
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: normal;
+  }
+  .today-visit-row {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0ebe0;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 13px;
+  }
+  .today-visit-row:last-child { border-bottom: none; }
+  .today-visit-row:hover, .today-visit-row:active {
+    background: #fff8e7;
+  }
+  .today-visit-row .row-1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+  .today-visit-row .row-1 .name {
+    font-weight: bold;
+    color: var(--text);
+  }
+  .today-visit-row .row-1 .time {
+    color: var(--text-sub);
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+  .today-visit-row .row-2 {
+    color: #888;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .today-visit-row .ongoing {
+    color: #2a8a2a;
+    font-weight: bold;
+  }
+  .today-empty {
+    color: #888;
+    font-size: 13px;
+    padding: 24px;
+    text-align: center;
+    background: #faf6ee;
+    border-radius: 8px;
+  }
+
   .shift-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -561,6 +671,11 @@
   table.shift td.shift-cell.on {
     background: var(--on-bg) !important;
     color: #2a6a2a;
+    font-weight: bold;
+  }
+  table.shift td.shift-cell.pending {
+    background: #fff4d6 !important;
+    color: #b87a00;
     font-weight: bold;
   }
   table.shift td.shift-cell.off {
@@ -1083,6 +1198,7 @@
       <button class="nav-btn" data-page="shift">📅 シフト</button>
       <button class="nav-btn" data-page="reservations">📖 予約</button>
       <button class="nav-btn" data-page="customers">👤 顧客</button>
+      <button class="nav-btn" data-page="today">📊 本日</button>
       <button class="nav-btn" data-page="settings">⚙️ 設定</button>
     </nav>
     <div class="sync-status">
@@ -1137,8 +1253,10 @@
         </span>
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
-        セルをタップで出勤/休みを切替。予約マーカーがある日は ○ や ① ② ③ を省略しマーカーだけ表示。<br>
-        ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ○ ）。
+        セルをタップで切替：— → ○（出勤）→ △（未定）→ —（休み）<br>
+        予約マーカーがある日は ○ や ① ② ③ を省略しマーカーだけ表示。<br>
+        ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ○ ）。<br>
+        △（未定）は出勤扱いとしてカウントされません。
       </p>
     </section>
 
@@ -1176,6 +1294,17 @@
         <button class="btn" onclick="openCustomerModal(null)">+ 新規追加</button>
       </div>
       <div class="cust-list" id="custList"></div>
+    </section>
+
+    <!-- ===== TODAY SUMMARY PAGE ===== -->
+    <section class="page" id="page-today">
+      <h2 class="page-title">📊 本日の来店状況</h2>
+      <div class="floor-toolbar">
+        <button class="btn-sub btn-sm" onclick="renderTodaySummary()">🔄 更新</button>
+        <span style="color:#888; font-size:12px;" id="todayDateLabel"></span>
+      </div>
+      <div id="todayStatsCards" class="today-stats-cards"></div>
+      <div id="todaySummaryBody"></div>
     </section>
 
     <!-- ===== SETTINGS PAGE ===== -->
@@ -1355,6 +1484,7 @@ function persistSave() {
     tables: state.tables,
     shiftData: state.shiftData,
     reservations: state.reservations,
+    visitLog: state.visitLog,
     _updatedAt: Date.now()
   };
   try {
@@ -1378,6 +1508,7 @@ function persistLoad() {
     if (data.tables) state.tables = data.tables;
     if (data.shiftData) state.shiftData = data.shiftData;
     if (Array.isArray(data.reservations)) state.reservations = data.reservations;
+    if (Array.isArray(data.visitLog)) state.visitLog = data.visitLog;
   } catch(e) {
     console.error('persistLoad failed', e);
   }
@@ -1403,6 +1534,7 @@ const state = {
   tables: {},
   shiftData: {},
   reservations: [],
+  visitLog: [], // 退店時に記録される来店履歴
   weekOffset: 0,
 };
 
@@ -1454,11 +1586,21 @@ function shiftKey(dateStr, castId) {
   return `${dateStr}_${castId}`;
 }
 function getShift(dateStr, castId) {
-  return !!state.shiftData[shiftKey(dateStr, castId)];
+  // 出勤判定（true=出勤確定、false=休みor未定）
+  return state.shiftData[shiftKey(dateStr, castId)] === true;
+}
+function getShiftStatus(dateStr, castId) {
+  // 'on' | 'pending' | 'off'
+  const v = state.shiftData[shiftKey(dateStr, castId)];
+  if (v === true) return 'on';
+  if (v === 'pending') return 'pending';
+  return 'off';
 }
 function setShift(dateStr, castId, val) {
+  // val: true=出勤 / 'pending'=未定 / falsy=休み
   const k = shiftKey(dateStr, castId);
-  if (val) state.shiftData[k] = true;
+  if (val === true) state.shiftData[k] = true;
+  else if (val === 'pending') state.shiftData[k] = 'pending';
   else delete state.shiftData[k];
 }
 
@@ -1495,6 +1637,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (target === 'shift') renderShift();
     if (target === 'reservations') renderReservations();
     if (target === 'customers') renderCustomerList();
+    if (target === 'today') renderTodaySummary();
     if (target === 'settings') renderSettings();
   });
 });
@@ -1769,10 +1912,16 @@ function getTableName(id) {
 // 退店
 function checkOut(tableId) {
   const tName = getTableName(tableId);
+  const prev = state.tables[tableId] || {};
+  // 来店ログに記録（入店していた場合のみ）
+  if (prev.occupied && prev.startedAt) {
+    recordVisitLog(tableId, prev);
+  }
   state.tables[tableId] = {
     occupied: false, guests: 0, castIds: [], castFree: '',
     customerId: '', customerName: '', memo: '',
     startedAt: null, endsAt: null, setCount: 0,
+    autoExtend: false,
     alertedWarn: false, alertedCritical: false,
     _updated: Date.now(),
   };
@@ -1785,6 +1934,291 @@ function checkOut(tableId) {
       body: '',
       type: 'checkout',
     });
+  }
+}
+
+// 来店ログ詳細モーダル（顧客来店履歴タップ・本日集計から呼ばれる）
+function showVisitDetail(logId) {
+  if (!Array.isArray(state.visitLog)) return;
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) {
+    alert('来店記録が見つかりません');
+    return;
+  }
+  const fmtTime = (ts) => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+  const startStr = fmtTime(log.startedAt);
+  const endStr = fmtTime(log.endedAt);
+  const dur = log.durationMin || 0;
+  const durStr = dur >= 60
+    ? `${Math.floor(dur/60)}時間${dur%60 ? dur%60+'分' : ''}`
+    : `${dur}分`;
+  const castNames = (log.castIds || [])
+    .map(cid => state.casts.find(c => c.id === cid)?.name || '')
+    .filter(Boolean);
+  const allCasts = [...castNames, (log.castFree || '').trim()].filter(Boolean).join('・') || '—';
+  const custName = log.customerName || '（記録なし）';
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1700;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:440px;">
+      <h3>📋 ${escapeHtml(log.date)} 来店詳細</h3>
+      <div class="cust-detail-section" style="margin-top:8px;">
+        <table style="width:100%; font-size:13px; line-height:1.9; border-collapse:collapse;">
+          <tr><td style="color:#888; width:90px; vertical-align:top;">お客様</td><td><b>${escapeHtml(custName)}</b></td></tr>
+          <tr><td style="color:#888; vertical-align:top;">テーブル</td><td>${escapeHtml(log.tableName || log.tableId)}</td></tr>
+          <tr><td style="color:#888; vertical-align:top;">時間帯</td><td>${startStr} 〜 ${endStr}　<span style="color:#888;">(${durStr})</span></td></tr>
+          <tr><td style="color:#888; vertical-align:top;">人数</td><td>${log.guests || 0}名</td></tr>
+          <tr><td style="color:#888; vertical-align:top;">担当キャスト</td><td>${escapeHtml(allCasts)}</td></tr>
+          <tr><td style="color:#888; vertical-align:top;">セット数</td><td>${log.setCount || 1}セット</td></tr>
+          ${log.memo ? `<tr><td style="color:#888; vertical-align:top;">メモ</td><td style="white-space:pre-wrap;">${escapeHtml(log.memo)}</td></tr>` : ''}
+        </table>
+      </div>
+      <div class="row-buttons" style="margin-top:14px;">
+        <button class="btn-sub" data-close>閉じる</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('[data-close]').addEventListener('click', () => bg.remove());
+  bg.addEventListener('click', (e) => {
+    if (e.target === bg) bg.remove();
+  });
+}
+
+// 本日の来店状況サマリー画面
+function renderTodaySummary() {
+  const todayStr = localDateStr(new Date());
+  const labelEl = document.getElementById('todayDateLabel');
+  if (labelEl) {
+    const d = new Date();
+    const wd = ['日','月','火','水','木','金','土'][d.getDay()];
+    labelEl.textContent = `${todayStr}（${wd}）`;
+  }
+
+  // 本日のログ + 現在使用中の入店中テーブルも「進行中」として混ぜる
+  const completedToday = (state.visitLog || []).filter(v => v.date === todayStr);
+
+  // 進行中の卓を取得（占有中）
+  const ongoing = [];
+  DEFAULT_TABLES.forEach(t => {
+    const tdata = state.tables[t.id];
+    if (tdata && tdata.occupied && tdata.startedAt && localDateStr(new Date(tdata.startedAt)) === todayStr) {
+      let custName = tdata.customerName || '';
+      if (tdata.customerId) {
+        const c = state.customers.find(x => x.id === tdata.customerId);
+        if (c) custName = c.name;
+      }
+      ongoing.push({
+        id: '__ongoing_' + t.id,
+        date: todayStr,
+        tableId: t.id,
+        tableName: t.name,
+        customerId: tdata.customerId || '',
+        customerName: custName || '（記録なし）',
+        guests: tdata.guests || 0,
+        castIds: (tdata.castIds || []).slice(),
+        castFree: tdata.castFree || '',
+        memo: tdata.memo || '',
+        startedAt: tdata.startedAt,
+        endedAt: null, // 進行中
+        setCount: tdata.setCount || 1,
+        durationMin: Math.round((Date.now() - tdata.startedAt) / 60000),
+        ongoing: true,
+      });
+    }
+  });
+
+  const allEntries = [...ongoing, ...completedToday];
+
+  // 統計カード
+  const totalVisits = allEntries.length;
+  const totalGuests = allEntries.reduce((s, v) => s + (v.guests || 0), 0);
+  // 利用テーブル数（ユニーク）
+  const uniqueTables = new Set(allEntries.map(v => v.tableId)).size;
+  // キャスト出勤数（本日シフトON）
+  const activeCasts = (state.casts || []).filter(c => !c.removed);
+  let castOnDuty = 0;
+  let trialOnDuty = 0;
+  activeCasts.forEach(c => {
+    // 出勤確定（true）のみカウント。'pending'（未定）は除外。
+    if (getShift(todayStr, c.id)) {
+      castOnDuty++;
+      if (c.trial) trialOnDuty++;
+    }
+  });
+  // 進行中の組数
+  const ongoingCount = ongoing.length;
+
+  const statsHtml = `
+    <div class="stat-card">
+      <div class="label">来店組数</div>
+      <div class="value">${totalVisits}</div>
+      <div class="sub">${ongoingCount > 0 ? `（うち進行中：${ongoingCount}）` : ''}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">合計人数</div>
+      <div class="value">${totalGuests}</div>
+      <div class="sub">名</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">使用テーブル</div>
+      <div class="value">${uniqueTables}</div>
+      <div class="sub">/ ${DEFAULT_TABLES.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">キャスト出勤</div>
+      <div class="value">${castOnDuty}</div>
+      <div class="sub">${trialOnDuty > 0 ? `（うち体験：${trialOnDuty}）` : '名'}</div>
+    </div>
+  `;
+  document.getElementById('todayStatsCards').innerHTML = statsHtml;
+
+  // テーブル別グルーピング（同テーブルが複数回使われた場合も検出可能）
+  const byTable = new Map();
+  // テーブル順にソート（DEFAULT_TABLES の順）
+  DEFAULT_TABLES.forEach(t => {
+    const entries = allEntries.filter(v => v.tableId === t.id);
+    if (entries.length > 0) {
+      // 開始時刻の降順
+      entries.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+      byTable.set(t.id, { table: t, entries });
+    }
+  });
+
+  // メイン本文
+  let bodyHtml = '';
+  if (allEntries.length === 0) {
+    bodyHtml = '<div class="today-empty">本日の来店記録はまだありません</div>';
+  } else {
+    bodyHtml += '<div class="today-section"><h3>テーブル別 来店履歴</h3>';
+    byTable.forEach(({ table, entries }) => {
+      const reused = entries.length > 1;
+      bodyHtml += `<div class="today-table-block">`;
+      bodyHtml += `<div class="head"><span>🪑 ${escapeHtml(table.name)}</span>`;
+      bodyHtml += `<span class="count-badge">${entries.length}回${reused ? '（複数）' : ''}</span></div>`;
+      entries.forEach(v => {
+        const fmtTime = (ts) => {
+          if (!ts) return '—';
+          const d = new Date(ts);
+          return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        };
+        const startStr = fmtTime(v.startedAt);
+        const endStr = v.ongoing ? '<span class="ongoing">進行中</span>' : fmtTime(v.endedAt);
+        const castNames = (v.castIds || [])
+          .map(cid => state.casts.find(c => c.id === cid)?.name || '')
+          .filter(Boolean);
+        const allCasts = [...castNames, (v.castFree || '').trim()].filter(Boolean).join('・') || '—';
+        const memoSnippet = v.memo
+          ? `<br>📝 ${escapeHtml(v.memo.length > 60 ? v.memo.slice(0, 60)+'…' : v.memo)}`
+          : '';
+        const onclickAttr = v.ongoing
+          ? `onclick="showOngoingDetail('${v.tableId}')"`
+          : `onclick="showVisitDetail('${v.id}')"`;
+        bodyHtml += `<div class="today-visit-row" ${onclickAttr}>
+          <div class="row-1">
+            <span class="name">${escapeHtml(v.customerName || '（記録なし）')}　<span style="color:#888; font-weight:normal; font-size:11px;">${v.guests || 0}名</span></span>
+            <span class="time">${startStr} 〜 ${endStr}</span>
+          </div>
+          <div class="row-2">
+            🌹 ${escapeHtml(allCasts)}　／　${v.setCount || 1}セット
+            ${memoSnippet}
+          </div>
+        </div>`;
+      });
+      bodyHtml += '</div>';
+    });
+    bodyHtml += '</div>';
+
+    // キャスト別サマリー（本日付いた組数）
+    const castVisitCount = new Map();
+    allEntries.forEach(v => {
+      (v.castIds || []).forEach(cid => {
+        castVisitCount.set(cid, (castVisitCount.get(cid) || 0) + 1);
+      });
+    });
+    if (castVisitCount.size > 0) {
+      const castRows = activeCasts
+        .filter(c => castVisitCount.has(c.id))
+        .sort((a, b) => (castVisitCount.get(b.id) || 0) - (castVisitCount.get(a.id) || 0))
+        .map(c => {
+          const n = castVisitCount.get(c.id) || 0;
+          const trialMark = c.trial ? '<span class="trial-badge">体験</span>' : '';
+          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 12px; border-bottom:1px solid #f0ebe0; font-size:13px;">
+            <span>🌹 ${escapeHtml(c.name)} ${trialMark}</span>
+            <span style="color:var(--accent); font-weight:bold;">${n}組</span>
+          </div>`;
+        }).join('');
+      bodyHtml += `
+        <div class="today-section">
+          <h3>キャスト別 接客組数（本日）</h3>
+          <div class="today-table-block">${castRows}</div>
+        </div>
+      `;
+    }
+  }
+  document.getElementById('todaySummaryBody').innerHTML = bodyHtml;
+}
+
+// 進行中卓の詳細表示（本日集計の進行中行から呼ばれる）
+function showOngoingDetail(tableId) {
+  // 通常の openTableModal を開くだけでOK
+  openTableModal(tableId);
+}
+function recordVisitLog(tableId, tdata) {
+  const now = Date.now();
+  const tName = getTableName(tableId);
+  const date = localDateStr(new Date(tdata.startedAt));
+  // 顧客名解決
+  let custName = tdata.customerName || '';
+  if (tdata.customerId) {
+    const c = state.customers.find(x => x.id === tdata.customerId);
+    if (c) custName = c.name;
+  }
+  const log = {
+    id: genId('vlog'),
+    date,
+    tableId,
+    tableName: tName,
+    customerId: tdata.customerId || '',
+    customerName: custName,
+    guests: tdata.guests || 0,
+    castIds: (tdata.castIds || []).slice(),
+    castFree: tdata.castFree || '',
+    memo: tdata.memo || '',
+    startedAt: tdata.startedAt,
+    endedAt: now,
+    setCount: tdata.setCount || 1,
+    durationMin: Math.round((now - tdata.startedAt) / 60000),
+    _created: now,
+  };
+  if (!Array.isArray(state.visitLog)) state.visitLog = [];
+  state.visitLog.push(log);
+  // 顧客の visits にも詳細情報を追記（既存の date, castIds 形式と互換維持しつつ、logId で詳細参照可能に）
+  if (tdata.customerId) {
+    const cust = state.customers.find(c => c.id === tdata.customerId);
+    if (cust) {
+      if (!Array.isArray(cust.visits)) cust.visits = [];
+      // 既存の同日エントリがあれば更新、なければ追加
+      const existing = cust.visits.find(v => v.date === date && !v.logId);
+      if (existing) {
+        // 既存の情報を logId で詳細参照可能に
+        existing.logId = log.id;
+        existing.castIds = Array.from(new Set([...(existing.castIds||[]), ...(tdata.castIds||[])]));
+      } else {
+        cust.visits.push({
+          date,
+          castIds: (tdata.castIds || []).slice(),
+          logId: log.id,
+        });
+      }
+      cust._updated = now;
+    }
   }
 }
 
@@ -2352,29 +2786,33 @@ function renderShift() {
         let trialPastShiftDates = null;
         if (c.trial) {
           trialPastShiftDates = Object.keys(state.shiftData || {})
-            .filter(k => k.endsWith('_' + c.id) && state.shiftData[k])
+            .filter(k => k.endsWith('_' + c.id) && state.shiftData[k] === true)
             .map(k => k.slice(0, 10))
             .filter(d => d <= todayStr) // 今日以前のみ（実績）
             .sort();
         }
         days.forEach(d => {
           const dStr = localDateStr(d);
-          const on = getShift(dStr, c.id);
+          const status = getShiftStatus(dStr, c.id);
+          const on = (status === 'on');
+          const pending = (status === 'pending');
           // 予約マーカー（キャストのみ）
           const resvTypes = (resvIndex[dStr] && resvIndex[dStr][c.id]) || [];
           const hasResv = resvTypes.length > 0;
           const hasResvCls = hasResv ? ' has-resv' : '';
           const marksHtml = buildResvMarks(resvTypes);
-          // 出勤マーク：体験キャストで実績1〜3回目なら丸数字、それ以外は ○
-          // ただし予約マーカーがある日は ◯/丸数字を省略してマーカーだけ表示（コンパクト化）
+          // 出勤マーク：
+          // - 出勤＋予約あり → マーカーのみ
+          // - 出勤のみ → ◯ または丸数字（体験キャストで実績1〜3回目）
+          // - 未定 → △
+          // - 休み → —
           let cellContent;
+          let cellClass;
           if (on && hasResv) {
-            // 出勤＋予約あり → マーカーのみ（縦幅節約）
             cellContent = marksHtml;
+            cellClass = 'on';
           } else if (on) {
-            // 出勤のみ → ◯ または丸数字
             let mark = '○';
-            // 体験キャストで、その日が今日以前（実績）なら丸数字を試みる
             if (c.trial && trialPastShiftDates && dStr <= todayStr) {
               const idx = trialPastShiftDates.indexOf(dStr);
               if (idx === 0) mark = '①';
@@ -2382,11 +2820,15 @@ function renderShift() {
               else if (idx === 2) mark = '③';
             }
             cellContent = mark;
+            cellClass = 'on';
+          } else if (pending) {
+            cellContent = '△';
+            cellClass = 'pending';
           } else {
-            // 休み
             cellContent = '—';
+            cellClass = 'off';
           }
-          html += `<td class="shift-cell ${on?'on':'off'}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
+          html += `<td class="shift-cell ${cellClass}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
         });
         html += '</tr>';
       });
@@ -2399,9 +2841,12 @@ function renderShift() {
         html += `<td class="cast-col">👔 ${escapeHtml(s.name)}</td>`;
         days.forEach(d => {
           const dStr = localDateStr(d);
-          const on = getShift(dStr, s.id);
-          // 予約マーカーは表示しない
-          html += `<td class="shift-cell ${on?'on':'off'}" data-date="${dStr}" data-cast="${s.id}" onclick="toggleShift('${dStr}','${s.id}')">${on?'○':'—'}</td>`;
+          const status = getShiftStatus(dStr, s.id);
+          let mark, cls;
+          if (status === 'on') { mark = '○'; cls = 'on'; }
+          else if (status === 'pending') { mark = '△'; cls = 'pending'; }
+          else { mark = '—'; cls = 'off'; }
+          html += `<td class="shift-cell ${cls}" data-date="${dStr}" data-cast="${s.id}" onclick="toggleShift('${dStr}','${s.id}')">${mark}</td>`;
         });
         html += '</tr>';
       });
@@ -2457,14 +2902,19 @@ function buildResvMarks(types) {
   return html;
 }
 function toggleShift(dateStr, castId) {
-  const cur = getShift(dateStr, castId);
-  setShift(dateStr, castId, !cur);
+  // 3状態サイクル：休み(off) → 出勤(on) → 未定(pending) → 休み(off)
+  const cur = getShiftStatus(dateStr, castId);
+  let next;
+  if (cur === 'off') next = true;            // 休み → 出勤
+  else if (cur === 'on') next = 'pending';   // 出勤 → 未定
+  else next = false;                         // 未定 → 休み
+  setShift(dateStr, castId, next);
   recalcAllTrialCounts();
   persistSave();
   renderShift();
 }
 function recalcAllTrialCounts() {
-  // 実績のみカウント：今日（含む）以前の出勤日のみ
+  // 実績のみカウント：今日（含む）以前の「出勤確定」（true）のみ。'pending' は除外。
   const todayStr = localDateStr(new Date());
   state.casts.forEach(c => {
     if (c.trial) {
@@ -2472,7 +2922,8 @@ function recalcAllTrialCounts() {
       const suffix = '_' + c.id;
       Object.keys(state.shiftData).forEach(k => {
         if (!k.endsWith(suffix)) return;
-        if (!state.shiftData[k]) return;
+        // 出勤確定のみ（'pending' は未定なので除外）
+        if (state.shiftData[k] !== true) return;
         // キーから日付部分（YYYY-MM-DD = 先頭10文字）を抽出
         const dateStr = k.slice(0, 10);
         // 今日以前のみカウント
@@ -2490,7 +2941,8 @@ function updateTodayShiftCount() {
   let total = 0;
   let trial = 0;
   activeCasts.forEach(c => {
-    if (state.shiftData[shiftKey(todayStr, c.id)]) {
+    // 出勤確定（true）のみカウント。'pending'（未定）は除外。
+    if (getShift(todayStr, c.id)) {
       total++;
       if (c.trial) trial++;
     }
@@ -2563,10 +3015,13 @@ function openCustomerModal(id) {
 
   const visitsHtml = (cust.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)).map((v, idx) => {
     const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
-    return `<div class="visit-row">
-      <span class="date">${escapeHtml(v.date)}</span>
+    const hasDetail = !!v.logId;
+    const detailIcon = hasDetail ? '<span style="color:#b8860b; font-size:11px; margin-left:4px;">▶ 詳細</span>' : '';
+    const clickable = hasDetail ? `style="cursor:pointer;" onclick="showVisitDetail('${v.logId}')"` : '';
+    return `<div class="visit-row" ${clickable}>
+      <span class="date">${escapeHtml(v.date)}${detailIcon}</span>
       <span class="cast">${escapeHtml(castNames || '—')}</span>
-      <button class="btn-danger btn-sm" onclick="removeVisit(${idx})">×</button>
+      <button class="btn-danger btn-sm" onclick="event.stopPropagation(); removeVisit(${idx})">×</button>
     </div>`;
   }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
 
@@ -2703,17 +3158,19 @@ function reopenWithEditing() {
   rebuildCustomerModalBody(custEditing);
 }
 function rebuildCustomerModalBody(cust) {
-  const visitsHtml = (cust.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)).map((v) => {
-    // 並び替え後のインデックスではなく、元配列のインデックスで操作したいので map 前に index を付与
-    return v;
-  });
-  // インデックス対応のため、元の順で表示する
-  const visitsRowsHtml = (cust.visits||[]).map((v, idx) => {
+  // 来店履歴は日付降順で表示。logIdがあれば詳細表示可能。
+  // 操作（×ボタン）は元配列のインデックスを保つ必要があるので、index付与してから降順ソート。
+  const indexedVisits = (cust.visits||[]).map((v, idx) => ({ ...v, _origIdx: idx }));
+  indexedVisits.sort((a, b) => b.date.localeCompare(a.date));
+  const visitsRowsHtml = indexedVisits.map((v) => {
     const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
-    return `<div class="visit-row">
-      <span class="date">${escapeHtml(v.date)}</span>
+    const hasDetail = !!v.logId;
+    const detailIcon = hasDetail ? '<span style="color:#b8860b; font-size:11px; margin-left:4px;">▶ 詳細</span>' : '';
+    const clickable = hasDetail ? `style="cursor:pointer;" onclick="showVisitDetail('${v.logId}')"` : '';
+    return `<div class="visit-row" ${clickable}>
+      <span class="date">${escapeHtml(v.date)}${detailIcon}</span>
       <span class="cast">${escapeHtml(castNames || '—')}</span>
-      <button class="btn-danger btn-sm" onclick="removeVisit(${idx})">×</button>
+      <button class="btn-danger btn-sm" onclick="event.stopPropagation(); removeVisit(${v._origIdx})">×</button>
     </div>`;
   }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
 
@@ -4047,11 +4504,21 @@ function applyServerData(payload) {
       }
     });
   }
+  // 来店ログ（visitLog）：IDベースで追加、既存はそのまま
+  if (Array.isArray(payload.visitLog)) {
+    if (!Array.isArray(state.visitLog)) state.visitLog = [];
+    payload.visitLog.forEach(rl => {
+      if (!state.visitLog.find(x => x.id === rl.id)) {
+        state.visitLog.push(rl);
+      }
+    });
+  }
   // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
   try { localStorage.setItem(LS_KEY, JSON.stringify({
     pin: state.pin, casts: state.casts, staff: state.staff,
     customers: state.customers, tables: state.tables, shiftData: state.shiftData,
     reservations: state.reservations,
+    visitLog: state.visitLog,
     _updatedAt: Date.now()
   })); } catch(e) {}
 
@@ -4065,6 +4532,7 @@ function applyServerData(payload) {
   if (document.getElementById('page-shift').classList.contains('active')) renderShift();
   if (document.getElementById('page-customers').classList.contains('active')) renderCustomerList();
   if (document.getElementById('page-reservations').classList.contains('active')) renderReservations();
+  if (document.getElementById('page-today').classList.contains('active')) renderTodaySummary();
   if (document.getElementById('page-settings').classList.contains('active')) renderSettings();
 }
 
