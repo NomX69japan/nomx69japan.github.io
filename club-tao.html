@@ -696,6 +696,45 @@
     padding: 1px 5px; border-radius: 8px; font-size: 10px;
     margin-left: 4px;
   }
+
+  /* ====== 指名キャスト選択（A/B/なしトグル） ====== */
+  .cast-pick-list {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .cast-pick-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); flex-wrap: wrap;
+  }
+  .cast-pick-row .small-label {
+    display: flex; align-items: center; gap: 4px;
+    cursor: pointer;
+  }
+  .nom-toggle {
+    display: inline-flex; gap: 0;
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    flex-shrink: 0;
+  }
+  .nom-toggle .nom-btn {
+    background: transparent; border: none; padding: 4px 10px;
+    font-size: 12px; cursor: pointer; color: var(--text-sub);
+    border-right: 1px solid var(--border);
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    min-width: 36px;
+  }
+  .nom-toggle .nom-btn:last-child { border-right: none; }
+  .nom-toggle .nom-btn:hover { background: var(--surface-alt); }
+  .nom-toggle .nom-btn.active.a {
+    background: #d4a4a4; color: #fff; font-weight: 600;
+  }
+  .nom-toggle .nom-btn.active.b {
+    background: #a4b4d4; color: #fff; font-weight: 600;
+  }
+  .nom-toggle .nom-btn.active.none {
+    background: var(--text-muted); color: #fff; font-weight: 600;
+  }
+
   /* 予約凡例 */
   .resv-legend {
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -1604,6 +1643,43 @@ function buildTimeSelectOptions(selectedHHMM, fromHour, toHour, stepMin) {
   return html;
 }
 
+// ---------- 指名種別（A/B）ヘルパー ----------
+// データ構造（後方互換）：
+//   - castIds: ['castA', 'castB']  指名されているキャストID配列（既存）
+//   - castNoms: { 'castA': 'A', 'castB': 'B' }  ID→指名種別マップ（'A'|'B'のみ。
+//     'なし'は castIds に入って castNoms にキーがない状態）
+// 旧データに castNoms が無くても castIds から「指名なし」として動作する。
+function getCastNomType(castId, source) {
+  if (!source) return null;
+  if (source.castNoms && source.castNoms[castId]) return source.castNoms[castId];
+  if (Array.isArray(source.castIds) && source.castIds.includes(castId)) return 'none';
+  return null;
+}
+// 「A：〇〇さん / B：△△さん / 〇〇さん（指名なし）/ フリー名」形式の表示文字列を生成
+function buildCastDisplay(source, includeFree) {
+  if (!source) return '';
+  const castIds = source.castIds || [];
+  const castNoms = source.castNoms || {};
+  const aList = [], bList = [], noneList = [];
+  castIds.forEach(cid => {
+    const c = state.casts.find(x => x.id === cid);
+    const name = c ? c.name : '';
+    if (!name) return;
+    const t = castNoms[cid];
+    if (t === 'A') aList.push(name);
+    else if (t === 'B') bList.push(name);
+    else noneList.push(name);
+  });
+  const parts = [];
+  if (aList.length) parts.push(`A：${aList.join('・')}`);
+  if (bList.length) parts.push(`B：${bList.join('・')}`);
+  if (noneList.length) parts.push(noneList.join('・'));
+  if (includeFree && (source.castFree || '').trim()) {
+    parts.push((source.castFree || '').trim());
+  }
+  return parts.join(' / ');
+}
+
 // ---------- Login ----------
 function tryLogin() {
   const v = document.getElementById('pinInput').value;
@@ -1652,7 +1728,7 @@ function initApp() {
   if (!state.tables) state.tables = {};
   DEFAULT_TABLES.forEach(t => {
     if (!state.tables[t.id]) {
-      state.tables[t.id] = { occupied:false, guests:0, castIds:[], startedAt:null, endsAt:null, setCount:0, memo:'' };
+      state.tables[t.id] = { occupied:false, guests:0, castIds:[], castNoms:{}, startedAt:null, endsAt:null, setCount:0, memo:'' };
     }
   });
   renderFloor();
@@ -1718,17 +1794,8 @@ function buildTableCard(t, tdata) {
 
   card.className = cls;
 
-  const castNames = (tdata.castIds || [])
-    .map(cid => {
-      const c = state.casts.find(x => x.id === cid);
-      return c ? c.name : '';
-    })
-    .filter(Boolean)
-    .join('・');
-
-  // フリー入力キャスト名（castIds に存在しない名前）
-  const freeCast = tdata.castFree || '';
-  const allCastDisp = [castNames, freeCast].filter(Boolean).join('・');
+  // 指名種別（A/B/なし）を反映した担当者表示
+  const allCastDisp = buildCastDisplay(tdata, true);
 
   const customerName = tdata.customerId
     ? (state.customers.find(c => c.id === tdata.customerId)?.name || '')
@@ -1802,6 +1869,7 @@ function checkIn(tableId, opts) {
   let customerName = opts.customerName || tdata.customerName || '';
   const guests = opts.guests != null ? opts.guests : (tdata.guests || 1);
   const castIds = opts.castIds || tdata.castIds || [];
+  const castNoms = opts.castNoms || tdata.castNoms || {};
   const castFree = opts.castFree != null ? opts.castFree : (tdata.castFree || '');
   const memo = opts.memo != null ? opts.memo : (tdata.memo || '');
 
@@ -1841,6 +1909,7 @@ function checkIn(tableId, opts) {
     occupied: true,
     guests,
     castIds,
+    castNoms,
     castFree,
     customerId,
     customerName: customerId ? '' : customerName, // 顧客IDがあれば未紐付け名称はクリア
@@ -1855,7 +1924,7 @@ function checkIn(tableId, opts) {
   };
   // 顧客の来店履歴
   if (customerId) {
-    recordVisit(customerId, castIds);
+    recordVisit(customerId, castIds, castNoms);
   }
 
   persistSave();
@@ -1867,13 +1936,11 @@ function checkIn(tableId, opts) {
     const custDisplay = customerId
       ? (state.customers.find(c => c.id === customerId)?.name || customerName || 'お客様')
       : (customerName || 'お客様');
-    const castNames = (castIds || [])
-      .map(cid => state.casts.find(c => c.id === cid)?.name || '')
-      .filter(Boolean);
-    const allCasts = [...castNames, (castFree || '').trim()].filter(Boolean).join('・');
+    // 指名種別を反映した担当者表示
+    const castDisp = buildCastDisplay({ castIds, castNoms, castFree }, true);
     let body = `${custDisplay}様`;
     if (guests) body += ` (${guests}名)`;
-    if (allCasts) body += ` 担当:${allCasts}`;
+    if (castDisp) body += ` 担当:${castDisp}`;
     dispatchPushNotification({
       title: `🟢 ${tName} 入店`,
       body: body,
@@ -1913,7 +1980,7 @@ function checkOut(tableId) {
     recordVisitLog(tableId, prev);
   }
   state.tables[tableId] = {
-    occupied: false, guests: 0, castIds: [], castFree: '',
+    occupied: false, guests: 0, castIds: [], castNoms: {}, castFree: '',
     customerId: '', customerName: '', memo: '',
     startedAt: null, endsAt: null, setCount: 0,
     autoExtend: false,
@@ -1951,10 +2018,8 @@ function showVisitDetail(logId) {
   const durStr = dur >= 60
     ? `${Math.floor(dur/60)}時間${dur%60 ? dur%60+'分' : ''}`
     : `${dur}分`;
-  const castNames = (log.castIds || [])
-    .map(cid => state.casts.find(c => c.id === cid)?.name || '')
-    .filter(Boolean);
-  const allCasts = [...castNames, (log.castFree || '').trim()].filter(Boolean).join('・') || '—';
+  // 指名種別を反映した担当者表示
+  const allCasts = buildCastDisplay(log, true) || '—';
   const custName = log.customerName || '（記録なし）';
 
   const bg = document.createElement('div');
@@ -2018,6 +2083,7 @@ function renderTodaySummary() {
         customerName: custName || '（記録なし）',
         guests: tdata.guests || 0,
         castIds: (tdata.castIds || []).slice(),
+        castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
         castFree: tdata.castFree || '',
         memo: tdata.memo || '',
         startedAt: tdata.startedAt,
@@ -2105,10 +2171,7 @@ function renderTodaySummary() {
         };
         const startStr = fmtTime(v.startedAt);
         const endStr = v.ongoing ? '<span class="ongoing">進行中</span>' : fmtTime(v.endedAt);
-        const castNames = (v.castIds || [])
-          .map(cid => state.casts.find(c => c.id === cid)?.name || '')
-          .filter(Boolean);
-        const allCasts = [...castNames, (v.castFree || '').trim()].filter(Boolean).join('・') || '—';
+        const allCasts = buildCastDisplay(v, true) || '—';
         const memoSnippet = v.memo
           ? `<br>📝 ${escapeHtml(v.memo.length > 60 ? v.memo.slice(0, 60)+'…' : v.memo)}`
           : '';
@@ -2184,6 +2247,7 @@ function recordVisitLog(tableId, tdata) {
     customerName: custName,
     guests: tdata.guests || 0,
     castIds: (tdata.castIds || []).slice(),
+    castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
     castFree: tdata.castFree || '',
     memo: tdata.memo || '',
     startedAt: tdata.startedAt,
@@ -2205,10 +2269,12 @@ function recordVisitLog(tableId, tdata) {
         // 既存の情報を logId で詳細参照可能に
         existing.logId = log.id;
         existing.castIds = Array.from(new Set([...(existing.castIds||[]), ...(tdata.castIds||[])]));
+        existing.castNoms = { ...(existing.castNoms||{}), ...(tdata.castNoms||{}) };
       } else {
         cust.visits.push({
           date,
           castIds: (tdata.castIds || []).slice(),
+          castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
           logId: log.id,
         });
       }
@@ -2218,16 +2284,24 @@ function recordVisitLog(tableId, tdata) {
 }
 
 // 来店履歴を記録
-function recordVisit(customerId, castIds) {
+function recordVisit(customerId, castIds, castNoms) {
   const cust = state.customers.find(c => c.id === customerId);
   if (!cust) return;
   if (!Array.isArray(cust.visits)) cust.visits = [];
   const today = localDateStr(new Date());
   const dup = cust.visits.find(v => v.date === today);
   if (!dup) {
-    cust.visits.push({ date: today, castIds: (castIds||[]).slice() });
+    cust.visits.push({
+      date: today,
+      castIds: (castIds||[]).slice(),
+      castNoms: castNoms ? { ...castNoms } : {}
+    });
   } else {
     dup.castIds = Array.from(new Set([...(dup.castIds||[]), ...(castIds||[])]));
+    // castNomsは新しいものを優先マージ
+    if (castNoms) {
+      dup.castNoms = { ...(dup.castNoms||{}), ...castNoms };
+    }
   }
   cust._updated = Date.now();
 }
@@ -2414,9 +2488,20 @@ function openTableModal(tableId) {
     .filter(c => !c.removed)
     .map(c => {
       const checked = (tdata.castIds || []).includes(c.id) ? 'checked' : '';
-      return `<label class="small-label" style="margin:4px 8px 4px 0;">
-        <input type="checkbox" value="${c.id}" ${checked} class="cast-pick"> ${escapeHtml(c.name)}${c.trial?'<span class="trial-badge">体験</span>':''}
-      </label>`;
+      const cur = (tdata.castNoms && tdata.castNoms[c.id]) || 'none';
+      // 指名種別トグル：A / B / なし（チェックOFFのときは無効化見た目）
+      const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
+      return `<div class="cast-pick-row" data-cast-id="${c.id}">
+        <label class="small-label" style="margin:0; flex:1; min-width:0;">
+          <input type="checkbox" value="${c.id}" ${checked} class="cast-pick" data-cast-pick="${c.id}">
+          ${escapeHtml(c.name)}${trialBadge}
+        </label>
+        <div class="nom-toggle" data-cast-nom-toggle="${c.id}">
+          <button type="button" class="nom-btn ${cur==='A'?'active a':''}" data-nom="A">A</button>
+          <button type="button" class="nom-btn ${cur==='B'?'active b':''}" data-nom="B">B</button>
+          <button type="button" class="nom-btn ${cur==='none'?'active none':''}" data-nom="none">なし</button>
+        </div>
+      </div>`;
     }).join('');
 
   const custOptions = ['<option value="">（指定なし）</option>']
@@ -2484,7 +2569,7 @@ function openTableModal(tableId) {
   const castBlock = `
     <div class="field">
       <span class="lab">指名キャスト</span>
-      <div style="display:flex; flex-wrap:wrap;">
+      <div class="cast-pick-list">
         ${castOptions || '<span style="color:var(--text-muted);font-size:12px;">設定からキャストを追加してください</span>'}
       </div>
       <input type="text" id="tblCastFree" value="${escapeHtml(tdata.castFree||'')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px;">
@@ -2538,6 +2623,37 @@ function openTableModal(tableId) {
     el.addEventListener('click', () => {
       const min = parseInt(el.getAttribute('data-extend-modal'), 10);
       extendFromModal(min);
+    });
+  });
+  // 指名種別（A/B/なし）トグルボタン
+  document.querySelectorAll('#tableModalBody .nom-toggle').forEach(toggle => {
+    const castId = toggle.getAttribute('data-cast-nom-toggle');
+    toggle.querySelectorAll('.nom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nom = btn.getAttribute('data-nom');
+        // 同じグループの他のボタンの active を外す
+        toggle.querySelectorAll('.nom-btn').forEach(b => {
+          b.classList.remove('active', 'a', 'b', 'none');
+        });
+        btn.classList.add('active', nom.toLowerCase());
+        // 対応するチェックボックスを自動的にON（指名種別を選んだ＝指名している）
+        const cb = document.querySelector(`#tableModalBody input.cast-pick[data-cast-pick="${castId}"]`);
+        if (cb) cb.checked = true;
+      });
+    });
+  });
+  // チェックボックスがOFFになったら、その行の指名種別もリセット
+  document.querySelectorAll('#tableModalBody input.cast-pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (!cb.checked) {
+        const castId = cb.getAttribute('data-cast-pick');
+        const toggle = document.querySelector(`#tableModalBody .nom-toggle[data-cast-nom-toggle="${castId}"]`);
+        if (toggle) {
+          toggle.querySelectorAll('.nom-btn').forEach(b => {
+            b.classList.remove('active', 'a', 'b', 'none');
+          });
+        }
+      }
     });
   });
 
@@ -2655,11 +2771,23 @@ function readTableModalForm() {
   }
   const guests = parseInt(document.getElementById('tblGuests')?.value || '0') || 0;
   const castIds = Array.from(document.querySelectorAll('#tableModalBody .cast-pick:checked')).map(el => el.value);
+  // 指名種別（A/B）を抽出。castIds に含まれているキャストのみ対象。
+  const castNoms = {};
+  castIds.forEach(cid => {
+    const toggle = document.querySelector(`#tableModalBody .nom-toggle[data-cast-nom-toggle="${cid}"]`);
+    if (!toggle) return;
+    const activeBtn = toggle.querySelector('.nom-btn.active');
+    if (!activeBtn) return;
+    const nom = activeBtn.getAttribute('data-nom');
+    if (nom === 'A' || nom === 'B') {
+      castNoms[cid] = nom;
+    }
+    // 'none' のときは castNoms に入れない（指名なし扱い）
+  });
   const castFree = (document.getElementById('tblCastFree')?.value || '').trim();
   const memo = document.getElementById('tblMemo')?.value || '';
-  // 入店時刻（HH:MM形式の文字列）。空席時のみ存在
   const startTime = document.getElementById('tblStartTime')?.value || '';
-  return { customerId, customerName, createNewCustomer, guests, castIds, castFree, memo, startTime };
+  return { customerId, customerName, createNewCustomer, guests, castIds, castNoms, castFree, memo, startTime };
 }
 
 function saveTableInternal(closeAfter) {
@@ -2698,6 +2826,7 @@ function saveTableInternal(closeAfter) {
     ...prev,
     guests: data.guests,
     castIds: data.castIds,
+    castNoms: data.castNoms || {},
     castFree: data.castFree,
     customerId,
     customerName: customerId ? '' : customerName,
@@ -2708,7 +2837,7 @@ function saveTableInternal(closeAfter) {
 
   // 使用中で、顧客が新たに紐付いたら来店履歴に記録
   if (wasOccupied && customerId && customerId !== prevCustomerId) {
-    recordVisit(customerId, data.castIds);
+    recordVisit(customerId, data.castIds, data.castNoms);
   }
 
   persistSave();
@@ -3395,12 +3524,8 @@ function buildReservationCardHTML(r) {
   const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
   const customerName = cust ? cust.name : (r.customerName || '(未登録)');
 
-  // キャスト名表示
-  const castNames = (r.castIds || [])
-    .map(cid => state.casts.find(c => c.id === cid)?.name || '')
-    .filter(Boolean);
-  const castFreeStr = (r.castFree || '').trim();
-  const castDisplay = [castNames.join('・'), castFreeStr].filter(Boolean).join('・');
+  // キャスト名表示（A/B指名種別あり）
+  const castDisplay = buildCastDisplay(r, true);
 
   // 日時
   const dt = r.datetime ? new Date(r.datetime) : null;
@@ -3606,6 +3731,7 @@ function proceedCheckInFromReservation(r, tableId) {
     createNewCustomer: createNew,
     guests: r.guests || 1,
     castIds: r.castIds || [],
+    castNoms: r.castNoms || {},
     castFree: r.castFree || '',
     memo: r.memo || '',
   });
@@ -3719,9 +3845,19 @@ function openReservationModal(id) {
   // キャスト選択肢
   const castOptions = state.casts.filter(c => !c.removed).map(c => {
     const checked = (r.castIds || []).includes(c.id) ? 'checked' : '';
-    return `<label class="small-label" style="margin:4px 8px 4px 0;">
-      <input type="checkbox" value="${c.id}" ${checked} class="resv-cast-pick"> ${escapeHtml(c.name)}${c.trial?'<span class="trial-badge">体験</span>':''}
-    </label>`;
+    const cur = (r.castNoms && r.castNoms[c.id]) || 'none';
+    const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
+    return `<div class="cast-pick-row" data-cast-id="${c.id}">
+      <label class="small-label" style="margin:0; flex:1; min-width:0;">
+        <input type="checkbox" value="${c.id}" ${checked} class="resv-cast-pick" data-resv-cast-pick="${c.id}">
+        ${escapeHtml(c.name)}${trialBadge}
+      </label>
+      <div class="nom-toggle" data-resv-nom-toggle="${c.id}">
+        <button type="button" class="nom-btn ${cur==='A'?'active a':''}" data-nom="A">A</button>
+        <button type="button" class="nom-btn ${cur==='B'?'active b':''}" data-nom="B">B</button>
+        <button type="button" class="nom-btn ${cur==='none'?'active none':''}" data-nom="none">なし</button>
+      </div>
+    </div>`;
   }).join('');
 
   // テーブル選択肢
@@ -3777,7 +3913,7 @@ function openReservationModal(id) {
 
     <div class="field">
       <span class="lab">指名キャスト</span>
-      <div style="display:flex; flex-wrap:wrap;">
+      <div class="cast-pick-list">
         ${castOptions || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
       </div>
       <input type="text" id="resvCastFree" value="${escapeHtml(r.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px;">
@@ -3797,6 +3933,37 @@ function openReservationModal(id) {
   // フッター
   buildResvModalFooter(!!id);
   document.getElementById('resvModalBg').classList.add('active');
+
+  // 予約モーダル：A/B/なしトグルのイベント
+  document.querySelectorAll('#resvModalBody .nom-toggle[data-resv-nom-toggle]').forEach(toggle => {
+    const castId = toggle.getAttribute('data-resv-nom-toggle');
+    toggle.querySelectorAll('.nom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nom = btn.getAttribute('data-nom');
+        toggle.querySelectorAll('.nom-btn').forEach(b => {
+          b.classList.remove('active', 'a', 'b', 'none');
+        });
+        btn.classList.add('active', nom.toLowerCase());
+        // 対応するチェックボックスを自動的にON
+        const cb = document.querySelector(`#resvModalBody input.resv-cast-pick[data-resv-cast-pick="${castId}"]`);
+        if (cb) cb.checked = true;
+      });
+    });
+  });
+  // チェックボックスがOFFになったら、その行の指名種別もリセット
+  document.querySelectorAll('#resvModalBody input.resv-cast-pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (!cb.checked) {
+        const castId = cb.getAttribute('data-resv-cast-pick');
+        const toggle = document.querySelector(`#resvModalBody .nom-toggle[data-resv-nom-toggle="${castId}"]`);
+        if (toggle) {
+          toggle.querySelectorAll('.nom-btn').forEach(b => {
+            b.classList.remove('active', 'a', 'b', 'none');
+          });
+        }
+      }
+    });
+  });
 }
 
 function buildResvModalFooter(isEdit) {
@@ -3861,6 +4028,18 @@ function saveReservation() {
 
   const guests = parseInt(document.getElementById('resvGuests').value, 10) || 1;
   const castIds = Array.from(document.querySelectorAll('.resv-cast-pick:checked')).map(el => el.value);
+  // 指名種別（A/B）を予約モーダルから抽出
+  const castNoms = {};
+  castIds.forEach(cid => {
+    const toggle = document.querySelector(`#resvModalBody .nom-toggle[data-resv-nom-toggle="${cid}"]`);
+    if (!toggle) return;
+    const activeBtn = toggle.querySelector('.nom-btn.active');
+    if (!activeBtn) return;
+    const nom = activeBtn.getAttribute('data-nom');
+    if (nom === 'A' || nom === 'B') {
+      castNoms[cid] = nom;
+    }
+  });
   const castFree = (document.getElementById('resvCastFree').value || '').trim();
   const tableId = document.getElementById('resvTable').value || '';
   const memo = document.getElementById('resvMemo').value || '';
@@ -3873,6 +4052,7 @@ function saveReservation() {
       r.customerName = customerId ? '' : customerName;
       r.guests = guests;
       r.castIds = castIds;
+      r.castNoms = castNoms;
       r.castFree = castFree;
       r.datetime = datetime;
       r.types = types;
@@ -3887,6 +4067,7 @@ function saveReservation() {
       customerName: customerId ? '' : customerName,
       guests,
       castIds,
+      castNoms,
       castFree,
       datetime,
       types,
@@ -4613,9 +4794,7 @@ function detectAndNotifyChanges(snap) {
       } else if (after.customerName) {
         custLabel = after.customerName;
       }
-      const castNames = (after.castIds || [])
-        .map(cid => state.casts.find(x => x.id === cid)?.name || '')
-        .filter(Boolean).join('・');
+      const castNames = buildCastDisplay(after, true);
       let msg = `🟢 ${tName} 入店`;
       if (custLabel) msg += `: ${custLabel}様`;
       if (after.guests) msg += ` (${after.guests}名)`;
