@@ -440,6 +440,92 @@
     color: #fff;
   }
 
+  /* ====== 履歴カレンダー ====== */
+  .cal-header {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px; padding: 8px 0;
+  }
+  .cal-month-label {
+    font-size: 18px; font-weight: 600; color: var(--text);
+    min-width: 120px; text-align: center;
+  }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-weekdays {
+    margin-bottom: 4px;
+  }
+  .cal-wd {
+    text-align: center; font-size: 12px; color: var(--text-sub);
+    padding: 6px 0; font-weight: 500;
+  }
+  .cal-wd-sat { color: #4a7ec4; }
+  .cal-wd-sun { color: #c44a4a; }
+  .cal-day {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 4px; min-height: 64px;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    display: flex; flex-direction: column; align-items: stretch;
+  }
+  .cal-day:hover {
+    background: var(--surface-alt);
+    border-color: var(--accent);
+  }
+  .cal-day.cal-empty {
+    background: transparent; border-color: transparent;
+    cursor: default; pointer-events: none;
+  }
+  .cal-day.cal-today {
+    border: 2px solid var(--accent);
+    background: #fff8e7;
+  }
+  .cal-day.cal-future {
+    background: #fafafa; color: #aaa;
+  }
+  .cal-day.cal-has-visit {
+    background: #f0f7ec;
+  }
+  .cal-day.cal-has-visit.cal-today {
+    background: #fff8e7;
+  }
+  .cal-day-num {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    line-height: 1.2;
+  }
+  .cal-day.cal-sat .cal-day-num { color: #4a7ec4; }
+  .cal-day.cal-sun .cal-day-num { color: #c44a4a; }
+  .cal-day.cal-future .cal-day-num { color: #bbb; }
+  .cal-counts {
+    display: flex; flex-direction: column; gap: 1px;
+    margin-top: 4px; font-size: 11px; line-height: 1.2;
+  }
+  .cal-counts .cal-vc {
+    color: #5a8a3a; font-weight: 600;
+  }
+  .cal-counts .cal-cc {
+    color: #b87a00;
+  }
+  .cal-legend {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    margin-top: 12px; font-size: 11px; color: var(--text-sub);
+  }
+  .cal-legend .dot {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 2px; margin-right: 4px; vertical-align: middle;
+  }
+  .cal-legend .dot-vc { background: #5a8a3a; }
+  .cal-legend .dot-cc { background: #b87a00; }
+
+  /* スマホ用カレンダー調整 */
+  @media (max-width: 640px) {
+    .cal-day { min-height: 52px; padding: 4px 2px; }
+    .cal-day-num { font-size: 13px; }
+    .cal-counts { font-size: 10px; }
+    .cal-month-label { font-size: 16px; min-width: 100px; }
+    .cal-wd { font-size: 11px; padding: 4px 0; }
+  }
+
   /* 本日集計ページ */
   .today-stats-cards {
     display: grid;
@@ -1207,7 +1293,7 @@
       <button class="nav-btn" data-page="shift">📅 シフト</button>
       <button class="nav-btn" data-page="reservations">📖 予約</button>
       <button class="nav-btn" data-page="customers">👤 顧客</button>
-      <button class="nav-btn" data-page="today">📊 本日</button>
+      <button class="nav-btn" data-page="today">📅 履歴</button>
       <button class="nav-btn" data-page="settings">⚙️ 設定</button>
     </nav>
     <div class="sync-status">
@@ -1305,15 +1391,10 @@
       <div class="cust-list" id="custList"></div>
     </section>
 
-    <!-- ===== TODAY SUMMARY PAGE ===== -->
+    <!-- ===== HISTORY (CALENDAR) PAGE ===== -->
     <section class="page" id="page-today">
-      <h2 class="page-title">📊 本日の来店状況</h2>
-      <div class="floor-toolbar">
-        <button class="btn-sub btn-sm" onclick="renderTodaySummary()">🔄 更新</button>
-        <span style="color:#888; font-size:12px;" id="todayDateLabel"></span>
-      </div>
-      <div id="todayStatsCards" class="today-stats-cards"></div>
-      <div id="todaySummaryBody"></div>
+      <h2 class="page-title">📅 履歴</h2>
+      <div id="calendarContainer"></div>
     </section>
 
     <!-- ===== SETTINGS PAGE ===== -->
@@ -2051,111 +2132,230 @@ function showVisitDetail(logId) {
   });
 }
 
-// 本日の来店状況サマリー画面
-function renderTodaySummary() {
+// ---------- 履歴カレンダー ----------
+// 表示中の年月（state変数）。null時は今月。
+let calendarYM = null; // { year, month } (month: 0-indexed)
+
+function getCalendarYM() {
+  if (calendarYM) return calendarYM;
+  const d = new Date();
+  return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+// 指定日付の集計を返す（visitLog + 進行中卓 + シフト出勤数）
+function getDateSummary(dateStr) {
+  const completed = (state.visitLog || []).filter(v => v.date === dateStr);
+  // その日に進行中の卓があるかは、todayStr === dateStr のときのみ意味がある
   const todayStr = localDateStr(new Date());
-  const labelEl = document.getElementById('todayDateLabel');
-  if (labelEl) {
-    const d = new Date();
-    const wd = ['日','月','火','水','木','金','土'][d.getDay()];
-    labelEl.textContent = `${todayStr}（${wd}）`;
-  }
-
-  // 本日のログ + 現在使用中の入店中テーブルも「進行中」として混ぜる
-  const completedToday = (state.visitLog || []).filter(v => v.date === todayStr);
-
-  // 進行中の卓を取得（占有中）
   const ongoing = [];
-  DEFAULT_TABLES.forEach(t => {
-    const tdata = state.tables[t.id];
-    if (tdata && tdata.occupied && tdata.startedAt && localDateStr(new Date(tdata.startedAt)) === todayStr) {
-      let custName = tdata.customerName || '';
-      if (tdata.customerId) {
-        const c = state.customers.find(x => x.id === tdata.customerId);
-        if (c) custName = c.name;
+  if (dateStr === todayStr) {
+    DEFAULT_TABLES.forEach(t => {
+      const tdata = state.tables[t.id];
+      if (tdata && tdata.occupied && tdata.startedAt && localDateStr(new Date(tdata.startedAt)) === dateStr) {
+        let custName = tdata.customerName || '';
+        if (tdata.customerId) {
+          const c = state.customers.find(x => x.id === tdata.customerId);
+          if (c) custName = c.name;
+        }
+        ongoing.push({
+          id: '__ongoing_' + t.id,
+          date: dateStr,
+          tableId: t.id,
+          tableName: t.name,
+          customerId: tdata.customerId || '',
+          customerName: custName || '（記録なし）',
+          guests: tdata.guests || 0,
+          castIds: (tdata.castIds || []).slice(),
+          castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
+          castFree: tdata.castFree || '',
+          memo: tdata.memo || '',
+          startedAt: tdata.startedAt,
+          endedAt: null,
+          setCount: tdata.setCount || 1,
+          durationMin: Math.round((Date.now() - tdata.startedAt) / 60000),
+          ongoing: true,
+        });
       }
-      ongoing.push({
-        id: '__ongoing_' + t.id,
-        date: todayStr,
-        tableId: t.id,
-        tableName: t.name,
-        customerId: tdata.customerId || '',
-        customerName: custName || '（記録なし）',
-        guests: tdata.guests || 0,
-        castIds: (tdata.castIds || []).slice(),
-        castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
-        castFree: tdata.castFree || '',
-        memo: tdata.memo || '',
-        startedAt: tdata.startedAt,
-        endedAt: null, // 進行中
-        setCount: tdata.setCount || 1,
-        durationMin: Math.round((Date.now() - tdata.startedAt) / 60000),
-        ongoing: true,
-      });
-    }
-  });
-
-  const allEntries = [...ongoing, ...completedToday];
-
-  // 統計カード
-  const totalVisits = allEntries.length;
-  const totalGuests = allEntries.reduce((s, v) => s + (v.guests || 0), 0);
-  // 利用テーブル数（ユニーク）
-  const uniqueTables = new Set(allEntries.map(v => v.tableId)).size;
-  // キャスト出勤数（本日シフトON）
+    });
+  }
+  const allEntries = [...ongoing, ...completed];
+  // キャスト出勤数
   const activeCasts = (state.casts || []).filter(c => !c.removed);
   let castOnDuty = 0;
   let trialOnDuty = 0;
   activeCasts.forEach(c => {
-    // 出勤確定（true）のみカウント。'pending'（未定）は除外。
-    if (getShift(todayStr, c.id)) {
+    if (getShift(dateStr, c.id)) {
       castOnDuty++;
       if (c.trial) trialOnDuty++;
     }
   });
-  // 進行中の組数
-  const ongoingCount = ongoing.length;
+  const totalGuests = allEntries.reduce((s, v) => s + (v.guests || 0), 0);
+  const uniqueTables = new Set(allEntries.map(v => v.tableId)).size;
+  return {
+    dateStr,
+    allEntries,
+    completed,
+    ongoing,
+    visitCount: allEntries.length,
+    totalGuests,
+    uniqueTables,
+    castOnDuty,
+    trialOnDuty,
+    activeCasts,
+  };
+}
 
-  const statsHtml = `
-    <div class="stat-card">
-      <div class="label">来店組数</div>
-      <div class="value">${totalVisits}</div>
-      <div class="sub">${ongoingCount > 0 ? `（うち進行中：${ongoingCount}）` : ''}</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">合計人数</div>
-      <div class="value">${totalGuests}</div>
-      <div class="sub">名</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">使用テーブル</div>
-      <div class="value">${uniqueTables}</div>
-      <div class="sub">/ ${DEFAULT_TABLES.length}</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">キャスト出勤</div>
-      <div class="value">${castOnDuty}</div>
-      <div class="sub">${trialOnDuty > 0 ? `（うち体験：${trialOnDuty}）` : '名'}</div>
+// メインのカレンダー描画
+function renderTodaySummary() {
+  const cont = document.getElementById('calendarContainer');
+  if (!cont) return;
+  const { year, month } = getCalendarYM();
+  const todayStr = localDateStr(new Date());
+
+  // 月初〜月末
+  const first = new Date(year, month, 1);
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  // カレンダーグリッドの開始：月曜始まり
+  // first.getDay(): 0=Sun, 1=Mon, ..., 6=Sat
+  const firstWday = first.getDay();
+  const offset = (firstWday + 6) % 7; // Sun→6, Mon→0, Tue→1, ...
+  const cells = [];
+  // 前月分の埋めセル
+  for (let i = 0; i < offset; i++) cells.push(null);
+  // 今月分
+  for (let d = 1; d <= lastDate; d++) cells.push(d);
+  // 末尾をきれいに（7の倍数まで）
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const monthLabel = `${year}年${month + 1}月`;
+
+  // 月切替ナビゲーション
+  let html = `
+    <div class="cal-header">
+      <button class="btn-sub btn-sm" onclick="changeCalMonth(-1)">◀ 前月</button>
+      <span class="cal-month-label">${monthLabel}</span>
+      <button class="btn-sub btn-sm" onclick="changeCalMonth(1)">次月 ▶</button>
+      <button class="btn-sub btn-sm" onclick="goToCalToday()" style="margin-left:auto;">今日</button>
     </div>
   `;
-  document.getElementById('todayStatsCards').innerHTML = statsHtml;
 
-  // テーブル別グルーピング（同テーブルが複数回使われた場合も検出可能）
+  // 曜日ヘッダー
+  html += `<div class="cal-grid cal-weekdays">
+    <div class="cal-wd">月</div>
+    <div class="cal-wd">火</div>
+    <div class="cal-wd">水</div>
+    <div class="cal-wd">木</div>
+    <div class="cal-wd">金</div>
+    <div class="cal-wd cal-wd-sat">土</div>
+    <div class="cal-wd cal-wd-sun">日</div>
+  </div>`;
+
+  // 日付グリッド
+  html += '<div class="cal-grid cal-days">';
+  cells.forEach((day, idx) => {
+    if (day === null) {
+      html += '<div class="cal-day cal-empty"></div>';
+      return;
+    }
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday = (dateStr === todayStr);
+    const isFuture = (dateStr > todayStr);
+    const wdayIdx = idx % 7; // 0=月, 5=土, 6=日
+    const wdayCls = wdayIdx === 5 ? ' cal-sat' : (wdayIdx === 6 ? ' cal-sun' : '');
+    // 集計
+    const sum = getDateSummary(dateStr);
+    const visitCount = sum.visitCount;
+    const castCount = sum.castOnDuty;
+    let countLine = '';
+    if (visitCount > 0 || castCount > 0) {
+      const parts = [];
+      if (visitCount > 0) parts.push(`<span class="cal-vc">${visitCount}組</span>`);
+      if (castCount > 0) parts.push(`<span class="cal-cc">${castCount}名</span>`);
+      countLine = `<div class="cal-counts">${parts.join('/')}</div>`;
+    }
+    const todayCls = isToday ? ' cal-today' : '';
+    const futureCls = isFuture ? ' cal-future' : '';
+    const hasDataCls = (visitCount > 0) ? ' cal-has-visit' : '';
+    html += `<div class="cal-day${wdayCls}${todayCls}${futureCls}${hasDataCls}" onclick="showDayDetailModal('${dateStr}')">
+      <div class="cal-day-num">${day}</div>
+      ${countLine}
+    </div>`;
+  });
+  html += '</div>';
+
+  // 凡例
+  html += `<div class="cal-legend">
+    <span><span class="dot dot-vc"></span>来店組数</span>
+    <span><span class="dot dot-cc"></span>キャスト出勤数</span>
+    <span style="color:#888;">日付タップで詳細表示</span>
+  </div>`;
+
+  cont.innerHTML = html;
+}
+
+// カレンダー月送り
+function changeCalMonth(delta) {
+  const cur = getCalendarYM();
+  let y = cur.year, m = cur.month + delta;
+  while (m < 0) { m += 12; y--; }
+  while (m > 11) { m -= 12; y++; }
+  calendarYM = { year: y, month: m };
+  renderTodaySummary();
+}
+function goToCalToday() {
+  calendarYM = null; // 今月にリセット
+  renderTodaySummary();
+}
+
+// 日付詳細モーダル（日付タップで開く）
+function showDayDetailModal(dateStr) {
+  const sum = getDateSummary(dateStr);
+  const d = new Date(dateStr + 'T00:00:00');
+  const wd = ['日','月','火','水','木','金','土'][d.getDay()];
+  const titleStr = `${dateStr}（${wd}）`;
+  const todayStr = localDateStr(new Date());
+  const isToday = (dateStr === todayStr);
+
+  // 統計カード
+  const ongoingCount = sum.ongoing.length;
+  const statsHtml = `
+    <div class="today-stats-cards">
+      <div class="stat-card">
+        <div class="label">来店組数</div>
+        <div class="value">${sum.visitCount}</div>
+        <div class="sub">${ongoingCount > 0 ? `（うち進行中：${ongoingCount}）` : ''}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">合計人数</div>
+        <div class="value">${sum.totalGuests}</div>
+        <div class="sub">名</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">使用テーブル</div>
+        <div class="value">${sum.uniqueTables}</div>
+        <div class="sub">/ ${DEFAULT_TABLES.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">キャスト出勤</div>
+        <div class="value">${sum.castOnDuty}</div>
+        <div class="sub">${sum.trialOnDuty > 0 ? `（うち体験：${sum.trialOnDuty}）` : '名'}</div>
+      </div>
+    </div>
+  `;
+
+  // テーブル別グルーピング
   const byTable = new Map();
-  // テーブル順にソート（DEFAULT_TABLES の順）
   DEFAULT_TABLES.forEach(t => {
-    const entries = allEntries.filter(v => v.tableId === t.id);
+    const entries = sum.allEntries.filter(v => v.tableId === t.id);
     if (entries.length > 0) {
-      // 開始時刻の降順
       entries.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
       byTable.set(t.id, { table: t, entries });
     }
   });
 
-  // メイン本文
-  let bodyHtml = '';
-  if (allEntries.length === 0) {
-    bodyHtml = '<div class="today-empty">本日の来店記録はまだありません</div>';
+  let bodyHtml = statsHtml;
+  if (sum.allEntries.length === 0) {
+    bodyHtml += '<div class="today-empty">この日の来店記録はありません</div>';
   } else {
     bodyHtml += '<div class="today-section"><h3>テーブル別 来店履歴</h3>';
     byTable.forEach(({ table, entries }) => {
@@ -2166,8 +2366,8 @@ function renderTodaySummary() {
       entries.forEach(v => {
         const fmtTime = (ts) => {
           if (!ts) return '—';
-          const d = new Date(ts);
-          return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+          const d2 = new Date(ts);
+          return `${String(d2.getHours()).padStart(2,'0')}:${String(d2.getMinutes()).padStart(2,'0')}`;
         };
         const startStr = fmtTime(v.startedAt);
         const endStr = v.ongoing ? '<span class="ongoing">進行中</span>' : fmtTime(v.endedAt);
@@ -2193,15 +2393,15 @@ function renderTodaySummary() {
     });
     bodyHtml += '</div>';
 
-    // キャスト別サマリー（本日付いた組数）
+    // キャスト別サマリー
     const castVisitCount = new Map();
-    allEntries.forEach(v => {
+    sum.allEntries.forEach(v => {
       (v.castIds || []).forEach(cid => {
         castVisitCount.set(cid, (castVisitCount.get(cid) || 0) + 1);
       });
     });
     if (castVisitCount.size > 0) {
-      const castRows = activeCasts
+      const castRows = sum.activeCasts
         .filter(c => castVisitCount.has(c.id))
         .sort((a, b) => (castVisitCount.get(b.id) || 0) - (castVisitCount.get(a.id) || 0))
         .map(c => {
@@ -2214,13 +2414,31 @@ function renderTodaySummary() {
         }).join('');
       bodyHtml += `
         <div class="today-section">
-          <h3>キャスト別 接客組数（本日）</h3>
+          <h3>キャスト別 接客組数</h3>
           <div class="today-table-block">${castRows}</div>
         </div>
       `;
     }
   }
-  document.getElementById('todaySummaryBody').innerHTML = bodyHtml;
+
+  // モーダル組み立て
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1700;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:560px; max-height:90vh; overflow-y:auto;">
+      <h3>${escapeHtml(titleStr)}${isToday ? '　<span style="color:var(--accent); font-size:12px;">（本日）</span>' : ''}</h3>
+      <div style="margin-top:12px;">${bodyHtml}</div>
+      <div class="row-buttons" style="margin-top:14px;">
+        <button class="btn-sub" data-close>閉じる</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('[data-close]').addEventListener('click', () => bg.remove());
+  bg.addEventListener('click', (e) => {
+    if (e.target === bg) bg.remove();
+  });
 }
 
 // 進行中卓の詳細表示（本日集計の進行中行から呼ばれる）
