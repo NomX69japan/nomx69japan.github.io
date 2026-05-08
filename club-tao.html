@@ -1579,6 +1579,31 @@ function genId(prefix) {
   return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 }
 
+// ---------- 時間セレクト生成（15分刻み・全日対応） ----------
+// Androidネイティブの<input type="time">はセット/OKボタンがない端末があるため、
+// 通常のセレクトボックスで時刻を選択させる。
+// fromHour=0, toHour=23 で 0:00〜23:45 の範囲を15分刻みで生成。
+// 営業時間に合わせて狭めることもできる（例: fromHour=18, toHour=27 で 18:00〜翌3:45）。
+function buildTimeSelectOptions(selectedHHMM, fromHour, toHour, stepMin) {
+  fromHour = (fromHour == null) ? 0 : fromHour;
+  toHour = (toHour == null) ? 23 : toHour;
+  stepMin = stepMin || 15;
+  let html = '';
+  for (let h = fromHour; h <= toHour; h++) {
+    const realH = h % 24;
+    for (let m = 0; m < 60; m += stepMin) {
+      // toHour と一致する時間で 60分まで進めない
+      if (h === toHour && m > 0 && stepMin === 60) break;
+      const hh = String(realH).padStart(2,'0');
+      const mm = String(m).padStart(2,'0');
+      const val = `${hh}:${mm}`;
+      const sel = (val === selectedHHMM) ? ' selected' : '';
+      html += `<option value="${val}"${sel}>${val}</option>`;
+    }
+  }
+  return html;
+}
+
 // ---------- Login ----------
 function tryLogin() {
   const v = document.getElementById('pinInput').value;
@@ -2466,17 +2491,24 @@ function openTableModal(tableId) {
     </div>
   `;
 
-  // 入店時刻入力欄（空席時のみ表示、デフォルトは現在時刻）
+  // 入店時刻入力欄（空席時のみ表示、デフォルトは現在時刻に最も近い15分刻み）
   let startTimeBlock = '';
   if (!tdata.occupied) {
     const now = new Date();
-    const hh = String(now.getHours()).padStart(2,'0');
-    const mm = String(now.getMinutes()).padStart(2,'0');
+    const curH = now.getHours();
+    const curM = now.getMinutes();
+    // 直近の15分刻みに揃える（切り捨て）
+    const snapM = Math.floor(curM / 15) * 15;
+    const hh = String(curH).padStart(2,'0');
+    const mm = String(snapM).padStart(2,'0');
+    const startVal = `${hh}:${mm}`;
     startTimeBlock = `
       <label class="field">
         <span class="lab">入店時刻</span>
-        <input type="time" id="tblStartTime" value="${hh}:${mm}" style="font-size:14px; padding:6px 8px;">
-        <span style="color:#888; font-size:11px; display:block; margin-top:3px;">変更すると指定時刻が開始時刻になります（60分後まで）</span>
+        <select id="tblStartTime" style="font-size:14px; padding:6px 8px;">
+          ${buildTimeSelectOptions(startVal, 0, 23, 15)}
+        </select>
+        <span style="color:#888; font-size:11px; display:block; margin-top:3px;">15分刻みで選択。デフォルトは現在時刻に最も近い15分刻みです</span>
       </label>
     `;
   }
@@ -2995,15 +3027,7 @@ function openCustomerModal(id) {
     </div>`;
   }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
 
-  const bottlesHtml = (cust.bottles||[]).map((b, idx) => `
-    <div class="bottle-row">
-      <span class="name">🍾 ${escapeHtml(b.name||'')}</span>
-      ${b.tag ? `<span class="tag">🏷 ${escapeHtml(b.tag)}</span>` : ''}
-      ${b.location ? `<span class="tag">📍 ${escapeHtml(b.location)}</span>` : ''}
-      ${b.openedDate ? `<span class="tag">${escapeHtml(b.openedDate)}〜</span>` : ''}
-      <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
-    </div>
-  `).join('') || '<p style="color:#888; font-size:12px; margin:0;">ボトルキープなし</p>';
+  const bottlesHtml = buildBottlesListHtml(cust.bottles);
 
   document.getElementById('custModalBody').innerHTML = `
     <div class="cust-detail-section">
@@ -3089,6 +3113,61 @@ function removeBottle(idx) {
   custEditing.bottles.splice(idx, 1);
   preserveAndReopen();
 }
+// 既存ボトルの編集モードに入る
+let bottleEditingIdx = -1; // -1: 編集なし、0以上: そのインデックスのボトルを編集中
+function startEditBottle(idx) {
+  bottleEditingIdx = idx;
+  preserveAndReopen();
+}
+function cancelEditBottle() {
+  bottleEditingIdx = -1;
+  preserveAndReopen();
+}
+function saveEditBottle(idx) {
+  if (!custEditing || !custEditing.bottles || !custEditing.bottles[idx]) return;
+  const name = document.getElementById('editBottleName_' + idx).value.trim();
+  if (!name) { alert('ボトル名を入力してください'); return; }
+  const tag = document.getElementById('editBottleTag_' + idx).value.trim();
+  const loc = document.getElementById('editBottleLoc_' + idx).value.trim();
+  const date = document.getElementById('editBottleDate_' + idx).value;
+  custEditing.bottles[idx] = { name, tag, location:loc, openedDate:date };
+  bottleEditingIdx = -1;
+  preserveAndReopen();
+}
+// ボトル一覧のHTML生成（編集中のものは入力欄に置き換え）
+function buildBottlesListHtml(bottles) {
+  const arr = bottles || [];
+  if (arr.length === 0) {
+    return '<p style="color:#888; font-size:12px; margin:0;">ボトルキープなし</p>';
+  }
+  return arr.map((b, idx) => {
+    if (bottleEditingIdx === idx) {
+      // 編集モード
+      return `<div class="bottle-row" style="display:block; padding:8px; background:#fff8e7; border:1px solid #d4af37;">
+        <div class="bottle-add-grid" style="margin-bottom:6px;">
+          <input type="text" id="editBottleName_${idx}" value="${escapeHtml(b.name||'')}" placeholder="ボトル名（必須）">
+          <input type="text" id="editBottleTag_${idx}" value="${escapeHtml(b.tag||'')}" placeholder="🏷 ネームタグ">
+          <input type="text" id="editBottleLoc_${idx}" value="${escapeHtml(b.location||'')}" placeholder="📍 保管場所">
+          <input type="date" id="editBottleDate_${idx}" value="${escapeHtml(b.openedDate||'')}">
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-sm" onclick="saveEditBottle(${idx})">💾 保存</button>
+          <button class="btn-sub btn-sm" onclick="cancelEditBottle()">キャンセル</button>
+        </div>
+      </div>`;
+    } else {
+      // 通常表示
+      return `<div class="bottle-row">
+        <span class="name">🍾 ${escapeHtml(b.name||'')}</span>
+        ${b.tag ? `<span class="tag">🏷 ${escapeHtml(b.tag)}</span>` : ''}
+        ${b.location ? `<span class="tag">📍 ${escapeHtml(b.location)}</span>` : ''}
+        ${b.openedDate ? `<span class="tag">${escapeHtml(b.openedDate)}〜</span>` : ''}
+        <button class="btn-sub btn-sm" onclick="startEditBottle(${idx})" title="編集" style="margin-left:auto;">✏</button>
+        <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
+      </div>`;
+    }
+  }).join('');
+}
 function preserveAndReopen() {
   // 入力中のフォーム値を custEditing に反映してから再描画
   const n = document.getElementById('cstName')?.value;
@@ -3144,15 +3223,7 @@ function rebuildCustomerModalBody(cust) {
     </div>`;
   }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
 
-  const bottlesHtml = (cust.bottles||[]).map((b, idx) => `
-    <div class="bottle-row">
-      <span class="name">🍾 ${escapeHtml(b.name||'')}</span>
-      ${b.tag ? `<span class="tag">🏷 ${escapeHtml(b.tag)}</span>` : ''}
-      ${b.location ? `<span class="tag">📍 ${escapeHtml(b.location)}</span>` : ''}
-      ${b.openedDate ? `<span class="tag">${escapeHtml(b.openedDate)}〜</span>` : ''}
-      <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
-    </div>
-  `).join('') || '<p style="color:#888; font-size:12px; margin:0;">ボトルキープなし</p>';
+  const bottlesHtml = buildBottlesListHtml(cust.bottles);
 
   document.getElementById('custModalBody').innerHTML = `
     <div class="cust-detail-section">
@@ -3679,7 +3750,9 @@ function openReservationModal(id) {
       <span class="lab">予約日時</span>
       <div style="display:flex; gap:6px;">
         <input type="date" id="resvDate" value="${dateVal}" style="flex:1;">
-        <input type="time" id="resvTime" value="${timeVal}" style="flex:1;">
+        <select id="resvTime" style="flex:1;">
+          ${buildTimeSelectOptions(timeVal, 0, 23, 15)}
+        </select>
       </div>
     </label>
 
