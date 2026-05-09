@@ -1678,6 +1678,26 @@ function todayBusinessDate() {
   return businessDateStr(new Date());
 }
 
+// 「現在の営業日」を返す。
+// 入店中の卓がある場合は、最も古い入店時刻の営業日を返す（その卓の営業日が継続中とみなす）。
+// 全て退店している場合は、現在時刻の営業日を返す。
+// 用途：フロア・シフトの「本日出勤」バナー、本日の予約絞り込みなど、
+//      「営業中は前営業日のまま、退店したら新営業日に切り替わる」表示に使う。
+function currentBusinessDate() {
+  let oldestStartedAt = null;
+  Object.values(state.tables || {}).forEach(tdata => {
+    if (tdata && tdata.occupied && tdata.startedAt) {
+      if (oldestStartedAt == null || tdata.startedAt < oldestStartedAt) {
+        oldestStartedAt = tdata.startedAt;
+      }
+    }
+  });
+  if (oldestStartedAt != null) {
+    return businessDateStr(new Date(oldestStartedAt));
+  }
+  return businessDateStr(new Date());
+}
+
 function parseDateLocal(str) {
   // "YYYY-MM-DD" を正午基準でローカルDateに
   const [y,m,d] = str.split('-').map(Number);
@@ -2159,7 +2179,7 @@ let calendarYM = null; // { year, month } (month: 0-indexed)
 function getCalendarYM() {
   if (calendarYM) return calendarYM;
   // 営業日ベースで今月を判定（月末深夜の0:30も前月扱いになるように）
-  const t = todayBusinessDate(); // 'YYYY-MM-DD'
+  const t = currentBusinessDate(); // 'YYYY-MM-DD'
   const [y, m] = t.split('-').map(Number);
   return { year: y, month: m - 1 };
 }
@@ -2168,7 +2188,7 @@ function getCalendarYM() {
 function getDateSummary(dateStr) {
   const completed = (state.visitLog || []).filter(v => v.date === dateStr);
   // その日に進行中の卓があるかは、営業日が一致する時のみ
-  const todayStr = todayBusinessDate();
+  const todayStr = currentBusinessDate();
   const ongoing = [];
   if (dateStr === todayStr) {
     DEFAULT_TABLES.forEach(t => {
@@ -2234,7 +2254,7 @@ function renderTodaySummary() {
   if (!cont) return;
   const { year, month } = getCalendarYM();
   // 「今日」のハイライトは営業日基準
-  const todayStr = todayBusinessDate();
+  const todayStr = currentBusinessDate();
 
   // 月初〜月末
   const first = new Date(year, month, 1);
@@ -2337,7 +2357,7 @@ function showDayDetailModal(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   const wd = ['日','月','火','水','木','金','土'][d.getDay()];
   const titleStr = `${dateStr}（${wd}）`;
-  const todayStr = todayBusinessDate();
+  const todayStr = currentBusinessDate();
   const isToday = (dateStr === todayStr);
 
   // 統計カード
@@ -3311,7 +3331,7 @@ function recalcAllTrialCounts() {
 
 // 本日のキャスト出勤数を集計してフロア・シフト両方のバナーに表示
 function updateTodayShiftCount() {
-  const todayStr = businessDateStr();
+  const todayStr = currentBusinessDate();
   const activeCasts = (state.casts || []).filter(c => !c.removed);
   let total = 0;
   let trial = 0;
@@ -3704,7 +3724,7 @@ function renderReservations() {
   const all = (state.reservations || []).filter(r => !r.removed);
 
   const now = Date.now();
-  const todayStr = businessDateStr();
+  const todayStr = currentBusinessDate();
 
   // 本日の予約：本日の日付（datetime の YYYY-MM-DD 部分が today と一致）かつ未キャンセル
   const todayList = all.filter(r => {
