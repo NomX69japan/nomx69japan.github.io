@@ -1658,6 +1658,26 @@ function localDateStr(d) {
   const dd = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${dd}`;
 }
+
+// 営業日の境界時刻（深夜営業対応）
+// 0:00〜0:59 はその日の営業日扱い、1:00 以降は翌日の営業日に切り替わる。
+// 例：5/8 の営業日 = 5/8 1:00 〜 5/9 0:59
+const BUSINESS_DAY_OFFSET_HOURS = 1;
+// 指定日時（または現在時刻）の営業日を YYYY-MM-DD で返す
+function businessDateStr(d) {
+  if (d == null) d = new Date();
+  if (!(d instanceof Date)) d = new Date(d);
+  // 入力時刻から OFFSET 時間引いた時刻の「カレンダー日付」が営業日
+  // 例：5/9 0:30 → -1時間 → 5/8 23:30 → 営業日 5/8
+  // 例：5/9 1:30 → -1時間 → 5/9 0:30 → 営業日 5/9
+  const shifted = new Date(d.getTime() - BUSINESS_DAY_OFFSET_HOURS * 3600 * 1000);
+  return localDateStr(shifted);
+}
+// 現在時刻の営業日（よく使うのでショートカット）
+function todayBusinessDate() {
+  return businessDateStr(new Date());
+}
+
 function parseDateLocal(str) {
   // "YYYY-MM-DD" を正午基準でローカルDateに
   const [y,m,d] = str.split('-').map(Number);
@@ -2138,20 +2158,23 @@ let calendarYM = null; // { year, month } (month: 0-indexed)
 
 function getCalendarYM() {
   if (calendarYM) return calendarYM;
-  const d = new Date();
-  return { year: d.getFullYear(), month: d.getMonth() };
+  // 営業日ベースで今月を判定（月末深夜の0:30も前月扱いになるように）
+  const t = todayBusinessDate(); // 'YYYY-MM-DD'
+  const [y, m] = t.split('-').map(Number);
+  return { year: y, month: m - 1 };
 }
 
-// 指定日付の集計を返す（visitLog + 進行中卓 + シフト出勤数）
+// 指定日付（営業日）の集計を返す（visitLog + 進行中卓 + シフト出勤数）
 function getDateSummary(dateStr) {
   const completed = (state.visitLog || []).filter(v => v.date === dateStr);
-  // その日に進行中の卓があるかは、todayStr === dateStr のときのみ意味がある
-  const todayStr = localDateStr(new Date());
+  // その日に進行中の卓があるかは、営業日が一致する時のみ
+  const todayStr = todayBusinessDate();
   const ongoing = [];
   if (dateStr === todayStr) {
     DEFAULT_TABLES.forEach(t => {
       const tdata = state.tables[t.id];
-      if (tdata && tdata.occupied && tdata.startedAt && localDateStr(new Date(tdata.startedAt)) === dateStr) {
+      // 進行中卓の判定も「入店時刻の営業日」が一致するかで見る
+      if (tdata && tdata.occupied && tdata.startedAt && businessDateStr(new Date(tdata.startedAt)) === dateStr) {
         let custName = tdata.customerName || '';
         if (tdata.customerId) {
           const c = state.customers.find(x => x.id === tdata.customerId);
@@ -2210,7 +2233,8 @@ function renderTodaySummary() {
   const cont = document.getElementById('calendarContainer');
   if (!cont) return;
   const { year, month } = getCalendarYM();
-  const todayStr = localDateStr(new Date());
+  // 「今日」のハイライトは営業日基準
+  const todayStr = todayBusinessDate();
 
   // 月初〜月末
   const first = new Date(year, month, 1);
@@ -2313,7 +2337,7 @@ function showDayDetailModal(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   const wd = ['日','月','火','水','木','金','土'][d.getDay()];
   const titleStr = `${dateStr}（${wd}）`;
-  const todayStr = localDateStr(new Date());
+  const todayStr = todayBusinessDate();
   const isToday = (dateStr === todayStr);
 
   // 統計カード
@@ -2449,7 +2473,8 @@ function showOngoingDetail(tableId) {
 function recordVisitLog(tableId, tdata) {
   const now = Date.now();
   const tName = getTableName(tableId);
-  const date = localDateStr(new Date(tdata.startedAt));
+  // 営業日基準：入店時刻の営業日（0:59までの入店は前日扱い）
+  const date = businessDateStr(new Date(tdata.startedAt));
   // 顧客名解決
   let custName = tdata.customerName || '';
   if (tdata.customerId) {
@@ -2506,7 +2531,8 @@ function recordVisit(customerId, castIds, castNoms) {
   const cust = state.customers.find(c => c.id === customerId);
   if (!cust) return;
   if (!Array.isArray(cust.visits)) cust.visits = [];
-  const today = localDateStr(new Date());
+  // 営業日基準（深夜営業中の入店も前日扱い）
+  const today = todayBusinessDate();
   const dup = cust.visits.find(v => v.date === today);
   if (!dup) {
     cust.visits.push({
@@ -3124,7 +3150,7 @@ function renderShift() {
     // キャスト行
     if (activeCasts.length > 0) {
       html += `<tr class="section-header"><td colspan="7">🌹 キャスト</td></tr>`;
-      const todayStr = localDateStr(new Date());
+      const todayStr = businessDateStr();
       activeCasts.forEach(c => {
         const trialMark = c.trial
           ? ` <span class="trial-badge">体験 ${c.trialCount||0}/3</span>`
@@ -3264,7 +3290,7 @@ function toggleShift(dateStr, castId) {
 }
 function recalcAllTrialCounts() {
   // 実績のみカウント：今日（含む）以前の「出勤確定」（true）のみ。'pending' は除外。
-  const todayStr = localDateStr(new Date());
+  const todayStr = businessDateStr();
   state.casts.forEach(c => {
     if (c.trial) {
       let count = 0;
@@ -3285,7 +3311,7 @@ function recalcAllTrialCounts() {
 
 // 本日のキャスト出勤数を集計してフロア・シフト両方のバナーに表示
 function updateTodayShiftCount() {
-  const todayStr = localDateStr(new Date());
+  const todayStr = businessDateStr();
   const activeCasts = (state.casts || []).filter(c => !c.removed);
   let total = 0;
   let trial = 0;
@@ -3678,7 +3704,7 @@ function renderReservations() {
   const all = (state.reservations || []).filter(r => !r.removed);
 
   const now = Date.now();
-  const todayStr = localDateStr(new Date());
+  const todayStr = businessDateStr();
 
   // 本日の予約：本日の日付（datetime の YYYY-MM-DD 部分が today と一致）かつ未キャンセル
   const todayList = all.filter(r => {
