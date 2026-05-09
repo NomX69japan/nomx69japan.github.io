@@ -526,35 +526,44 @@
     .cal-wd { font-size: 11px; padding: 4px 0; }
   }
 
-  /* 本日集計ページ */
+  /* 本日集計ページ／履歴日付詳細 */
   .today-stats-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
-    margin: 12px 0 20px 0;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    margin: 8px 0 14px 0;
   }
   .today-stats-cards .stat-card {
     background: linear-gradient(135deg, #fff8e7 0%, #f5ebd0 100%);
     border: 1px solid #d4af37;
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 6px;
+    padding: 6px 4px;
     text-align: center;
+    min-width: 0;
   }
   .today-stats-cards .stat-card .label {
-    font-size: 11px;
+    font-size: 10px;
     color: #8b6914;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .today-stats-cards .stat-card .value {
-    font-size: 22px;
+    font-size: 17px;
     font-weight: bold;
     color: #b8860b;
-    line-height: 1.2;
+    line-height: 1.1;
   }
   .today-stats-cards .stat-card .sub {
-    font-size: 10px;
+    font-size: 9px;
     color: #888;
-    margin-top: 2px;
+    margin-top: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .today-section {
@@ -2160,16 +2169,388 @@ function showVisitDetail(logId) {
           ${log.memo ? `<tr><td style="color:#888; vertical-align:top;">メモ</td><td style="white-space:pre-wrap;">${escapeHtml(log.memo)}</td></tr>` : ''}
         </table>
       </div>
-      <div class="row-buttons" style="margin-top:14px;">
-        <button class="btn-sub" data-close>閉じる</button>
+      <div class="row-buttons" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn-sub" data-edit style="flex:1; min-width:90px;">✏️ 編集</button>
+        <button class="btn-sub" data-undo-checkout style="flex:1; min-width:90px; background:#fff4e6; border-color:#ff9800; color:#c65a00;">↩️ 退店取消</button>
+        <button class="btn-sub" data-delete-log style="flex:1; min-width:80px; background:#ffebee; border-color:#e57373; color:#c62828;">🗑 削除</button>
+        <button class="btn-sub" data-close style="flex:1; min-width:70px;">閉じる</button>
       </div>
     </div>
   `;
   document.body.appendChild(bg);
   bg.querySelector('[data-close]').addEventListener('click', () => bg.remove());
+  bg.querySelector('[data-edit]').addEventListener('click', () => {
+    bg.remove();
+    openVisitLogEditModal(logId);
+  });
+  bg.querySelector('[data-undo-checkout]').addEventListener('click', () => {
+    bg.remove();
+    undoCheckout(logId);
+  });
+  bg.querySelector('[data-delete-log]').addEventListener('click', () => {
+    if (!confirm(`この来店記録を完全に削除しますか？\n\n${escapeHtml(custName)}（${log.date} ${startStr}〜${endStr}）\n\n※削除すると元に戻せません。`)) return;
+    deleteVisitLog(logId);
+    bg.remove();
+  });
   bg.addEventListener('click', (e) => {
     if (e.target === bg) bg.remove();
   });
+}
+
+// 来店ログを完全削除
+function deleteVisitLog(logId) {
+  if (!Array.isArray(state.visitLog)) return;
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+  // visitLogから削除
+  state.visitLog = state.visitLog.filter(x => x.id !== logId);
+  // 顧客のvisitsからもlogId参照を持つ要素を削除（紐づきがある場合）
+  if (log.customerId) {
+    const cust = state.customers.find(c => c.id === log.customerId);
+    if (cust && Array.isArray(cust.visits)) {
+      cust.visits = cust.visits.filter(v => v.logId !== logId);
+      cust._updated = Date.now();
+    }
+  }
+  persistSave();
+  // 履歴カレンダー画面なら再描画
+  if (typeof renderTodaySummary === 'function') renderTodaySummary();
+  showToast('来店記録を削除しました', 'normal');
+}
+
+// 退店取消：来店ログを削除し、卓を「使用中」状態に復活させる
+function undoCheckout(logId) {
+  if (!Array.isArray(state.visitLog)) return;
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+  const tableId = log.tableId;
+  if (!tableId) {
+    alert('テーブル情報が記録されていないため、復元できません');
+    return;
+  }
+  // 現在の卓状態確認
+  const cur = state.tables[tableId];
+  if (cur && cur.occupied) {
+    alert(`${getTableName(tableId)} は現在使用中です。\n別のお客様が入店中のため、退店取消はできません。`);
+    return;
+  }
+  if (!confirm(`${getTableName(tableId)} の退店を取り消し、使用中状態に戻しますか？\n\n顧客：${escapeHtml(log.customerName || '（記録なし）')}\n入店：${(()=>{const d=new Date(log.startedAt);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()}\nセット：${log.setCount || 1}セット`)) return;
+  const now = Date.now();
+  // 終了予定時刻を再計算（入店からセット数×SET_MINUTES）
+  const setCount = log.setCount || 1;
+  const endsAt = log.startedAt + setCount * SET_MINUTES * 60000;
+  // 卓を復活
+  state.tables[tableId] = {
+    occupied: true,
+    guests: log.guests || 0,
+    castIds: (log.castIds || []).slice(),
+    castNoms: log.castNoms ? { ...log.castNoms } : {},
+    castFree: log.castFree || '',
+    customerId: log.customerId || '',
+    customerName: log.customerId ? '' : (log.customerName || ''),
+    memo: log.memo || '',
+    startedAt: log.startedAt,
+    endsAt,
+    setCount,
+    autoExtend: false,
+    alertedWarn: false,
+    alertedCritical: false,
+    _updated: now,
+  };
+  // 来店ログから削除
+  state.visitLog = state.visitLog.filter(x => x.id !== logId);
+  // 顧客のvisitsからもlogId参照を削除
+  if (log.customerId) {
+    const cust = state.customers.find(c => c.id === log.customerId);
+    if (cust && Array.isArray(cust.visits)) {
+      cust.visits = cust.visits.filter(v => v.logId !== logId);
+      cust._updated = now;
+    }
+  }
+  persistSave();
+  if (typeof renderFloor === 'function') renderFloor();
+  if (typeof renderTodaySummary === 'function') renderTodaySummary();
+  showToast(`${getTableName(tableId)} を使用中に戻しました`, 'normal');
+}
+
+// 来店ログ編集モーダル
+function openVisitLogEditModal(logId) {
+  if (!Array.isArray(state.visitLog)) return;
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+
+  const fmtTimeInput = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+  const startTimeVal = fmtTimeInput(log.startedAt);
+  const endTimeVal = fmtTimeInput(log.endedAt);
+
+  // キャスト一覧（出勤者のみ＋現在のlog.castIdsに含まれる過去キャストも）
+  const allCasts = state.casts.filter(c => !c.removed);
+  const includedIds = new Set(log.castIds || []);
+  const castSorted = allCasts.slice().sort((a,b) => {
+    // 含まれているもの優先
+    const aIn = includedIds.has(a.id) ? 0 : 1;
+    const bIn = includedIds.has(b.id) ? 0 : 1;
+    if (aIn !== bIn) return aIn - bIn;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const castRowsHtml = castSorted.map(c => {
+    const checked = includedIds.has(c.id);
+    const nom = (log.castNoms && log.castNoms[c.id]) || 'none';
+    const trialMark = c.trial ? '<span style="background:#ffe0e6; color:#c2185b; font-size:10px; padding:1px 4px; border-radius:3px; margin-left:4px;">体験</span>' : '';
+    return `
+      <div class="cast-pick-row" style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #f0ebe0;">
+        <label style="display:flex; align-items:center; flex:1; cursor:pointer;">
+          <input type="checkbox" class="vle-cast-pick" data-cast-pick="${c.id}" value="${c.id}" ${checked?'checked':''} style="margin-right:6px;">
+          <span style="font-size:13px;">${escapeHtml(c.name)}${trialMark}</span>
+        </label>
+        <div class="nom-toggle" data-vle-nom-toggle="${c.id}" style="display:flex; gap:2px;">
+          <button type="button" class="nom-btn ${nom==='A'?'active a':''}" data-nom="A" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='A'?'#ffd54f':'#fafafa'}; cursor:pointer;">A</button>
+          <button type="button" class="nom-btn ${nom==='B'?'active b':''}" data-nom="B" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='B'?'#ffb74d':'#fafafa'}; cursor:pointer;">B</button>
+          <button type="button" class="nom-btn ${nom==='none'?'active none':''}" data-nom="none" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='none'?'#e0e0e0':'#fafafa'}; cursor:pointer;">なし</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 顧客ドロップダウン（既存顧客選択用）
+  const custOptions = ['<option value="">-- 選択しない（フリー入力） --</option>']
+    .concat(state.customers
+      .filter(c => !c.removed)
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .map(c => {
+        const sel = (c.id === log.customerId) ? ' selected' : '';
+        return `<option value="${c.id}"${sel}>${escapeHtml(c.name)}</option>`;
+      }))
+    .join('');
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1750;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px; max-height:90vh; overflow-y:auto;">
+      <h3>✏️ 来店記録の編集</h3>
+      <div style="font-size:12px; color:#888; margin-bottom:10px;">${log.date}　${escapeHtml(log.tableName || log.tableId)}</div>
+
+      <label class="field">
+        <span class="lab">お客様（既存から選択）</span>
+        <select id="vleCustomer">${custOptions}</select>
+      </label>
+      <label class="field">
+        <span class="lab">お客様（フリー入力 / 顧客未選択時）</span>
+        <input type="text" id="vleCustomerName" value="${escapeHtml(log.customerId ? '' : (log.customerName || ''))}" placeholder="既存顧客を選んでいない場合の名前">
+      </label>
+
+      <label class="field">
+        <span class="lab">人数</span>
+        <input type="number" id="vleGuests" value="${log.guests || 0}" min="0" max="20">
+      </label>
+
+      <div style="display:flex; gap:8px;">
+        <label class="field" style="flex:1;">
+          <span class="lab">入店時刻</span>
+          <input type="time" id="vleStartTime" value="${startTimeVal}">
+        </label>
+        <label class="field" style="flex:1;">
+          <span class="lab">退店時刻</span>
+          <input type="time" id="vleEndTime" value="${endTimeVal}">
+        </label>
+      </div>
+      <div style="font-size:11px; color:#888; margin:-6px 0 10px 2px;">※日付は記録日（${log.date}）のまま</div>
+
+      <label class="field">
+        <span class="lab">セット数</span>
+        <input type="number" id="vleSetCount" value="${log.setCount || 1}" min="1" max="20">
+      </label>
+
+      <div class="field">
+        <span class="lab">指名キャスト（A/B/なし）</span>
+        <div class="cast-pick-list" style="max-height:240px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:4px 8px; background:#fff;">
+          ${castRowsHtml || '<div style="color:#888; font-size:12px; padding:8px;">キャストがいません</div>'}
+        </div>
+      </div>
+
+      <label class="field">
+        <span class="lab">フリー入力（その他キャスト名）</span>
+        <input type="text" id="vleCastFree" value="${escapeHtml(log.castFree || '')}" placeholder="未登録のヘルプ等">
+      </label>
+
+      <label class="field">
+        <span class="lab">メモ</span>
+        <textarea id="vleMemo" rows="3">${escapeHtml(log.memo || '')}</textarea>
+      </label>
+
+      <div class="row-buttons" style="margin-top:14px; display:flex; gap:8px;">
+        <button class="btn-main" data-save style="flex:1;">保存</button>
+        <button class="btn-sub" data-cancel style="flex:1;">キャンセル</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+
+  // A/B/なしトグル動作
+  bg.querySelectorAll('.nom-toggle').forEach(toggle => {
+    const castId = toggle.getAttribute('data-vle-nom-toggle');
+    toggle.querySelectorAll('.nom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nom = btn.getAttribute('data-nom');
+        toggle.querySelectorAll('.nom-btn').forEach(b => {
+          b.classList.remove('active', 'a', 'b', 'none');
+          b.style.background = '#fafafa';
+        });
+        btn.classList.add('active', nom.toLowerCase());
+        if (nom === 'A') btn.style.background = '#ffd54f';
+        else if (nom === 'B') btn.style.background = '#ffb74d';
+        else btn.style.background = '#e0e0e0';
+        // チェック自動ON
+        const cb = bg.querySelector(`input.vle-cast-pick[data-cast-pick="${castId}"]`);
+        if (cb) cb.checked = true;
+      });
+    });
+  });
+  // チェックOFFで指名種別もリセット
+  bg.querySelectorAll('input.vle-cast-pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (!cb.checked) {
+        const cid = cb.getAttribute('data-cast-pick');
+        const toggle = bg.querySelector(`.nom-toggle[data-vle-nom-toggle="${cid}"]`);
+        if (toggle) {
+          toggle.querySelectorAll('.nom-btn').forEach(b => {
+            b.classList.remove('active', 'a', 'b', 'none');
+            b.style.background = '#fafafa';
+          });
+          // 「なし」を活性に戻す
+          const noneBtn = toggle.querySelector('.nom-btn[data-nom="none"]');
+          if (noneBtn) {
+            noneBtn.classList.add('active', 'none');
+            noneBtn.style.background = '#e0e0e0';
+          }
+        }
+      }
+    });
+  });
+
+  bg.querySelector('[data-cancel]').addEventListener('click', () => {
+    bg.remove();
+    showVisitDetail(logId);
+  });
+  bg.addEventListener('click', (e) => {
+    if (e.target === bg) {
+      bg.remove();
+      showVisitDetail(logId);
+    }
+  });
+  bg.querySelector('[data-save]').addEventListener('click', () => {
+    saveVisitLogEdit(logId, bg);
+  });
+}
+
+// 来店ログ編集の保存
+function saveVisitLogEdit(logId, bg) {
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+
+  const customerId = bg.querySelector('#vleCustomer').value || '';
+  const customerNameInput = (bg.querySelector('#vleCustomerName').value || '').trim();
+  const guests = parseInt(bg.querySelector('#vleGuests').value, 10) || 0;
+  const startTimeVal = bg.querySelector('#vleStartTime').value;
+  const endTimeVal = bg.querySelector('#vleEndTime').value;
+  const setCount = parseInt(bg.querySelector('#vleSetCount').value, 10) || 1;
+  const castFree = (bg.querySelector('#vleCastFree').value || '').trim();
+  const memo = bg.querySelector('#vleMemo').value || '';
+
+  if (!startTimeVal || !endTimeVal) {
+    alert('入店時刻と退店時刻を入力してください');
+    return;
+  }
+
+  // キャスト
+  const castIds = Array.from(bg.querySelectorAll('input.vle-cast-pick:checked')).map(el => el.value);
+  const castNoms = {};
+  castIds.forEach(cid => {
+    const toggle = bg.querySelector(`.nom-toggle[data-vle-nom-toggle="${cid}"]`);
+    if (!toggle) return;
+    const activeBtn = toggle.querySelector('.nom-btn.active');
+    if (!activeBtn) return;
+    const nom = activeBtn.getAttribute('data-nom');
+    if (nom === 'A' || nom === 'B') castNoms[cid] = nom;
+  });
+
+  // 時刻のタイムスタンプ化（log.dateをベースに）
+  // 入店が0:00〜2:00頃で、その日の営業日が前日の場合、入店時刻は翌日の0時台になる
+  // 既存のstartedAt/endedAtの「日」を保ったまま時刻だけ差し替える
+  const buildTs = (origTs, hhmm) => {
+    const [hh, mm] = hhmm.split(':').map(n => parseInt(n, 10));
+    const d = new Date(origTs);
+    d.setHours(hh, mm, 0, 0);
+    return d.getTime();
+  };
+  let newStartedAt = buildTs(log.startedAt, startTimeVal);
+  let newEndedAt = buildTs(log.endedAt, endTimeVal);
+  // 退店時刻が入店より前になったら警告
+  if (newEndedAt <= newStartedAt) {
+    // 翌日にまたいでいる可能性（例：入店23:00 → 退店01:30）
+    // endedAtの日付を1日進める
+    if (!confirm('退店時刻が入店時刻より前または同じです。\n翌日（深夜帯）に退店した扱いにしますか？\n「いいえ」を選ぶと修正画面に戻ります。')) {
+      return;
+    }
+    newEndedAt = buildTs(log.endedAt + 24 * 3600 * 1000, endTimeVal);
+  }
+
+  // 顧客名解決
+  let custName = customerNameInput;
+  if (customerId) {
+    const c = state.customers.find(x => x.id === customerId);
+    if (c) custName = c.name;
+  }
+
+  // ログ更新
+  log.customerId = customerId;
+  log.customerName = custName;
+  log.guests = guests;
+  log.castIds = castIds;
+  log.castNoms = castNoms;
+  log.castFree = castFree;
+  log.memo = memo;
+  log.startedAt = newStartedAt;
+  log.endedAt = newEndedAt;
+  log.setCount = setCount;
+  log.durationMin = Math.round((newEndedAt - newStartedAt) / 60000);
+  log._updated = Date.now();
+
+  // 顧客のvisits連動（簡易）：顧客IDが変わった、または castIds 等の更新を反映
+  // 旧顧客のvisits該当エントリを除去
+  state.customers.forEach(c => {
+    if (!Array.isArray(c.visits)) return;
+    const before = c.visits.length;
+    c.visits = c.visits.filter(v => v.logId !== logId);
+    if (c.visits.length !== before) c._updated = Date.now();
+  });
+  // 新顧客のvisitsに追記
+  if (customerId) {
+    const cust = state.customers.find(c => c.id === customerId);
+    if (cust) {
+      if (!Array.isArray(cust.visits)) cust.visits = [];
+      cust.visits.push({
+        date: log.date,
+        castIds: castIds.slice(),
+        castNoms: { ...castNoms },
+        logId,
+      });
+      cust._updated = Date.now();
+    }
+  }
+
+  persistSave();
+  bg.remove();
+  if (typeof renderTodaySummary === 'function') renderTodaySummary();
+  showToast('来店記録を更新しました', 'normal');
+  // 詳細モーダルを再表示
+  showVisitDetail(logId);
 }
 
 // ---------- 履歴カレンダー ----------
@@ -2367,7 +2748,7 @@ function showDayDetailModal(dateStr) {
       <div class="stat-card">
         <div class="label">来店組数</div>
         <div class="value">${sum.visitCount}</div>
-        <div class="sub">${ongoingCount > 0 ? `（うち進行中：${ongoingCount}）` : ''}</div>
+        <div class="sub">${ongoingCount > 0 ? `進行中${ongoingCount}` : '組'}</div>
       </div>
       <div class="stat-card">
         <div class="label">合計人数</div>
@@ -2375,14 +2756,14 @@ function showDayDetailModal(dateStr) {
         <div class="sub">名</div>
       </div>
       <div class="stat-card">
-        <div class="label">使用テーブル</div>
+        <div class="label">使用卓</div>
         <div class="value">${sum.uniqueTables}</div>
-        <div class="sub">/ ${DEFAULT_TABLES.length}</div>
+        <div class="sub">/${DEFAULT_TABLES.length}</div>
       </div>
       <div class="stat-card">
-        <div class="label">キャスト出勤</div>
+        <div class="label">出勤</div>
         <div class="value">${sum.castOnDuty}</div>
-        <div class="sub">${sum.trialOnDuty > 0 ? `（うち体験：${sum.trialOnDuty}）` : '名'}</div>
+        <div class="sub">${sum.trialOnDuty > 0 ? `体験${sum.trialOnDuty}` : '名'}</div>
       </div>
     </div>
   `;
@@ -2840,27 +3221,9 @@ function openTableModal(tableId) {
     </div>
   `;
 
-  // 入店時刻入力欄（空席時のみ表示、デフォルトは現在時刻に最も近い15分刻み）
+  // 入店時刻入力欄は廃止：入店処理は実際に「入店」ボタンを押した時刻で記録される
+  // （履歴から後で時刻を編集することは可能）
   let startTimeBlock = '';
-  if (!tdata.occupied) {
-    const now = new Date();
-    const curH = now.getHours();
-    const curM = now.getMinutes();
-    // 直近の15分刻みに揃える（切り捨て）
-    const snapM = Math.floor(curM / 15) * 15;
-    const hh = String(curH).padStart(2,'0');
-    const mm = String(snapM).padStart(2,'0');
-    const startVal = `${hh}:${mm}`;
-    startTimeBlock = `
-      <label class="field">
-        <span class="lab">入店時刻</span>
-        <select id="tblStartTime" style="font-size:14px; padding:6px 8px;">
-          ${buildTimeSelectOptions(startVal, 0, 23, 15)}
-        </select>
-        <span style="color:#888; font-size:11px; display:block; margin-top:3px;">15分刻みで選択。デフォルトは現在時刻に最も近い15分刻みです</span>
-      </label>
-    `;
-  }
 
   document.getElementById('tableModalBody').innerHTML = `
     ${statusBlock}
@@ -4144,16 +4507,21 @@ function openReservationModal(id) {
     dateVal = r.datetime.slice(0, 10);
     timeVal = r.datetime.slice(11, 16);
   }
+  // 新規予約時のデフォルト：今日の日付＋20:00
+  if (!dateVal) {
+    const t = new Date();
+    dateVal = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  }
+  if (!timeVal) timeVal = '20:00';
 
   document.getElementById('resvModalBody').innerHTML = `
     <label class="field">
       <span class="lab">予約日時</span>
       <div style="display:flex; gap:6px;">
         <input type="date" id="resvDate" value="${dateVal}" style="flex:1;">
-        <select id="resvTime" style="flex:1;">
-          ${buildTimeSelectOptions(timeVal, 0, 23, 15)}
-        </select>
+        <input type="time" id="resvTime" value="${timeVal}" style="flex:1;">
       </div>
+      <span style="color:#888; font-size:11px; display:block; margin-top:3px;">営業時間：20:00〜00:59 の範囲で入力してください</span>
     </label>
 
     <div class="field">
@@ -4273,6 +4641,13 @@ function saveReservation() {
   const timeVal = document.getElementById('resvTime').value;
   if (!dateVal || !timeVal) {
     alert('予約日時を入力してください');
+    return;
+  }
+  // 営業時間バリデーション：20:00〜23:59 または 00:00〜00:59
+  const [vH, vM] = timeVal.split(':').map(n => parseInt(n, 10));
+  const isInBusinessHours = (vH >= 20 && vH <= 23) || (vH === 0);
+  if (!isInBusinessHours) {
+    alert('営業時間外です。20:00〜00:59 の範囲で入力してください');
     return;
   }
   const datetime = `${dateVal}T${timeVal}`;
