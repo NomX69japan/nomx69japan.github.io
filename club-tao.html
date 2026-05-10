@@ -1511,6 +1511,9 @@
           <button class="btn-sub btn-sm" onclick="document.getElementById('importFile').click()">📤 復元</button>
           <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(event)">
           <p style="color:#888; font-size:11px; margin-top:8px;">JSON形式で全データを保存・復元できます。</p>
+          <hr style="margin:12px 0; border:none; border-top:1px solid #eee;">
+          <button class="btn-sub btn-sm" onclick="recoverVisitLogFromCustomers()" style="background:#fff4e6; border-color:#ff9800; color:#c65a00;">💊 来店ログ復旧</button>
+          <p style="color:#888; font-size:11px; margin-top:8px;">来店ログが消えた場合、顧客の来店履歴から最低限の情報（日付・お客様名・指名キャスト）を再構築します。時刻やセット数は推定値（20:00開始・1セット）になります。</p>
         </div>
       </details>
 
@@ -5175,6 +5178,8 @@ function exportBackup() {
     customers: state.customers,
     tables: state.tables,
     shiftData: state.shiftData,
+    reservations: state.reservations,
+    visitLog: state.visitLog,
     _exportedAt: Date.now()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -5200,6 +5205,8 @@ function importBackup(e) {
       if (Array.isArray(data.customers)) state.customers = data.customers;
       if (data.tables) state.tables = data.tables;
       if (data.shiftData) state.shiftData = data.shiftData;
+      if (Array.isArray(data.reservations)) state.reservations = data.reservations;
+      if (Array.isArray(data.visitLog)) state.visitLog = data.visitLog;
       persistSave();
       alert('復元しました');
       location.reload();
@@ -5216,6 +5223,75 @@ function resetAllData() {
   localStorage.removeItem(LS_KEY);
   localStorage.removeItem(LS_SRV);
   location.reload();
+}
+
+// 来店ログ復旧：顧客のvisits配列に残っているlogId参照から、消失したvisitLogを再構築
+function recoverVisitLogFromCustomers() {
+  if (!Array.isArray(state.visitLog)) state.visitLog = [];
+  if (!Array.isArray(state.customers)) {
+    alert('顧客データがありません');
+    return;
+  }
+  // 既存のvisitLog IDを把握
+  const existingIds = new Set(state.visitLog.map(v => v.id));
+  // 復旧候補を集める：customers[*].visits[*] の中で logId があり、かつ existingIds に無いもの
+  const candidates = [];
+  state.customers.forEach(c => {
+    if (!Array.isArray(c.visits)) return;
+    c.visits.forEach(v => {
+      if (v.logId && !existingIds.has(v.logId) && v.date) {
+        candidates.push({
+          customer: c,
+          visit: v
+        });
+      }
+    });
+  });
+  if (candidates.length === 0) {
+    alert('復旧できる来店記録は見つかりませんでした。\n\n（顧客の来店履歴に logId 紐づけがあり、かつ visitLog に該当記録が無いものが対象です）');
+    return;
+  }
+  // 日付別の件数を表示してから確認
+  const byDate = {};
+  candidates.forEach(c => {
+    byDate[c.visit.date] = (byDate[c.visit.date] || 0) + 1;
+  });
+  const summary = Object.keys(byDate).sort().reverse().slice(0, 10)
+    .map(d => `  ${d}: ${byDate[d]}件`).join('\n');
+  if (!confirm(`${candidates.length}件の来店記録を復旧します。\n\n日付別件数（最近10日）:\n${summary}\n\n※時刻は20:00開始・1セット（90分）の推定値で記録されます。\n　後から履歴編集で実際の時刻に修正できます。\n\n復旧しますか？`)) return;
+
+  const now = Date.now();
+  let added = 0;
+  candidates.forEach(({ customer, visit }) => {
+    // 推定の入店時刻：その営業日の20:00（営業日 = 入店時刻の営業日。20:00 → 営業日 = その日）
+    const [yy, mm, dd] = visit.date.split('-').map(n => parseInt(n, 10));
+    const startedAt = new Date(yy, mm - 1, dd, 20, 0, 0, 0).getTime();
+    const endedAt = startedAt + 90 * 60000; // 1セット = 90分後（推定）
+    const log = {
+      id: visit.logId,
+      date: visit.date,
+      tableId: '',
+      tableName: '（不明）',
+      customerId: customer.id,
+      customerName: customer.name || '',
+      guests: 1,
+      castIds: (visit.castIds || []).slice(),
+      castNoms: visit.castNoms ? { ...visit.castNoms } : {},
+      castFree: '',
+      memo: '【復旧】時刻・卓番・人数・セット数は推定値です。履歴編集で正確な値に修正してください。',
+      startedAt,
+      endedAt,
+      setCount: 1,
+      durationMin: 90,
+      _created: now,
+      _recovered: true,
+    };
+    state.visitLog.push(log);
+    added++;
+  });
+  persistSave();
+  if (typeof renderTodaySummary === 'function') renderTodaySummary();
+  alert(`${added}件の来店記録を復旧しました。\n\n履歴タブから対象日を開いて、各記録の「✏️ 編集」ボタンで実際の時刻・人数・セット数等に修正してください。`);
 }
 
 // ---------- Server Sync ----------
@@ -5479,6 +5555,7 @@ function buildSaveData() {
     tables: state.tables,
     shiftData: state.shiftData,
     reservations: state.reservations,
+    visitLog: state.visitLog,
     _updatedAt: Date.now()
   };
 }
