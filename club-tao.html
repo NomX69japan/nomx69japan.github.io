@@ -908,6 +908,146 @@
     width: 100%;
   }
 
+  /* ====== 顧客モーダル v2: 履歴 ====== */
+  .visits-list-v2 {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .visit-row-v2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #ece6d3;
+    border-radius: 6px;
+  }
+  .visit-row-v2-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .visit-row-v2 .visit-date {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 88px;
+  }
+  .visit-row-v2 .visit-cast {
+    font-size: 12px;
+    color: var(--text-sub);
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+  .visit-row-v2-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .visit-detail-btn {
+    font-size: 11px;
+    color: var(--accent);
+    background: #fff8e7;
+    border: 1px solid #e0d6a8;
+    border-radius: 4px;
+    padding: 3px 7px;
+    cursor: pointer;
+  }
+  .visit-detail-btn:hover { background: #fdf2c8; }
+  .visit-del-btn { padding: 3px 7px; font-size: 11px; }
+  .visit-add-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .visit-add-row input[type="date"] { flex: 1; min-width: 140px; }
+
+  /* ====== 顧客モーダル v2: ボトルキープ ====== */
+  .bottle-row-v2 {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ece6d3;
+    border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .bottle-row-v2.editing {
+    background: #fff8e7;
+    border-color: #d4af37;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bottle-row-v2-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .bottle-row-v2 .bottle-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-word;
+    margin-bottom: 4px;
+  }
+  .bottle-row-v2 .bottle-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .bottle-row-v2 .bottle-meta-item {
+    font-size: 11px;
+    color: var(--text-sub);
+    background: #f7f3e8;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .bottle-row-v2-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .bottle-add-v2 {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 10px;
+    background: #faf6ec;
+    border: 1px dashed #d4af37;
+    border-radius: 6px;
+  }
+  .bav-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bav-row .bav-lab {
+    font-size: 11px;
+    color: var(--text-sub);
+    min-width: 70px;
+    flex-shrink: 0;
+  }
+  .bav-row input {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+  .bav-addbtn { margin-top: 4px; align-self: flex-start; }
+  .bottle-edit-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
   /* ====== Reservations ====== */
   .resv-toolbar {
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -1751,6 +1891,12 @@ function genId(prefix) {
   return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 }
 
+// 顧客の表示名：ニックネームがあれば優先、なければ本名
+function displayName(cust) {
+  if (!cust) return '';
+  return (cust.nickname && cust.nickname.trim()) ? cust.nickname.trim() : (cust.name || '');
+}
+
 // ---------- 時間セレクト生成（15分刻み・全日対応） ----------
 // Androidネイティブの<input type="time">はセット/OKボタンがない端末があるため、
 // 通常のセレクトボックスで時刻を選択させる。
@@ -1931,7 +2077,7 @@ function buildTableCard(t, tdata) {
   const allCastDisp = buildCastDisplay(tdata, true);
 
   const customerName = tdata.customerId
-    ? (state.customers.find(c => c.id === tdata.customerId)?.name || '')
+    ? (displayName(state.customers.find(c => c.id === tdata.customerId)) || '')
     : (tdata.customerName || '');
 
   // 空席カード
@@ -2067,7 +2213,7 @@ function checkIn(tableId, opts) {
   if (notifPrefs.events.checkin) {
     const tName = getTableName(tableId);
     const custDisplay = customerId
-      ? (state.customers.find(c => c.id === customerId)?.name || customerName || 'お客様')
+      ? (displayName(state.customers.find(c => c.id === customerId)) || customerName || 'お客様')
       : (customerName || 'お客様');
     // 指名種別を反映した担当者表示
     const castDisp = buildCastDisplay({ castIds, castNoms, castFree }, true);
@@ -2336,14 +2482,18 @@ function openVisitLogEditModal(logId) {
     `;
   }).join('');
 
-  // 顧客ドロップダウン
+  // 顧客ドロップダウン（ニックネーム優先表示）
   const custOptions = ['<option value="">-- 選択しない（フリー入力） --</option>']
     .concat(state.customers
       .filter(c => !c.removed)
       .sort((a,b) => (a.name||'').localeCompare(b.name||''))
       .map(c => {
         const sel = (c.id === log.customerId) ? ' selected' : '';
-        return `<option value="${c.id}"${sel}>${escapeHtml(c.name)}</option>`;
+        const dn = displayName(c);
+        const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
+          ? `${dn}（${c.name}）`
+          : dn;
+        return `<option value="${c.id}"${sel}>${escapeHtml(label)}</option>`;
       }))
     .join('');
 
@@ -2545,11 +2695,11 @@ function saveVisitLogEdit(logId, bg) {
     }
   }
 
-  // 顧客名解決
+  // 顧客名解決（ニックネームがあれば優先）
   let custName = customerNameInput;
   if (customerId) {
     const c = state.customers.find(x => x.id === customerId);
-    if (c) custName = c.name;
+    if (c) custName = displayName(c);
   }
 
   // ログ更新
@@ -2625,7 +2775,7 @@ function getDateSummary(dateStr) {
         let custName = tdata.customerName || '';
         if (tdata.customerId) {
           const c = state.customers.find(x => x.id === tdata.customerId);
-          if (c) custName = c.name;
+          if (c) custName = displayName(c);
         }
         ongoing.push({
           id: '__ongoing_' + t.id,
@@ -2922,11 +3072,11 @@ function recordVisitLog(tableId, tdata) {
   const tName = getTableName(tableId);
   // 営業日基準：入店時刻の営業日（0:59までの入店は前日扱い）
   const date = businessDateStr(new Date(tdata.startedAt));
-  // 顧客名解決
+  // 顧客名解決（ニックネームがあれば優先）
   let custName = tdata.customerName || '';
   if (tdata.customerId) {
     const c = state.customers.find(x => x.id === tdata.customerId);
-    if (c) custName = c.name;
+    if (c) custName = displayName(c);
   }
   const log = {
     id: genId('vlog'),
@@ -3196,9 +3346,14 @@ function openTableModal(tableId) {
     }).join('');
 
   const custOptions = ['<option value="">（指定なし）</option>']
-    .concat(state.customers.filter(c=>!c.removed).map(c =>
-      `<option value="${c.id}" ${tdata.customerId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`
-    )).join('');
+    .concat(state.customers.filter(c=>!c.removed).map(c => {
+      const dn = displayName(c);
+      // 本名と異なる場合は本名を併記
+      const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
+        ? `${dn}（${c.name}）`
+        : dn;
+      return `<option value="${c.id}" ${tdata.customerId===c.id?'selected':''}>${escapeHtml(label)}</option>`;
+    })).join('');
 
   // 使用中ならステータス情報＋延長/退店UI
   let statusBlock = '';
@@ -3776,7 +3931,10 @@ function renderCustomerList() {
   const list = document.getElementById('custList');
   const filtered = state.customers
     .filter(c => !c.removed)
-    .filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.phone||'').includes(q))
+    .filter(c => !q
+      || (c.name || '').toLowerCase().includes(q)
+      || (c.nickname || '').toLowerCase().includes(q)
+      || (c.phone||'').includes(q))
     .sort((a,b) => (b._updated||b._created||0) - (a._updated||a._created||0));
 
   if (filtered.length === 0) {
@@ -3789,8 +3947,11 @@ function renderCustomerList() {
     const lastVisitStr = lastVisit ? lastVisit.date : '—';
     const visitCount = (c.visits||[]).length;
     const bottleCount = (c.bottles||[]).length;
+    const dispName = displayName(c) || '(無名)';
+    // ニックネームありなら本名を控えめに併記
+    const subName = (c.nickname && c.nickname.trim() && c.name) ? `<span style="font-size:11px; color:#888; font-weight:normal; margin-left:6px;">(${escapeHtml(c.name)})</span>` : '';
     return `<div class="cust-card" onclick="openCustomerModal('${c.id}')">
-      <div class="nm">${escapeHtml(c.name||'(無名)')}</div>
+      <div class="nm">${escapeHtml(dispName)}${subName}</div>
       <div class="meta">
         ${c.phone ? `📞 ${escapeHtml(c.phone)}` : ''}
         ${c.birthday ? `🎂 ${escapeHtml(c.birthday)}` : ''}
@@ -3812,68 +3973,13 @@ function openCustomerModal(id) {
     document.getElementById('custModalTitle').textContent = '顧客編集';
     document.getElementById('custDeleteBtn').style.display = '';
   } else {
-    cust = { id:null, name:'', phone:'', birthday:'', memo:'', visits:[], bottles:[] };
+    cust = { id:null, name:'', nickname:'', phone:'', birthday:'', memo:'', visits:[], bottles:[] };
     document.getElementById('custModalTitle').textContent = '顧客新規追加';
     document.getElementById('custDeleteBtn').style.display = 'none';
   }
 
-  const visitsHtml = (cust.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)).map((v, idx) => {
-    const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
-    const hasDetail = !!v.logId;
-    const detailIcon = hasDetail ? '<span style="color:#b8860b; font-size:11px; margin-left:4px;">▶ 詳細</span>' : '';
-    const clickable = hasDetail ? `style="cursor:pointer;" onclick="showVisitDetail('${v.logId}')"` : '';
-    return `<div class="visit-row" ${clickable}>
-      <span class="date">${escapeHtml(v.date)}${detailIcon}</span>
-      <span class="cast">${escapeHtml(castNames || '—')}</span>
-      <button class="btn-danger btn-sm" onclick="event.stopPropagation(); removeVisit(${idx})">×</button>
-    </div>`;
-  }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
-
-  const bottlesHtml = buildBottlesListHtml(cust.bottles);
-
-  document.getElementById('custModalBody').innerHTML = `
-    <div class="cust-detail-section">
-      <h4>基本情報</h4>
-      <label class="field">
-        <span class="lab">名前 *</span>
-        <input type="text" id="cstName" value="${escapeHtml(cust.name||'')}">
-      </label>
-      <label class="field">
-        <span class="lab">連絡先（電話/LINE等）</span>
-        <input type="text" id="cstPhone" value="${escapeHtml(cust.phone||'')}">
-      </label>
-      <label class="field">
-        <span class="lab">誕生日</span>
-        <input type="text" id="cstBday" value="${escapeHtml(cust.birthday||'')}" placeholder="例: 1990-04-15 / 4月15日">
-      </label>
-    </div>
-
-    <div class="cust-detail-section">
-      <h4>来店履歴</h4>
-      <div id="visitsList">${visitsHtml}</div>
-      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-        <input type="date" id="newVisitDate" style="flex:1; min-width:140px;">
-        <button class="btn btn-sm" onclick="addVisitToEditing()">+ 履歴追加</button>
-      </div>
-    </div>
-
-    <div class="cust-detail-section">
-      <h4>ボトルキープ</h4>
-      <div id="bottlesList">${bottlesHtml}</div>
-      <div class="bottle-add-grid">
-        <input type="text" id="newBottleName" placeholder="ボトル名（必須）">
-        <input type="text" id="newBottleTag" placeholder="🏷 ネームタグ">
-        <input type="text" id="newBottleLoc" placeholder="📍 保管場所">
-        <input type="date" id="newBottleDate">
-      </div>
-      <button class="btn btn-sm" style="margin-top:6px;" onclick="addBottleToEditing()">+ ボトル追加</button>
-    </div>
-
-    <div class="cust-detail-section">
-      <h4>フリーメモ</h4>
-      <textarea id="cstMemo" rows="4" style="width:100%;" placeholder="好きな飲み物、話題、注意点など…">${escapeHtml(cust.memo||'')}</textarea>
-    </div>
-  `;
+  // モーダル本体は共通関数で構築
+  rebuildCustomerModalBody(cust);
   document.getElementById('custModalBg').classList.add('active');
 
   // 編集中の一時データ
@@ -3945,27 +4051,31 @@ function buildBottlesListHtml(bottles) {
   return arr.map((b, idx) => {
     if (bottleEditingIdx === idx) {
       // 編集モード
-      return `<div class="bottle-row" style="display:block; padding:8px; background:#fff8e7; border:1px solid #d4af37;">
-        <div class="bottle-add-grid" style="margin-bottom:6px;">
-          <input type="text" id="editBottleName_${idx}" value="${escapeHtml(b.name||'')}" placeholder="ボトル名（必須）">
-          <input type="text" id="editBottleTag_${idx}" value="${escapeHtml(b.tag||'')}" placeholder="🏷 ネームタグ">
-          <input type="text" id="editBottleLoc_${idx}" value="${escapeHtml(b.location||'')}" placeholder="📍 保管場所">
-          <input type="date" id="editBottleDate_${idx}" value="${escapeHtml(b.openedDate||'')}">
-        </div>
-        <div style="display:flex; gap:6px;">
+      return `<div class="bottle-row-v2 editing">
+        <div class="bav-row"><span class="bav-lab">🍾 ボトル名</span><input type="text" id="editBottleName_${idx}" value="${escapeHtml(b.name||'')}" placeholder="必須"></div>
+        <div class="bav-row"><span class="bav-lab">🏷 タグ</span><input type="text" id="editBottleTag_${idx}" value="${escapeHtml(b.tag||'')}" placeholder="ネームタグ"></div>
+        <div class="bav-row"><span class="bav-lab">📍 保管</span><input type="text" id="editBottleLoc_${idx}" value="${escapeHtml(b.location||'')}" list="bottleLocList" placeholder="旧キャッシャー / キッチン / タグホルダー など"></div>
+        <div class="bav-row"><span class="bav-lab">📅 入店日</span><input type="date" id="editBottleDate_${idx}" value="${escapeHtml(b.openedDate||'')}"></div>
+        <div class="bottle-edit-actions">
           <button class="btn btn-sm" onclick="saveEditBottle(${idx})">💾 保存</button>
           <button class="btn-sub btn-sm" onclick="cancelEditBottle()">キャンセル</button>
         </div>
       </div>`;
     } else {
-      // 通常表示
-      return `<div class="bottle-row">
-        <span class="name">🍾 ${escapeHtml(b.name||'')}</span>
-        ${b.tag ? `<span class="tag">🏷 ${escapeHtml(b.tag)}</span>` : ''}
-        ${b.location ? `<span class="tag">📍 ${escapeHtml(b.location)}</span>` : ''}
-        ${b.openedDate ? `<span class="tag">${escapeHtml(b.openedDate)}〜</span>` : ''}
-        <button class="btn-sub btn-sm" onclick="startEditBottle(${idx})" title="編集" style="margin-left:auto;">✏</button>
-        <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
+      // 通常表示（2行レイアウト）
+      const metaParts = [];
+      if (b.tag) metaParts.push(`<span class="bottle-meta-item">🏷 ${escapeHtml(b.tag)}</span>`);
+      if (b.location) metaParts.push(`<span class="bottle-meta-item">📍 ${escapeHtml(b.location)}</span>`);
+      if (b.openedDate) metaParts.push(`<span class="bottle-meta-item">📅 ${escapeHtml(b.openedDate)}〜</span>`);
+      return `<div class="bottle-row-v2">
+        <div class="bottle-row-v2-main">
+          <div class="bottle-name">🍾 ${escapeHtml(b.name||'')}</div>
+          ${metaParts.length ? `<div class="bottle-meta">${metaParts.join('')}</div>` : ''}
+        </div>
+        <div class="bottle-row-v2-actions">
+          <button class="btn-sub btn-sm" onclick="startEditBottle(${idx})" title="編集">✏</button>
+          <button class="btn-danger btn-sm" onclick="removeBottle(${idx})">×</button>
+        </div>
       </div>`;
     }
   }).join('');
@@ -3973,10 +4083,12 @@ function buildBottlesListHtml(bottles) {
 function preserveAndReopen() {
   // 入力中のフォーム値を custEditing に反映してから再描画
   const n = document.getElementById('cstName')?.value;
+  const nk = document.getElementById('cstNickname')?.value;
   const p = document.getElementById('cstPhone')?.value;
   const b = document.getElementById('cstBday')?.value;
   const m = document.getElementById('cstMemo')?.value;
   if (n !== undefined) custEditing.name = n;
+  if (nk !== undefined) custEditing.nickname = nk;
   if (p !== undefined) custEditing.phone = p;
   if (b !== undefined) custEditing.birthday = b;
   if (m !== undefined) custEditing.memo = m;
@@ -4010,29 +4122,49 @@ function reopenWithEditing() {
 }
 function rebuildCustomerModalBody(cust) {
   // 来店履歴は日付降順で表示。logIdがあれば詳細表示可能。
-  // 操作（×ボタン）は元配列のインデックスを保つ必要があるので、index付与してから降順ソート。
   const indexedVisits = (cust.visits||[]).map((v, idx) => ({ ...v, _origIdx: idx }));
   indexedVisits.sort((a, b) => b.date.localeCompare(a.date));
   const visitsRowsHtml = indexedVisits.map((v) => {
     const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
     const hasDetail = !!v.logId;
-    const detailIcon = hasDetail ? '<span style="color:#b8860b; font-size:11px; margin-left:4px;">▶ 詳細</span>' : '';
-    const clickable = hasDetail ? `style="cursor:pointer;" onclick="showVisitDetail('${v.logId}')"` : '';
-    return `<div class="visit-row" ${clickable}>
-      <span class="date">${escapeHtml(v.date)}${detailIcon}</span>
-      <span class="cast">${escapeHtml(castNames || '—')}</span>
-      <button class="btn-danger btn-sm" onclick="event.stopPropagation(); removeVisit(${v._origIdx})">×</button>
+    const detailBtn = hasDetail
+      ? `<button class="visit-detail-btn" onclick="event.stopPropagation(); showVisitDetail('${v.logId}')">▶ 詳細</button>`
+      : '';
+    return `<div class="visit-row-v2">
+      <div class="visit-row-v2-main">
+        <div class="visit-date">${escapeHtml(v.date)}</div>
+        <div class="visit-cast">${escapeHtml(castNames || '—')}</div>
+      </div>
+      <div class="visit-row-v2-actions">
+        ${detailBtn}
+        <button class="btn-danger btn-sm visit-del-btn" onclick="event.stopPropagation(); removeVisit(${v._origIdx})">×</button>
+      </div>
     </div>`;
   }).join('') || '<p style="color:#888; font-size:12px; margin:0;">来店履歴なし</p>';
 
   const bottlesHtml = buildBottlesListHtml(cust.bottles);
 
+  // 保管場所のサジェスト一覧（既存データから収集 + 標準3項目）
+  const allLocs = new Set(['旧キャッシャー', 'キッチン', 'タグホルダー']);
+  (state.customers || []).forEach(c => {
+    (c.bottles || []).forEach(b => {
+      if (b.location && b.location.trim()) allLocs.add(b.location.trim());
+    });
+  });
+  const locOptions = Array.from(allLocs).map(loc => `<option value="${escapeHtml(loc)}">`).join('');
+
   document.getElementById('custModalBody').innerHTML = `
+    <datalist id="bottleLocList">${locOptions}</datalist>
+
     <div class="cust-detail-section">
       <h4>基本情報</h4>
       <label class="field">
         <span class="lab">名前 *</span>
         <input type="text" id="cstName" value="${escapeHtml(cust.name||'')}">
+      </label>
+      <label class="field">
+        <span class="lab">ニックネーム（あれば優先表示）</span>
+        <input type="text" id="cstNickname" value="${escapeHtml(cust.nickname||'')}" placeholder="例: タカさん、Kちゃん">
       </label>
       <label class="field">
         <span class="lab">連絡先（電話/LINE等）</span>
@@ -4043,28 +4175,43 @@ function rebuildCustomerModalBody(cust) {
         <input type="text" id="cstBday" value="${escapeHtml(cust.birthday||'')}" placeholder="例: 1990-04-15 / 4月15日">
       </label>
     </div>
+
     <div class="cust-detail-section">
-      <h4>来店履歴</h4>
-      <div id="visitsList">${visitsRowsHtml}</div>
-      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-        <input type="date" id="newVisitDate" style="flex:1; min-width:140px;">
+      <h4>来店履歴 <span style="font-size:11px; font-weight:normal; color:#888;">(${indexedVisits.length}件)</span></h4>
+      <div id="visitsList" class="visits-list-v2">${visitsRowsHtml}</div>
+      <div class="visit-add-row">
+        <input type="date" id="newVisitDate">
         <button class="btn btn-sm" onclick="addVisitToEditing()">+ 履歴追加</button>
       </div>
     </div>
+
     <div class="cust-detail-section">
-      <h4>ボトルキープ</h4>
+      <h4>ボトルキープ <span style="font-size:11px; font-weight:normal; color:#888;">(${(cust.bottles||[]).length}本)</span></h4>
       <div id="bottlesList">${bottlesHtml}</div>
-      <div class="bottle-add-grid">
-        <input type="text" id="newBottleName" placeholder="ボトル名（必須）">
-        <input type="text" id="newBottleTag" placeholder="🏷 ネームタグ">
-        <input type="text" id="newBottleLoc" placeholder="📍 保管場所">
-        <input type="date" id="newBottleDate">
+      <div class="bottle-add-v2">
+        <label class="bav-row">
+          <span class="bav-lab">🍾 ボトル名</span>
+          <input type="text" id="newBottleName" placeholder="必須">
+        </label>
+        <label class="bav-row">
+          <span class="bav-lab">🏷 タグ</span>
+          <input type="text" id="newBottleTag" placeholder="ネームタグ">
+        </label>
+        <label class="bav-row">
+          <span class="bav-lab">📍 保管</span>
+          <input type="text" id="newBottleLoc" list="bottleLocList" placeholder="旧キャッシャー / キッチン / タグホルダー など">
+        </label>
+        <label class="bav-row">
+          <span class="bav-lab">📅 入店日</span>
+          <input type="date" id="newBottleDate">
+        </label>
+        <button class="btn btn-sm bav-addbtn" onclick="addBottleToEditing()">+ ボトル追加</button>
       </div>
-      <button class="btn btn-sm" style="margin-top:6px;" onclick="addBottleToEditing()">+ ボトル追加</button>
     </div>
+
     <div class="cust-detail-section">
       <h4>フリーメモ</h4>
-      <textarea id="cstMemo" rows="4" style="width:100%;">${escapeHtml(cust.memo||'')}</textarea>
+      <textarea id="cstMemo" rows="4" style="width:100%;" placeholder="好きな飲み物、話題、注意点など…">${escapeHtml(cust.memo||'')}</textarea>
     </div>
   `;
 }
@@ -4074,6 +4221,7 @@ function saveCustomer() {
   const n = document.getElementById('cstName').value.trim();
   if (!n) { alert('名前を入力してください'); return; }
   custEditing.name = n;
+  custEditing.nickname = document.getElementById('cstNickname').value.trim();
   custEditing.phone = document.getElementById('cstPhone').value.trim();
   custEditing.birthday = document.getElementById('cstBday').value.trim();
   custEditing.memo = document.getElementById('cstMemo').value;
@@ -4195,7 +4343,7 @@ function renderReservations() {
 function buildReservationCardHTML(r) {
   // 顧客名表示
   const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
-  const customerName = cust ? cust.name : (r.customerName || '(未登録)');
+  const customerName = cust ? displayName(cust) : (r.customerName || '(未登録)');
 
   // キャスト名表示（A/B指名種別あり）
   const castDisplay = buildCastDisplay(r, true);
@@ -4509,11 +4657,15 @@ function openReservationModal(id) {
     document.getElementById('resvModalTitle').textContent = '新規予約';
   }
 
-  // 顧客選択肢
+  // 顧客選択肢（ニックネーム優先表示）
   const custOptions = ['<option value="">（未登録 or 新規）</option>']
-    .concat(state.customers.filter(c => !c.removed).map(c =>
-      `<option value="${c.id}" ${r.customerId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
-    )).join('');
+    .concat(state.customers.filter(c => !c.removed).map(c => {
+      const dn = displayName(c);
+      const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
+        ? `${dn}（${c.name}）`
+        : dn;
+      return `<option value="${c.id}" ${r.customerId === c.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    })).join('');
 
   // キャスト選択肢
   const castOptions = state.casts.filter(c => !c.removed).map(c => {
@@ -4795,7 +4947,7 @@ function saveReservation() {
         timeStr = `${mo}/${d} ${h}:${m}`;
       }
       const cust = customerId ? state.customers.find(c => c.id === customerId) : null;
-      const custName = cust ? cust.name : (customerName || 'お客様');
+      const custName = cust ? displayName(cust) : (customerName || 'お客様');
       let body = `${custName}様`;
       if (timeStr) body = `${timeStr} ${body}`;
       if (guests) body += ` (${guests}名)`;
@@ -5336,7 +5488,7 @@ function recoverVisitLogFromCustomers() {
       tableId: '',
       tableName: '（不明）',
       customerId: customer.id,
-      customerName: customer.name || '',
+      customerName: displayName(customer) || '',
       guests: 1,
       castIds: (visit.castIds || []).slice(),
       castNoms: visit.castNoms ? { ...visit.castNoms } : {},
@@ -5568,7 +5720,7 @@ function detectAndNotifyChanges(snap) {
       let custLabel = '';
       if (after.customerId) {
         const c = state.customers.find(x => x.id === after.customerId);
-        custLabel = c ? c.name : '';
+        custLabel = c ? displayName(c) : '';
       } else if (after.customerName) {
         custLabel = after.customerName;
       }
@@ -5600,7 +5752,7 @@ function detectAndNotifyChanges(snap) {
           timeStr = `${mo}/${d} ${h}:${m}`;
         }
         const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
-        const custName = cust ? cust.name : (r.customerName || '');
+        const custName = cust ? displayName(cust) : (r.customerName || '');
         let msg = `📖 新規予約`;
         if (timeStr) msg += ` ${timeStr}`;
         if (custName) msg += ` ${custName}様`;
