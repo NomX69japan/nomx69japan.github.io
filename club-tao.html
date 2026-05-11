@@ -1621,7 +1621,8 @@
             <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckin"> 🟢 入店</label>
             <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckout"> 🔴 退店</label>
             <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifResv"> 📖 新規予約</label>
-            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifTimer"> ⏱ タイマー警告（バナーのみ）</label>
+            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifTimer"> ⏱ 残り15分（画面バナー）</label>
+            <label class="field" style="margin-bottom:4px; padding-left:20px;"><input type="checkbox" id="notifTimerPush"> 📲 残り15分（バックグラウンド通知）</label>
           </div>
           <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn-sub btn-sm" onclick="testNotification()">🔊 テスト通知</button>
@@ -1785,7 +1786,7 @@ const LS_NOTIF = 'tao_lite_notif';
 const notifPrefs = {
   enabled: true,
   sound: true,
-  events: { checkin: true, checkout: true, resv: true, timer: true }
+  events: { checkin: true, checkout: true, resv: true, timer: true, timerPush: false }
 };
 function loadNotifPrefs() {
   try {
@@ -3156,25 +3157,36 @@ function updateTableTimers() {
     const remainMs = tdata.endsAt - Date.now();
     const remainMin = Math.ceil(remainMs / 60000);
 
-    // 残り15分アラート（バナー表示のみ）
-    if (!tdata.alertedWarn && remainMs > 0 && remainMin <= ALERT_15_MIN && remainMin > ALERT_10_MIN) {
+    // 残り15分アラート（バナー表示。設定により Push 通知も送る）
+    if (!tdata.alertedWarn && remainMs > 0 && remainMin <= ALERT_15_MIN) {
       tdata.alertedWarn = true;
       if (notifPrefs.enabled && notifPrefs.events.timer) {
         showToast(`⏱ ${t.name}：残り15分です`, 'warn');
       }
+      // バックグラウンド Push 通知（端末を閉じてても届く）
+      if (notifPrefs.events.timerPush) {
+        let custLabel = '';
+        if (tdata.customerId) {
+          const c = state.customers.find(x => x.id === tdata.customerId);
+          if (c) custLabel = displayName(c);
+        } else if (tdata.customerName) {
+          custLabel = tdata.customerName;
+        }
+        let body = '残り15分です';
+        if (custLabel) body = `${custLabel}様　${body}`;
+        dispatchPushNotification({
+          title: `⏱ ${t.name}：残り15分`,
+          body,
+          type: 'timer',
+        });
+      }
       needRender = true;
     }
-    // 残り10分で延長確認モーダル（または自動延長）
+    // 残り10分：自動延長フラグONなら無告知で延長（モーダル・通知なし）
     if (!tdata.alertedCritical && remainMs > 0 && remainMin <= ALERT_10_MIN) {
       tdata.alertedCritical = true;
-      if (notifPrefs.enabled && notifPrefs.events.timer) {
-        showToast(`⏱ ${t.name}：残り10分${tdata.autoExtend ? '（自動延長）' : '（延長確認）'}`, 'critical');
-      }
       if (tdata.autoExtend) {
-        // 自動延長（モーダルを出さずに +60分）
         extendTable(t.id, 60);
-      } else {
-        openExtendDialog(t.id);
       }
       needRender = true;
     }
@@ -3366,17 +3378,44 @@ function openTableModal(tableId) {
       ? new Date(tdata.endsAt).toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' })
       : '—';
     const autoExtChk = tdata.autoExtend ? 'checked' : '';
+    // 入店時刻変更用のhour/min（営業帯 20-04時を許容）
+    const stD = tdata.startedAt ? new Date(tdata.startedAt) : new Date();
+    const stH = stD.getHours();
+    const stM = stD.getMinutes();
+    const stHourOpts = [20,21,22,23,0,1,2,3,4].map(h => {
+      const v = String(h).padStart(2, '0');
+      return `<option value="${v}"${h===stH?' selected':''}>${v}</option>`;
+    }).join('');
+    const stMinOpts = Array.from({length:60}, (_,i) => {
+      const v = String(i).padStart(2, '0');
+      return `<option value="${v}"${i===stM?' selected':''}>${v}</option>`;
+    }).join('');
     statusBlock = `
       <div class="cust-detail-section" style="margin-bottom:12px;">
         <h4>📍 現在のステータス</h4>
         <div style="font-size:13px; color:var(--text); line-height:1.8;">
-          入店時刻：<b>${startedStr}</b>　／　終了予定：<b>${endsStr}</b><br>
+          入店時刻：<b id="curStartedDisp">${startedStr}</b>　／　終了予定：<b id="curEndsDisp">${endsStr}</b><br>
           現在 <b>${setNum}セット目</b>
         </div>
         <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
           <button type="button" class="btn btn-sm" data-extend-modal="30">+30分延長</button>
           <button type="button" class="btn btn-sm" data-extend-modal="60">+60分延長</button>
         </div>
+        <details style="margin-top:10px; background:#f7f3e8; border:1px dashed #d4af37; border-radius:6px; padding:8px;">
+          <summary style="cursor:pointer; font-size:12px; color:#8b6914;">⏱ 入店時刻を変更する</summary>
+          <div style="margin-top:8px;">
+            <div style="display:flex; gap:4px; align-items:center; margin-bottom:6px;">
+              <select id="tblEditStartHour" style="flex:1;">${stHourOpts}</select>
+              <span style="color:#888;">:</span>
+              <select id="tblEditStartMin" style="flex:1;">${stMinOpts}</select>
+              <button type="button" class="btn btn-sm" data-update-start>変更</button>
+            </div>
+            <p style="font-size:11px; color:#888; margin:0; line-height:1.4;">
+              入店時刻を変更すると、終了予定時刻も自動再計算されます。<br>
+              入店処理が遅れたときの調整にお使いください。
+            </p>
+          </div>
+        </details>
         <label class="small-label" style="margin-top:10px; display:flex; align-items:center; gap:6px; padding:6px 8px; background:#fff8e7; border:1px solid #d4af37; border-radius:6px;">
           <input type="checkbox" id="tblAutoExtend" ${autoExtChk}> 
           <span>🔁 自動延長（時間切れで60分自動延長、確認モーダル表示なし）</span>
@@ -3451,6 +3490,12 @@ function openTableModal(tableId) {
     el.addEventListener('click', () => {
       const min = parseInt(el.getAttribute('data-extend-modal'), 10);
       extendFromModal(min);
+    });
+  });
+  // 入店時刻変更ボタン
+  document.querySelectorAll('#tableModalBody [data-update-start]').forEach(el => {
+    el.addEventListener('click', () => {
+      updateStartTimeFromModal();
     });
   });
   // 指名種別（A/B/なし）トグルボタン
@@ -3578,6 +3623,46 @@ function extendFromModal(min) {
   saveTableInternal(false);
   extendTable(editingTableId, min);
   // モーダルを開き直して新しいセット数を反映
+  openTableModal(editingTableId);
+}
+
+// 入店時刻を変更（モーダル内の hour/min セレクトから）
+function updateStartTimeFromModal() {
+  if (!editingTableId) return;
+  const hourEl = document.getElementById('tblEditStartHour');
+  const minEl = document.getElementById('tblEditStartMin');
+  if (!hourEl || !minEl) return;
+  const hh = parseInt(hourEl.value, 10);
+  const mm = parseInt(minEl.value, 10);
+  const tdata = state.tables[editingTableId];
+  if (!tdata || !tdata.occupied) return;
+
+  // 既存の startedAt の年月日をベースに、時刻だけ差し替える
+  const orig = new Date(tdata.startedAt || Date.now());
+  let newDate = new Date(orig.getFullYear(), orig.getMonth(), orig.getDate(), hh, mm, 0, 0);
+
+  // 未来チェック（現在より明らかに後 → 確認）
+  const now = Date.now();
+  if (newDate.getTime() > now + 60000) {
+    if (!confirm('入店時刻が現在時刻より未来になっています。\nこのまま保存しますか？')) return;
+  }
+
+  const newStartedAt = newDate.getTime();
+  const setCount = tdata.setCount || 1;
+  // 終了予定 = 入店時刻 + セット数 × SET_MINUTES
+  const newEndsAt = newStartedAt + setCount * SET_MINUTES * 60000;
+
+  tdata.startedAt = newStartedAt;
+  tdata.endsAt = newEndsAt;
+  // アラート再判定（時刻変更で残時間が変わるため）
+  tdata.alertedWarn = false;
+  tdata.alertedCritical = false;
+  tdata._updated = Date.now();
+
+  persistSave();
+  renderFloor();
+  showToast(`入店時刻を ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')} に変更しました`, 'normal');
+  // モーダル再描画（新しい値を反映）
   openTableModal(editingTableId);
 }
 
@@ -4982,6 +5067,7 @@ function loadNotifPrefsUI() {
   const co = document.getElementById('notifCheckout');
   const re = document.getElementById('notifResv');
   const tm = document.getElementById('notifTimer');
+  const tmp = document.getElementById('notifTimerPush');
   if (!enabled) return;
   enabled.checked = notifPrefs.enabled;
   sound.checked = notifPrefs.sound;
@@ -4989,6 +5075,7 @@ function loadNotifPrefsUI() {
   co.checked = notifPrefs.events.checkout;
   re.checked = notifPrefs.events.resv;
   tm.checked = notifPrefs.events.timer;
+  if (tmp) tmp.checked = !!notifPrefs.events.timerPush;
   // バインド（重複防止）
   if (!enabled._bound) {
     enabled.addEventListener('change', () => { notifPrefs.enabled = enabled.checked; saveNotifPrefs(); });
@@ -4997,6 +5084,7 @@ function loadNotifPrefsUI() {
     co.addEventListener('change', () => { notifPrefs.events.checkout = co.checked; saveNotifPrefs(); });
     re.addEventListener('change', () => { notifPrefs.events.resv = re.checked; saveNotifPrefs(); });
     tm.addEventListener('change', () => { notifPrefs.events.timer = tm.checked; saveNotifPrefs(); });
+    if (tmp) tmp.addEventListener('change', () => { notifPrefs.events.timerPush = tmp.checked; saveNotifPrefs(); });
     enabled._bound = true;
   }
 }
