@@ -2282,19 +2282,35 @@ function openVisitLogEditModal(logId) {
   const log = state.visitLog.find(x => x.id === logId);
   if (!log) return;
 
-  const fmtTimeInput = (ts) => {
-    if (!ts) return '';
+  const splitHHMM = (ts) => {
+    if (!ts) return { h: 20, m: 0 };
     const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return { h: d.getHours(), m: d.getMinutes() };
   };
-  const startTimeVal = fmtTimeInput(log.startedAt);
-  const endTimeVal = fmtTimeInput(log.endedAt);
+  const sT = splitHHMM(log.startedAt);
+  const eT = splitHHMM(log.endedAt);
+
+  // 時/分ドロップダウン用ヘルパー
+  // 入店・退店は深夜帯（0〜4時）も含む全営業時間 + 営業外の修正にも対応
+  const buildHourOpts = (selH) => {
+    // 全時間（0〜23）。営業時間内（20-23, 0-4）を強調表示など考慮するが、シンプルに全表示
+    const allowed = [20,21,22,23,0,1,2,3,4]; // 営業帯（深夜入店も考慮）
+    return allowed.map(h => {
+      const v = String(h).padStart(2, '0');
+      return `<option value="${v}"${h===selH?' selected':''}>${v}</option>`;
+    }).join('');
+  };
+  const buildMinOpts = (selM) => {
+    return Array.from({length:60}, (_,i) => {
+      const v = String(i).padStart(2, '0');
+      return `<option value="${v}"${i===selM?' selected':''}>${v}</option>`;
+    }).join('');
+  };
 
   // キャスト一覧（出勤者のみ＋現在のlog.castIdsに含まれる過去キャストも）
   const allCasts = state.casts.filter(c => !c.removed);
   const includedIds = new Set(log.castIds || []);
   const castSorted = allCasts.slice().sort((a,b) => {
-    // 含まれているもの優先
     const aIn = includedIds.has(a.id) ? 0 : 1;
     const bIn = includedIds.has(b.id) ? 0 : 1;
     if (aIn !== bIn) return aIn - bIn;
@@ -2320,7 +2336,7 @@ function openVisitLogEditModal(logId) {
     `;
   }).join('');
 
-  // 顧客ドロップダウン（既存顧客選択用）
+  // 顧客ドロップダウン
   const custOptions = ['<option value="">-- 選択しない（フリー入力） --</option>']
     .concat(state.customers
       .filter(c => !c.removed)
@@ -2331,13 +2347,26 @@ function openVisitLogEditModal(logId) {
       }))
     .join('');
 
+  // テーブル選択肢
+  const tableOptions = ['<option value="">-- 未設定 --</option>']
+    .concat(DEFAULT_TABLES.map(t => {
+      const sel = (t.id === log.tableId) ? ' selected' : '';
+      return `<option value="${t.id}"${sel}>${escapeHtml(t.name)}</option>`;
+    }))
+    .join('');
+
   const bg = document.createElement('div');
   bg.className = 'modal-bg active';
   bg.style.zIndex = 1750;
   bg.innerHTML = `
     <div class="modal" style="max-width:480px; max-height:90vh; overflow-y:auto;">
       <h3>✏️ 来店記録の編集</h3>
-      <div style="font-size:12px; color:#888; margin-bottom:10px;">${log.date}　${escapeHtml(log.tableName || log.tableId)}</div>
+      <div style="font-size:12px; color:#888; margin-bottom:10px;">${log.date}</div>
+
+      <label class="field">
+        <span class="lab">テーブル</span>
+        <select id="vleTable">${tableOptions}</select>
+      </label>
 
       <label class="field">
         <span class="lab">お客様（既存から選択）</span>
@@ -2353,17 +2382,23 @@ function openVisitLogEditModal(logId) {
         <input type="number" id="vleGuests" value="${log.guests || 0}" min="0" max="20">
       </label>
 
-      <div style="display:flex; gap:8px;">
-        <label class="field" style="flex:1;">
-          <span class="lab">入店時刻</span>
-          <input type="time" id="vleStartTime" value="${startTimeVal}">
-        </label>
-        <label class="field" style="flex:1;">
-          <span class="lab">退店時刻</span>
-          <input type="time" id="vleEndTime" value="${endTimeVal}">
-        </label>
+      <div class="field">
+        <span class="lab">入店時刻</span>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <select id="vleStartHour" style="flex:1;">${buildHourOpts(sT.h)}</select>
+          <span style="color:#888;">:</span>
+          <select id="vleStartMin" style="flex:1;">${buildMinOpts(sT.m)}</select>
+        </div>
       </div>
-      <div style="font-size:11px; color:#888; margin:-6px 0 10px 2px;">※日付は記録日（${log.date}）のまま</div>
+      <div class="field">
+        <span class="lab">退店時刻</span>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <select id="vleEndHour" style="flex:1;">${buildHourOpts(eT.h)}</select>
+          <span style="color:#888;">:</span>
+          <select id="vleEndMin" style="flex:1;">${buildMinOpts(eT.m)}</select>
+        </div>
+      </div>
+      <div style="font-size:11px; color:#888; margin:-4px 0 10px 2px;">※日付は記録日（${log.date}）のまま</div>
 
       <label class="field">
         <span class="lab">セット数</span>
@@ -2457,19 +2492,24 @@ function saveVisitLogEdit(logId, bg) {
   const log = state.visitLog.find(x => x.id === logId);
   if (!log) return;
 
+  const tableId = bg.querySelector('#vleTable').value || '';
   const customerId = bg.querySelector('#vleCustomer').value || '';
   const customerNameInput = (bg.querySelector('#vleCustomerName').value || '').trim();
   const guests = parseInt(bg.querySelector('#vleGuests').value, 10) || 0;
-  const startTimeVal = bg.querySelector('#vleStartTime').value;
-  const endTimeVal = bg.querySelector('#vleEndTime').value;
+  const startHour = bg.querySelector('#vleStartHour').value;
+  const startMin = bg.querySelector('#vleStartMin').value;
+  const endHour = bg.querySelector('#vleEndHour').value;
+  const endMin = bg.querySelector('#vleEndMin').value;
   const setCount = parseInt(bg.querySelector('#vleSetCount').value, 10) || 1;
   const castFree = (bg.querySelector('#vleCastFree').value || '').trim();
   const memo = bg.querySelector('#vleMemo').value || '';
 
-  if (!startTimeVal || !endTimeVal) {
+  if (!startHour || !startMin || !endHour || !endMin) {
     alert('入店時刻と退店時刻を入力してください');
     return;
   }
+  const startTimeVal = `${startHour}:${startMin}`;
+  const endTimeVal = `${endHour}:${endMin}`;
 
   // キャスト
   const castIds = Array.from(bg.querySelectorAll('input.vle-cast-pick:checked')).map(el => el.value);
@@ -2484,24 +2524,25 @@ function saveVisitLogEdit(logId, bg) {
   });
 
   // 時刻のタイムスタンプ化（log.dateをベースに）
-  // 入店が0:00〜2:00頃で、その日の営業日が前日の場合、入店時刻は翌日の0時台になる
-  // 既存のstartedAt/endedAtの「日」を保ったまま時刻だけ差し替える
-  const buildTs = (origTs, hhmm) => {
+  // log.date は営業日。営業日 = (実日時) - 1時間 の日付なので、
+  // 入店時刻の時数が「20-23」なら営業日と同じ日、「0-4」なら営業日の翌日 という関係。
+  const [logY, logM, logD] = log.date.split('-').map(n => parseInt(n, 10));
+  const buildTsFromHHMM = (hhmm) => {
     const [hh, mm] = hhmm.split(':').map(n => parseInt(n, 10));
-    const d = new Date(origTs);
-    d.setHours(hh, mm, 0, 0);
-    return d.getTime();
+    // 営業日 20:00以降は営業日と同じ日付、0:00-4:00台は翌日に配置
+    const isNextDay = (hh >= 0 && hh <= 4);
+    const baseDate = new Date(logY, logM - 1, logD + (isNextDay ? 1 : 0), hh, mm, 0, 0);
+    return baseDate.getTime();
   };
-  let newStartedAt = buildTs(log.startedAt, startTimeVal);
-  let newEndedAt = buildTs(log.endedAt, endTimeVal);
-  // 退店時刻が入店より前になったら警告
+  let newStartedAt = buildTsFromHHMM(startTimeVal);
+  let newEndedAt = buildTsFromHHMM(endTimeVal);
+  // 退店時刻が入店と同じか前ならエラー
   if (newEndedAt <= newStartedAt) {
-    // 翌日にまたいでいる可能性（例：入店23:00 → 退店01:30）
-    // endedAtの日付を1日進める
-    if (!confirm('退店時刻が入店時刻より前または同じです。\n翌日（深夜帯）に退店した扱いにしますか？\n「いいえ」を選ぶと修正画面に戻ります。')) {
+    // 翌日扱いに修正トライ（例：入店23:30 → 退店00:30 で endが先に来てしまった場合）
+    // 上のbuildTsFromHHMMで既に「0-4時=翌日」扱いだが、両方が20-23のケースで退店<入店なら警告
+    if (!confirm('退店時刻が入店時刻より前または同じです。\nこのまま保存しますか？\n（時刻の入力ミスの可能性があります）')) {
       return;
     }
-    newEndedAt = buildTs(log.endedAt + 24 * 3600 * 1000, endTimeVal);
   }
 
   // 顧客名解決
@@ -2512,6 +2553,8 @@ function saveVisitLogEdit(logId, bg) {
   }
 
   // ログ更新
+  log.tableId = tableId;
+  log.tableName = tableId ? (DEFAULT_TABLES.find(t => t.id === tableId)?.name || tableId) : '（未設定）';
   log.customerId = customerId;
   log.customerName = custName;
   log.guests = guests;
@@ -4517,14 +4560,30 @@ function openReservationModal(id) {
   }
   if (!timeVal) timeVal = '20:00';
 
+  // 時刻を時・分に分解
+  const [tH, tM] = (timeVal || '20:00').split(':').map(n => parseInt(n, 10));
+  const businessHours = [20, 21, 22, 23, 0]; // 営業時間
+  const hourOpts = businessHours.map(h => {
+    const v = String(h).padStart(2, '0');
+    const sel = (h === tH) ? ' selected' : '';
+    return `<option value="${v}"${sel}>${v}</option>`;
+  }).join('');
+  const minOpts = Array.from({length: 60}, (_, i) => {
+    const v = String(i).padStart(2, '0');
+    const sel = (i === tM) ? ' selected' : '';
+    return `<option value="${v}"${sel}>${v}</option>`;
+  }).join('');
+
   document.getElementById('resvModalBody').innerHTML = `
     <label class="field">
       <span class="lab">予約日時</span>
-      <div style="display:flex; gap:6px;">
-        <input type="date" id="resvDate" value="${dateVal}" style="flex:1;">
-        <input type="time" id="resvTime" value="${timeVal}" style="flex:1;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="date" id="resvDate" value="${dateVal}" style="flex:1.5;">
+        <select id="resvHour" style="flex:1;">${hourOpts}</select>
+        <span style="color:#888;">:</span>
+        <select id="resvMin" style="flex:1;">${minOpts}</select>
       </div>
-      <span style="color:#888; font-size:11px; display:block; margin-top:3px;">営業時間：20:00〜00:59 の範囲で入力してください</span>
+      <span style="color:#888; font-size:11px; display:block; margin-top:3px;">営業時間：20:00〜00:59</span>
     </label>
 
     <div class="field">
@@ -4641,13 +4700,17 @@ function closeReservationModal() {
 
 function saveReservation() {
   const dateVal = document.getElementById('resvDate').value;
-  const timeVal = document.getElementById('resvTime').value;
-  if (!dateVal || !timeVal) {
+  const hourEl = document.getElementById('resvHour');
+  const minEl = document.getElementById('resvMin');
+  const hourVal = hourEl ? hourEl.value : '';
+  const minVal = minEl ? minEl.value : '';
+  if (!dateVal || !hourVal || !minVal) {
     alert('予約日時を入力してください');
     return;
   }
-  // 営業時間バリデーション：20:00〜23:59 または 00:00〜00:59
-  const [vH, vM] = timeVal.split(':').map(n => parseInt(n, 10));
+  const timeVal = `${hourVal}:${minVal}`;
+  // ドロップダウン構成で範囲制限済みだが念のため確認
+  const vH = parseInt(hourVal, 10);
   const isInBusinessHours = (vH >= 20 && vH <= 23) || (vH === 0);
   if (!isInBusinessHours) {
     alert('営業時間外です。20:00〜00:59 の範囲で入力してください');
