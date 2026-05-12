@@ -206,6 +206,47 @@
   label.field span.lab { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 11px; }
   label.field input, label.field select, label.field textarea { width: 100%; }
 
+  /* ====== 通知設定 v2: チェック横並び ====== */
+  .notif-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .notif-group:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .notif-group-head {
+    font-size: 11px;
+    color: var(--text-sub);
+    margin: 0 0 4px;
+  }
+  .notif-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    padding: 6px 4px;
+    cursor: pointer;
+    margin: 0;
+  }
+  .notif-opt input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin: 0;
+  }
+  .notif-opt span {
+    flex: 1;
+    line-height: 1.4;
+  }
+  .notif-opt-sub {
+    padding-left: 28px;
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+
   /* ====== Floor ====== */
   .floor-toolbar {
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -1048,6 +1089,54 @@
     margin-top: 6px;
   }
 
+  /* ====== Release Notes (What's New) ====== */
+  .rn-modal { padding: 20px 20px 16px; }
+  .rn-block {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: #fff8e7;
+    border: 1px solid #e0d6a8;
+    border-left: 4px solid #d4af37;
+    border-radius: 6px;
+  }
+  .rn-block:last-of-type { margin-bottom: 0; }
+  .rn-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+  .rn-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #8b6914;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rn-version {
+    font-size: 11px;
+    color: #b8860b;
+  }
+  .rn-newbadge {
+    display: inline-block;
+    background: #d4af37;
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .rn-items {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .rn-items li { margin-bottom: 4px; }
+
   /* ====== Reservations ====== */
   .resv-toolbar {
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -1610,22 +1699,21 @@
       <details class="settings-section">
         <summary>🔔 通知設定（端末ごと）</summary>
         <div class="body">
-          <label class="field" style="margin-bottom:8px;">
-            <input type="checkbox" id="notifEnabled"> 通知バナーを表示する
-          </label>
-          <label class="field" style="margin-bottom:8px;">
-            <input type="checkbox" id="notifSound"> 通知音を鳴らす
-          </label>
-          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border);">
-            <p style="color:var(--text-sub); font-size:11px; margin:0 0 6px;">通知するイベント</p>
-            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckin"> 🟢 入店</label>
-            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifCheckout"> 🔴 退店</label>
-            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifResv"> 📖 新規予約</label>
-            <label class="field" style="margin-bottom:4px;"><input type="checkbox" id="notifTimer"> ⏱ 残り15分（画面バナー）</label>
-            <label class="field" style="margin-bottom:4px; padding-left:20px;"><input type="checkbox" id="notifTimerPush"> 📲 残り15分（バックグラウンド通知）</label>
+          <div class="notif-group">
+            <label class="notif-opt"><input type="checkbox" id="notifEnabled"><span>通知バナーを表示する</span></label>
+            <label class="notif-opt"><input type="checkbox" id="notifSound"><span>通知音を鳴らす</span></label>
+          </div>
+          <div class="notif-group">
+            <p class="notif-group-head">通知するイベント</p>
+            <label class="notif-opt"><input type="checkbox" id="notifCheckin"><span>🟢 入店</span></label>
+            <label class="notif-opt"><input type="checkbox" id="notifCheckout"><span>🔴 退店</span></label>
+            <label class="notif-opt"><input type="checkbox" id="notifResv"><span>📖 新規予約</span></label>
+            <label class="notif-opt"><input type="checkbox" id="notifTimer"><span>⏱ 残り15分（画面バナー）</span></label>
+            <label class="notif-opt notif-opt-sub"><input type="checkbox" id="notifTimerPush"><span>📲 残り15分（バックグラウンド通知）</span></label>
           </div>
           <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn-sub btn-sm" onclick="testNotification()">🔊 テスト通知</button>
+            <button class="btn-sub btn-sm" onclick="testTimerPushFromSettings()">⏱ 残り15分Pushテスト</button>
           </div>
           <p style="color:#888; font-size:11px; margin-top:8px;">他端末で操作があった時に画面上部にバナーで通知。設定はこの端末にのみ保存されます。</p>
 
@@ -1642,6 +1730,14 @@
             </div>
             <p id="pushStatus" style="font-size:11px; color:#aaa; margin-top:6px;"></p>
           </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>📖 アップデート履歴</summary>
+        <div class="body">
+          <button class="btn btn-sm" onclick="showReleaseNotes(true)">📖 過去のアップデートを見る</button>
+          <p style="color:#888; font-size:11px; margin-top:8px;">現在のバージョン: <b id="curAppVersion">—</b></p>
         </div>
       </details>
 
@@ -1768,6 +1864,58 @@ const DEFAULT_TABLES = [
 const SET_MINUTES = 60;            // 1セット = 60分
 const ALERT_15_MIN = 15;           // 残りこの分数で1次アラート
 const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
+
+// ===== アプリバージョン & リリースノート =====
+// 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
+// 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
+const APP_VERSION = '2026.05.12';
+const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
+const RELEASE_NOTES = [
+  {
+    version: '2026.05.12',
+    date: '2026-05-12',
+    title: '通知UI整理と延長履歴の表示',
+    items: [
+      '通知設定画面のレイアウトを見やすく整理しました（チェックボックスと項目名の表示崩れを修正）。',
+      '残り15分のバックグラウンド通知（Push）が、フロアタブを開いていなくても発火するように修正しました。',
+      '通知設定に「⏱ 残り15分Pushテスト」ボタンを追加しました。実際の通知到達を確認できます。',
+      '来店履歴に延長の内訳が表示されるようになりました（例：3セット＋60分×1＋30分×1、自動延長は🔁マーク付き）。',
+    ],
+  },
+  {
+    version: '2026.05.11',
+    date: '2026-05-11',
+    title: '通知改良＆入店時刻の後修正',
+    items: [
+      '10分前アラート（延長確認モーダル）を廃止しました。シンプルに残り15分通知だけになります。',
+      '残り15分通知に「バックグラウンド通知（Push）」を追加しました。設定 → 🔔 通知設定 から有効化できます。',
+      '入店中の卓モーダルに「⏱ 入店時刻を変更する」を追加しました。入店処理が遅れた時の調整に使えます。',
+    ],
+  },
+  {
+    version: '2026.05.10',
+    date: '2026-05-10',
+    title: '顧客管理の使い勝手改善',
+    items: [
+      'ニックネーム欄を追加しました。設定すると顧客一覧・入店ログ・通知で優先表示されます。',
+      '顧客カードの来店履歴・ボトルキープを見やすいカード型レイアウトに変更しました。',
+      'ボトル保管場所を「旧キャッシャー / キッチン / タグホルダー」から選べるドロップダウンにしました（手入力も可）。',
+      '来店ログのバックアップ漏れを修正し、消えた履歴を復旧する機能を追加しました。',
+    ],
+  },
+  {
+    version: '2026.05.09',
+    date: '2026-05-09',
+    title: '履歴編集と予約の改善',
+    items: [
+      '来店履歴を後から編集できるようになりました（時刻・卓・人数・キャスト指名・セット数など）。',
+      '間違えて退店処理した卓を、履歴から「退店取消」で使用中に戻せるようになりました。',
+      '予約・入店予定時刻を 20:00〜00:59 の範囲だけに制限しました。',
+      '入店時刻は実際に「入店」ボタンを押した時刻で記録されるようになりました（15分刻みの選択は廃止）。',
+      '履歴の統計カード（来店組数・合計人数など）をコンパクトにしました。',
+    ],
+  },
+];
 
 const state = {
   pin: '0000',
@@ -2017,15 +2165,19 @@ function initApp() {
   if (server.url && server.token) {
     initServerSync();
   }
-  // 1秒ごとにタイマー更新（フロアが表示中の時のみ動作）
+  // タイマー更新：アラート判定は常時走らせる（他タブを見ていてもPush通知が届くように）。
+  // 画面のタイマー表示更新はフロアタブ表示時のみ。
   setInterval(() => {
-    if (document.getElementById('page-floor').classList.contains('active')) {
-      updateTableTimers();
-    }
+    const onFloor = document.getElementById('page-floor').classList.contains('active');
+    updateTableTimers(onFloor);
   }, 1000);
   // 1分ごとに時計
   setInterval(updateFloorClock, 60000);
   updateFloorClock();
+  // アップデート告知ポップアップ（新リリースがあるときだけ表示）
+  setTimeout(() => {
+    try { showReleaseNotes(false); } catch(e) { console.warn('release notes failed', e); }
+  }, 400);
 }
 
 function updateFloorClock() {
@@ -2230,13 +2382,21 @@ function checkIn(tableId, opts) {
 }
 
 // 延長（quickボタン用）
-function extendTable(tableId, addMin) {
+function extendTable(tableId, addMin, opts) {
   const tdata = state.tables[tableId];
   if (!tdata || !tdata.occupied) return;
+  opts = opts || {};
   // すでに過ぎていたら現在時刻基準、まだ残っていたら現在の endsAt 基準
   const base = (tdata.endsAt && tdata.endsAt > Date.now()) ? tdata.endsAt : Date.now();
   tdata.endsAt = base + addMin * 60000;
   tdata.setCount = (tdata.setCount || 1) + 1;
+  // 延長履歴を蓄積（退店時に log にコピーされる）
+  if (!Array.isArray(tdata.extensions)) tdata.extensions = [];
+  tdata.extensions.push({
+    min: addMin,
+    auto: !!opts.auto,
+    at: Date.now(),
+  });
   // 次セットでもアラートを出すためフラグリセット
   tdata.alertedWarn = false;
   tdata.alertedCritical = false;
@@ -2302,6 +2462,32 @@ function showVisitDetail(logId) {
   const allCasts = buildCastDisplay(log, true) || '—';
   const custName = log.customerName || '（記録なし）';
 
+  // セット数の内訳：初回1セット + 延長履歴の集計
+  const setBreakdownText = (() => {
+    const extensions = Array.isArray(log.extensions) ? log.extensions : [];
+    const setN = log.setCount || 1;
+    if (extensions.length === 0) {
+      // 旧データ：延長履歴なし。setCountから推定（1セットを除いた残りを60分延長と推測）
+      if (setN <= 1) return `${setN}セット`;
+      return `${setN}セット<span style="color:#888; font-size:11px; margin-left:6px;">（初回 + 60分延長×${setN - 1}）</span>`;
+    }
+    // 新データ：内訳を集計（min毎にカウント、自動／手動を区別）
+    const tally = {}; // key: `${min}|${auto}` -> count
+    extensions.forEach(e => {
+      const key = `${e.min}|${e.auto ? 'auto' : 'manual'}`;
+      tally[key] = (tally[key] || 0) + 1;
+    });
+    const parts = Object.keys(tally).sort().map(k => {
+      const [minStr, kind] = k.split('|');
+      const c = tally[k];
+      const autoMark = (kind === 'auto') ? '🔁' : '＋';
+      return `${autoMark}${minStr}分×${c}`;
+    });
+    const isAllAuto = extensions.every(e => e.auto);
+    const autoLabel = isAllAuto ? '<span style="color:#b8860b; font-size:11px; margin-left:6px;">（すべて自動延長）</span>' : '';
+    return `${setN}セット　<span style="color:#666; font-size:12px;">${parts.join(' / ')}</span>${autoLabel}`;
+  })();
+
   const bg = document.createElement('div');
   bg.className = 'modal-bg active';
   bg.style.zIndex = 1700;
@@ -2315,7 +2501,7 @@ function showVisitDetail(logId) {
           <tr><td style="color:#888; vertical-align:top;">時間帯</td><td>${startStr} 〜 ${endStr}　<span style="color:#888;">(${durStr})</span></td></tr>
           <tr><td style="color:#888; vertical-align:top;">人数</td><td>${log.guests || 0}名</td></tr>
           <tr><td style="color:#888; vertical-align:top;">担当キャスト</td><td>${escapeHtml(allCasts)}</td></tr>
-          <tr><td style="color:#888; vertical-align:top;">セット数</td><td>${log.setCount || 1}セット</td></tr>
+          <tr><td style="color:#888; vertical-align:top;">セット数</td><td>${setBreakdownText}</td></tr>
           ${log.memo ? `<tr><td style="color:#888; vertical-align:top;">メモ</td><td style="white-space:pre-wrap;">${escapeHtml(log.memo)}</td></tr>` : ''}
         </table>
       </div>
@@ -2386,9 +2572,17 @@ function undoCheckout(logId) {
   }
   if (!confirm(`${getTableName(tableId)} の退店を取り消し、使用中状態に戻しますか？\n\n顧客：${escapeHtml(log.customerName || '（記録なし）')}\n入店：${(()=>{const d=new Date(log.startedAt);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()}\nセット：${log.setCount || 1}セット`)) return;
   const now = Date.now();
-  // 終了予定時刻を再計算（入店からセット数×SET_MINUTES）
+  // 終了予定時刻を再計算：初回60分 + 延長履歴の合計分
   const setCount = log.setCount || 1;
-  const endsAt = log.startedAt + setCount * SET_MINUTES * 60000;
+  const extensions = Array.isArray(log.extensions) ? log.extensions.slice() : [];
+  let totalMin = SET_MINUTES; // 初回1セット
+  if (extensions.length > 0) {
+    extensions.forEach(e => { totalMin += (e.min || 0); });
+  } else {
+    // 旧データ互換：extensionsが無いが setCount > 1 なら 60分×追加セット分を加算
+    totalMin = SET_MINUTES * Math.max(1, setCount);
+  }
+  const endsAt = log.startedAt + totalMin * 60000;
   // 卓を復活
   state.tables[tableId] = {
     occupied: true,
@@ -2402,7 +2596,8 @@ function undoCheckout(logId) {
     startedAt: log.startedAt,
     endsAt,
     setCount,
-    autoExtend: false,
+    extensions,
+    autoExtend: !!log.autoExtend,
     alertedWarn: false,
     alertedCritical: false,
     _updated: now,
@@ -3094,6 +3289,8 @@ function recordVisitLog(tableId, tdata) {
     startedAt: tdata.startedAt,
     endedAt: now,
     setCount: tdata.setCount || 1,
+    extensions: Array.isArray(tdata.extensions) ? tdata.extensions.slice() : [],
+    autoExtend: !!tdata.autoExtend,
     durationMin: Math.round((now - tdata.startedAt) / 60000),
     _created: now,
   };
@@ -3148,7 +3345,10 @@ function recordVisit(customerId, castIds, castNoms) {
   cust._updated = Date.now();
 }
 
-function updateTableTimers() {
+function updateTableTimers(renderUI) {
+  // renderUI: true なら画面のタイマー表示も更新する（フロアタブ表示中のみtrue）
+  // false でもアラート判定（残り15分通知など）は実行されるので、Pushは届く
+  if (renderUI === undefined) renderUI = true;
   // 1秒ごとに呼ばれる：使用中卓のタイマー表示更新＋アラートチェック
   let needRender = false;
   DEFAULT_TABLES.forEach(t => {
@@ -3186,7 +3386,7 @@ function updateTableTimers() {
     if (!tdata.alertedCritical && remainMs > 0 && remainMin <= ALERT_10_MIN) {
       tdata.alertedCritical = true;
       if (tdata.autoExtend) {
-        extendTable(t.id, 60);
+        extendTable(t.id, 60, { auto: true });
       }
       needRender = true;
     }
@@ -3194,6 +3394,9 @@ function updateTableTimers() {
   if (needRender) {
     persistSave();
   }
+
+  // 画面のタイマー表示更新（フロアタブ表示中のみ）
+  if (!renderUI) return;
 
   // タイマー表示だけ書き換え（カード全体は再描画しない＝チラつき防止）
   // ただし stage が切り替わるタイミングでは再描画したいので、簡易チェック
@@ -5058,6 +5261,8 @@ function renderSettings() {
   loadServerConfigUI();
   loadNotifPrefsUI();
   updatePushUI();
+  const vEl = document.getElementById('curAppVersion');
+  if (vEl) vEl.textContent = APP_VERSION;
 }
 // 通知設定UIにロード＆バインド
 function loadNotifPrefsUI() {
@@ -5090,6 +5295,82 @@ function loadNotifPrefsUI() {
 }
 function testNotification() {
   showToast('🔔 テスト通知：これは通知の動作確認です', 'info');
+}
+// 残り15分のPush通知を即座にテスト送信
+function testTimerPushFromSettings() {
+  if (!server.url || !server.token) {
+    alert('サーバー同期が未設定です。\nWeb Push を使うには、設定 → サーバー同期 を構成してください。');
+    return;
+  }
+  if (!pushState.subscribed) {
+    alert('Web Push が未許可です。\n設定 → 「🔔 通知を許可する」を先に押してください。');
+    return;
+  }
+  dispatchPushNotification({
+    title: '⏱ T1：残り15分（テスト）',
+    body: 'テストPush送信。実際のアラートではありません。',
+    type: 'timer',
+  });
+  showToast('テストPushを送信しました', 'normal');
+}
+
+// ===== リリースノート（What's New）モーダル =====
+function showReleaseNotes(forceAll) {
+  // forceAll: 設定から呼ばれた時は全リリース履歴を表示
+  // 未指定（起動時）：最新リリースが未読のときだけ、最新リリース1件を表示
+  let lastSeen = '';
+  try { lastSeen = localStorage.getItem(LS_LAST_SEEN_VERSION) || ''; } catch(e) {}
+
+  let notesToShow;
+  if (forceAll) {
+    notesToShow = RELEASE_NOTES;
+  } else {
+    // 既に最新を見ていれば何も出さない
+    if (lastSeen >= APP_VERSION) return false;
+    // 最新リリースだけ
+    notesToShow = RELEASE_NOTES.slice(0, 1);
+  }
+  if (notesToShow.length === 0) return false;
+
+  const blocksHtml = notesToShow.map((n) => {
+    const newBadge = (n.version > lastSeen)
+      ? '<span class="rn-newbadge">NEW</span>'
+      : '';
+    const itemsHtml = n.items.map(it => `<li>${escapeHtml(it)}</li>`).join('');
+    return `
+      <div class="rn-block">
+        <div class="rn-header">
+          <div class="rn-title">${escapeHtml(n.title)} ${newBadge}</div>
+          <div class="rn-version">v${escapeHtml(n.version)}　<span style="color:#888;">${escapeHtml(n.date)}</span></div>
+        </div>
+        <ul class="rn-items">${itemsHtml}</ul>
+      </div>
+    `;
+  }).join('');
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1800;
+  bg.innerHTML = `
+    <div class="modal rn-modal" style="max-width:480px; max-height:88vh; overflow-y:auto;">
+      <h3 style="margin-top:0;">✨ アップデートのお知らせ</h3>
+      <p style="font-size:12px; color:#888; margin:0 0 12px;">club 道〜TAO〜 ライト版POS の改良内容です</p>
+      ${blocksHtml}
+      <div style="margin-top:14px; display:flex; gap:8px;">
+        <button class="btn-main" data-rn-close style="flex:1;">確認しました</button>
+      </div>
+      <p style="font-size:11px; color:#888; margin:10px 0 0; text-align:center;">設定 → 📖 アップデート履歴 からいつでも見られます</p>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const close = () => {
+    // 最新バージョンを既読として記録
+    try { localStorage.setItem(LS_LAST_SEEN_VERSION, APP_VERSION); } catch(e) {}
+    bg.remove();
+  };
+  bg.querySelector('[data-rn-close]').addEventListener('click', close);
+  bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
+  return true;
 }
 
 // =====================================================
