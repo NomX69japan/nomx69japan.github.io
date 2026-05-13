@@ -547,6 +547,12 @@
   .cal-counts .cal-cc {
     color: #b87a00;
   }
+  .cal-icons {
+    font-size: 11px;
+    line-height: 1.1;
+    margin-top: 2px;
+    letter-spacing: -1px;
+  }
   .cal-legend {
     display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
     margin-top: 12px; font-size: 11px; color: var(--text-sub);
@@ -877,6 +883,22 @@
   }
   .nom-toggle .nom-btn.active.none {
     background: var(--text-muted); color: #fff; font-weight: 600;
+  }
+  /* 同伴トグル（キャスト行内） */
+  .dohan-toggle {
+    display: inline-flex; align-items: center; gap: 2px;
+    margin: 0 6px 0 0; padding: 3px 7px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: #fafafa; cursor: pointer;
+    font-size: 11px; color: var(--text-sub);
+    flex-shrink: 0;
+  }
+  .dohan-toggle input { display: none; }
+  .dohan-toggle.is-dohan {
+    background: #fff4d6;
+    border-color: #d4af37;
+    color: #8a6a0a;
+    font-weight: 600;
   }
 
   /* 予約凡例 */
@@ -1267,6 +1289,76 @@
   .cast-list-item input.rename, .staff-list-item input.rename {
     flex: 1; padding: 4px 8px; font-size: 12px;
   }
+  .cast-list-item .bday-input, .staff-list-item .bday-input {
+    width: 110px; padding: 4px 6px; font-size: 11px;
+    flex-shrink: 0;
+  }
+  /* スマホでは折り返す */
+  @media (max-width: 600px) {
+    .cast-list-item, .staff-list-item {
+      flex-wrap: wrap;
+    }
+    .cast-list-item .bday-input, .staff-list-item .bday-input {
+      width: 100%; order: 99;
+    }
+  }
+  /* ====== Event Management ====== */
+  .event-list-item {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 10px; background: var(--surface); border-radius: 6px;
+    margin-bottom: 6px; font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .event-list-main {
+    flex: 1; min-width: 0;
+  }
+  .event-list-title {
+    font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .event-list-range {
+    font-size: 11px; color: var(--text-sub); margin-top: 2px;
+  }
+  .event-active-badge {
+    display: inline-block;
+    background: #d4af37; color: #fff;
+    font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    font-weight: 600;
+  }
+  .event-add-form {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px;
+    background: #fff8e7;
+    border: 1px dashed #d4af37;
+    border-radius: 6px;
+  }
+  .event-add-form input[type="text"] { padding: 6px 8px; font-size: 13px; }
+  .event-date-row {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .event-date-row input[type="date"] { flex: 1; min-width: 110px; padding: 6px 8px; font-size: 13px; }
+  /* ====== 本日のお祝い・イベントバナー（フロア/シフト） ====== */
+  .today-events-banner {
+    background: linear-gradient(135deg, #fff4d6 0%, #f5e8c0 100%);
+    border: 1px solid #d4af37;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 6px 0 12px;
+    font-size: 13px;
+    color: #5a4500;
+    line-height: 1.6;
+  }
+  .today-events-banner .teb-row {
+    display: flex; gap: 6px; align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .today-events-banner .teb-label {
+    font-weight: 600; color: #8b6914;
+    flex-shrink: 0;
+  }
+  .today-events-banner .teb-empty {
+    color: #a89060; font-size: 11px;
+  }
   .small-label {
     font-size: 11px; color: var(--text-sub); display: inline-flex; align-items: center; gap: 4px;
   }
@@ -1557,6 +1649,7 @@
         <span style="color:#888; font-size:12px;" id="floorClock"></span>
       </div>
       <div id="todayShiftCountFloor" class="today-count-banner"></div>
+      <div id="todayEventsFloor"></div>
 
       <div class="floor-layout">
         <div class="floor-section">
@@ -1580,6 +1673,7 @@
         <span id="weekRangeLabel" style="margin-left:8px; color:#ccc; font-size:13px;"></span>
       </div>
       <div id="todayShiftCountShift" class="today-count-banner"></div>
+      <div id="todayEventsShift"></div>
       <div class="shift-wrap">
         <table class="shift" id="shiftTable"></table>
       </div>
@@ -1742,6 +1836,23 @@
       </details>
 
       <details class="settings-section">
+        <summary>🎉 イベント管理</summary>
+        <div class="body">
+          <div id="eventList" style="margin-bottom:8px;"></div>
+          <div class="event-add-form">
+            <input type="text" id="newEventTitle" placeholder="🎉 イベント名（例: 周年祭、Xmas）">
+            <div class="event-date-row">
+              <input type="date" id="newEventStart" title="開始日">
+              <span style="color:#888;">〜</span>
+              <input type="date" id="newEventEnd" title="終了日（省略時は当日のみ）">
+              <button class="btn btn-sm" onclick="addEvent()">＋ 追加</button>
+            </div>
+          </div>
+          <p style="color:#888; font-size:11px; margin-top:8px;">複数日にまたがるイベントは「終了日」を入力してください。1日だけのイベントは終了日を空欄でOK。</p>
+        </div>
+      </details>
+
+      <details class="settings-section">
         <summary>📖 アップデート履歴</summary>
         <div class="body">
           <button class="btn btn-sm" onclick="showReleaseNotes(true)">📖 過去のアップデートを見る</button>
@@ -1856,6 +1967,7 @@ function persistLoad() {
     if (data.shiftData) state.shiftData = data.shiftData;
     if (Array.isArray(data.reservations)) state.reservations = data.reservations;
     if (Array.isArray(data.visitLog)) state.visitLog = data.visitLog;
+    if (Array.isArray(data.events)) state.events = data.events;
   } catch(e) {
     console.error('persistLoad failed', e);
   }
@@ -1876,9 +1988,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.13';
+const APP_VERSION = '2026.05.14';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.14',
+    date: '2026-05-14',
+    title: '同伴・誕生日・イベント機能',
+    items: [
+      '入店モーダルに「同」トグルを追加しました。指名キャストの中で同伴したキャストにチェックするだけ。',
+      '履歴詳細に「同伴：A もも、ちえ」のように同伴情報が表示されます。履歴編集からも修正できます。',
+      'キャスト・スタッフに誕生日を登録できるようになりました（設定 → キャスト管理／スタッフ管理）。',
+      '設定に「🎉 イベント管理」を追加。複数日にまたがるイベント（周年祭、Xmas等）を登録できます。',
+      'カレンダー（履歴タブ）の各日付に 🎂（誕生日）🎉（イベント）アイコンを表示。日付タップで名前も確認できます。',
+      'フロア・シフトタブの本日出勤バナー下に「🎂 本日誕生日：◯◯」「🎉 イベント：××」が自動表示されます。',
+    ],
+  },
   {
     version: '2026.05.13',
     date: '2026-05-13',
@@ -1945,6 +2070,7 @@ const state = {
   shiftData: {},
   reservations: [],
   visitLog: [], // 退店時に記録される来店履歴
+  events: [],   // 店舗イベント（誕生日・記念日・キャンペーンなど。{id, title, startDate, endDate}）
   weekOffset: 0,
 };
 
@@ -2079,6 +2205,67 @@ function withSan(name) {
   return n ? `${n}様` : '';
 }
 
+// 「YYYY-MM-DD」「MM-DD」「YYYY/MM/DD」「4月15日」などから {mm, dd} を抽出。失敗時 null
+function parseBirthdayToMonthDay(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  // YYYY-MM-DD or YYYY/MM/DD
+  let m = s.match(/^(?:\d{4}[-\/])?(\d{1,2})[-\/](\d{1,2})$/);
+  if (m) {
+    const mm = parseInt(m[1], 10);
+    const dd = parseInt(m[2], 10);
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) return { mm, dd };
+  }
+  // 「4月15日」
+  m = s.match(/^(\d{1,2})月\s*(\d{1,2})日?$/);
+  if (m) {
+    const mm = parseInt(m[1], 10);
+    const dd = parseInt(m[2], 10);
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) return { mm, dd };
+  }
+  return null;
+}
+function birthdayMatchesDate(birthday, dateStr /* YYYY-MM-DD */) {
+  const md = parseBirthdayToMonthDay(birthday);
+  if (!md) return false;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return false;
+  return (parseInt(parts[1], 10) === md.mm) && (parseInt(parts[2], 10) === md.dd);
+}
+// 指定日付に該当する誕生日対象を返す
+// { casts: [...], staff: [...], customers: [...] } の3区分
+function getBirthdaysOnDate(dateStr) {
+  const result = { casts: [], staff: [], customers: [] };
+  (state.casts || []).forEach(c => {
+    if (!c.removed && birthdayMatchesDate(c.birthday, dateStr)) result.casts.push(c);
+  });
+  (state.staff || []).forEach(s => {
+    if (!s.removed && birthdayMatchesDate(s.birthday, dateStr)) result.staff.push(s);
+  });
+  (state.customers || []).forEach(c => {
+    if (!c.removed && birthdayMatchesDate(c.birthday, dateStr)) result.customers.push(c);
+  });
+  return result;
+}
+function hasBirthdayOnDate(dateStr) {
+  const b = getBirthdaysOnDate(dateStr);
+  return b.casts.length > 0 || b.staff.length > 0 || b.customers.length > 0;
+}
+// 指定日付に該当する開催中イベントを返す（startDate〜endDateの範囲内、両端を含む）
+function getEventsOnDate(dateStr) {
+  if (!Array.isArray(state.events)) return [];
+  return state.events.filter(ev => {
+    if (!ev || ev.removed) return false;
+    const s = ev.startDate || '';
+    const e = ev.endDate || s;
+    if (!s) return false;
+    return s <= dateStr && dateStr <= e;
+  });
+}
+function hasEventOnDate(dateStr) {
+  return getEventsOnDate(dateStr).length > 0;
+}
+
 // ---------- 時間セレクト生成（15分刻み・全日対応） ----------
 // Androidネイティブの<input type="time">はセット/OKボタンがない端末があるため、
 // 通常のセレクトボックスで時刻を選択させる。
@@ -2139,6 +2326,25 @@ function buildCastDisplay(source, includeFree) {
     parts.push((source.castFree || '').trim());
   }
   return parts.join(' / ');
+}
+
+// 「同伴：A もも、ちえ」形式の表示文字列を生成
+// 同伴対象キャスト（source.dohanCastIds）に対し、各キャストの指名種別を併記
+function buildDohanDisplay(source) {
+  if (!source) return '';
+  const dohanIds = (source.dohanCastIds || []).filter(Boolean);
+  if (dohanIds.length === 0) return '';
+  const castNoms = source.castNoms || {};
+  const parts = dohanIds.map(cid => {
+    const c = state.casts.find(x => x.id === cid);
+    const name = c ? c.name : '';
+    if (!name) return '';
+    const t = castNoms[cid];
+    if (t === 'A') return `A ${name}`;
+    if (t === 'B') return `B ${name}`;
+    return name;
+  }).filter(Boolean);
+  return parts.join('、');
 }
 
 // ---------- Login ----------
@@ -2336,6 +2542,8 @@ function checkIn(tableId, opts) {
   const castIds = opts.castIds || tdata.castIds || [];
   const castNoms = opts.castNoms || tdata.castNoms || {};
   const castFree = opts.castFree != null ? opts.castFree : (tdata.castFree || '');
+  const dohan = opts.dohan != null ? !!opts.dohan : !!tdata.dohan;
+  const dohanCastIds = (opts.dohanCastIds || tdata.dohanCastIds || []).slice();
   const memo = opts.memo != null ? opts.memo : (tdata.memo || '');
 
   // 「新規顧客として登録」が選ばれた場合
@@ -2376,6 +2584,8 @@ function checkIn(tableId, opts) {
     castIds,
     castNoms,
     castFree,
+    dohan,
+    dohanCastIds,
     customerId,
     customerName: customerId ? '' : customerName, // 顧客IDがあれば未紐付け名称はクリア
     memo,
@@ -2534,6 +2744,7 @@ function showVisitDetail(logId) {
           <tr><td style="color:#888; vertical-align:top;">時間帯</td><td>${startStr} 〜 ${endStr}　<span style="color:#888;">(${durStr})</span></td></tr>
           <tr><td style="color:#888; vertical-align:top;">人数</td><td>${log.guests || 0}名</td></tr>
           <tr><td style="color:#888; vertical-align:top;">担当キャスト</td><td>${escapeHtml(allCasts)}</td></tr>
+          ${log.dohan && (log.dohanCastIds||[]).length > 0 ? `<tr><td style="color:#888; vertical-align:top;">同伴</td><td><span style="background:#fff4d6; color:#8a6a0a; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">${escapeHtml(buildDohanDisplay(log) || 'あり')}</span></td></tr>` : ''}
           <tr><td style="color:#888; vertical-align:top;">セット数</td><td>${setBreakdownText}</td></tr>
           ${log.memo ? `<tr><td style="color:#888; vertical-align:top;">メモ</td><td style="white-space:pre-wrap;">${escapeHtml(log.memo)}</td></tr>` : ''}
         </table>
@@ -2623,6 +2834,8 @@ function undoCheckout(logId) {
     castIds: (log.castIds || []).slice(),
     castNoms: log.castNoms ? { ...log.castNoms } : {},
     castFree: log.castFree || '',
+    dohan: !!log.dohan,
+    dohanCastIds: Array.isArray(log.dohanCastIds) ? log.dohanCastIds.slice() : [],
     customerId: log.customerId || '',
     customerName: log.customerId ? '' : (log.customerName || ''),
     memo: log.memo || '',
@@ -2692,15 +2905,22 @@ function openVisitLogEditModal(logId) {
     return (a.name || '').localeCompare(b.name || '');
   });
 
+  const dohanIds = new Set(log.dohanCastIds || []);
+
   const castRowsHtml = castSorted.map(c => {
     const checked = includedIds.has(c.id);
     const nom = (log.castNoms && log.castNoms[c.id]) || 'none';
+    const isDohan = dohanIds.has(c.id);
     const trialMark = c.trial ? '<span style="background:#ffe0e6; color:#c2185b; font-size:10px; padding:1px 4px; border-radius:3px; margin-left:4px;">体験</span>' : '';
     return `
-      <div class="cast-pick-row" style="display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #f0ebe0;">
-        <label style="display:flex; align-items:center; flex:1; cursor:pointer;">
+      <div class="cast-pick-row" style="display:flex; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid #f0ebe0;">
+        <label style="display:flex; align-items:center; flex:1; cursor:pointer; min-width:0;">
           <input type="checkbox" class="vle-cast-pick" data-cast-pick="${c.id}" value="${c.id}" ${checked?'checked':''} style="margin-right:6px;">
           <span style="font-size:13px;">${escapeHtml(c.name)}${trialMark}</span>
+        </label>
+        <label class="dohan-toggle ${isDohan?'is-dohan':''}" data-vle-dohan-wrap="${c.id}" title="同伴" style="margin:0;">
+          <input type="checkbox" class="vle-cast-dohan" data-vle-dohan="${c.id}" ${isDohan?'checked':''}>
+          <span>同</span>
         </label>
         <div class="nom-toggle" data-vle-nom-toggle="${c.id}" style="display:flex; gap:2px;">
           <button type="button" class="nom-btn ${nom==='A'?'active a':''}" data-nom="A" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='A'?'#ffd54f':'#fafafa'}; cursor:pointer;">A</button>
@@ -2847,6 +3067,23 @@ function openVisitLogEditModal(logId) {
             noneBtn.style.background = '#e0e0e0';
           }
         }
+        // 同伴チェックもOFF
+        const dohanCb = bg.querySelector(`input.vle-cast-dohan[data-vle-dohan="${cid}"]`);
+        if (dohanCb) {
+          dohanCb.checked = false;
+          dohanCb.closest('.dohan-toggle')?.classList.remove('is-dohan');
+        }
+      }
+    });
+  });
+  // 同伴チェック表示更新＆指名チェック自動ON
+  bg.querySelectorAll('input.vle-cast-dohan').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const cid = cb.getAttribute('data-vle-dohan');
+      cb.closest('.dohan-toggle')?.classList.toggle('is-dohan', cb.checked);
+      if (cb.checked) {
+        const pick = bg.querySelector(`input.vle-cast-pick[data-cast-pick="${cid}"]`);
+        if (pick && !pick.checked) pick.checked = true;
       }
     });
   });
@@ -2901,6 +3138,11 @@ function saveVisitLogEdit(logId, bg) {
     const nom = activeBtn.getAttribute('data-nom');
     if (nom === 'A' || nom === 'B') castNoms[cid] = nom;
   });
+  // 同伴キャスト（指名チェック中のキャストに限定）
+  const dohanCastIds = Array.from(bg.querySelectorAll('input.vle-cast-dohan:checked'))
+    .map(el => el.getAttribute('data-vle-dohan'))
+    .filter(cid => castIds.includes(cid));
+  const dohan = dohanCastIds.length > 0;
 
   // 時刻のタイムスタンプ化（log.dateをベースに）
   // log.date は営業日。営業日 = (実日時) - 1時間 の日付なので、
@@ -2940,6 +3182,8 @@ function saveVisitLogEdit(logId, bg) {
   log.castIds = castIds;
   log.castNoms = castNoms;
   log.castFree = castFree;
+  log.dohan = dohan;
+  log.dohanCastIds = dohanCastIds;
   log.memo = memo;
   log.startedAt = newStartedAt;
   log.endedAt = newEndedAt;
@@ -3126,8 +3370,14 @@ function renderTodaySummary() {
     const todayCls = isToday ? ' cal-today' : '';
     const futureCls = isFuture ? ' cal-future' : '';
     const hasDataCls = (visitCount > 0) ? ' cal-has-visit' : '';
+    // 誕生日・イベントアイコン
+    const iconParts = [];
+    if (hasBirthdayOnDate(dateStr)) iconParts.push('🎂');
+    if (hasEventOnDate(dateStr)) iconParts.push('🎉');
+    const iconsLine = iconParts.length ? `<div class="cal-icons">${iconParts.join('')}</div>` : '';
     html += `<div class="cal-day${wdayCls}${todayCls}${futureCls}${hasDataCls}" onclick="showDayDetailModal('${dateStr}')">
       <div class="cal-day-num">${day}</div>
+      ${iconsLine}
       ${countLine}
     </div>`;
   });
@@ -3137,6 +3387,8 @@ function renderTodaySummary() {
   html += `<div class="cal-legend">
     <span><span class="dot dot-vc"></span>来店組数</span>
     <span><span class="dot dot-cc"></span>キャスト出勤数</span>
+    <span>🎂 誕生日</span>
+    <span>🎉 イベント</span>
     <span style="color:#888;">日付タップで詳細表示</span>
   </div>`;
 
@@ -3203,7 +3455,28 @@ function showDayDetailModal(dateStr) {
     }
   });
 
-  let bodyHtml = statsHtml;
+  // 誕生日・イベント
+  const bdays = getBirthdaysOnDate(dateStr);
+  const events = getEventsOnDate(dateStr);
+  let celebrationHtml = '';
+  const celebRows = [];
+  if (bdays.casts.length > 0) {
+    celebRows.push(`<div class="teb-row"><span class="teb-label">🎂 キャスト誕生日：</span><span>${bdays.casts.map(c => escapeHtml(c.name)).join('、')}</span></div>`);
+  }
+  if (bdays.staff.length > 0) {
+    celebRows.push(`<div class="teb-row"><span class="teb-label">🎂 スタッフ誕生日：</span><span>${bdays.staff.map(s => escapeHtml(s.name)).join('、')}</span></div>`);
+  }
+  if (bdays.customers.length > 0) {
+    celebRows.push(`<div class="teb-row"><span class="teb-label">🎂 お客様誕生日：</span><span>${bdays.customers.map(c => escapeHtml(withSan(displayName(c)))).join('、')}</span></div>`);
+  }
+  if (events.length > 0) {
+    celebRows.push(`<div class="teb-row"><span class="teb-label">🎉 イベント：</span><span>${events.map(e => escapeHtml(e.title)).join('、')}</span></div>`);
+  }
+  if (celebRows.length > 0) {
+    celebrationHtml = `<div class="today-events-banner">${celebRows.join('')}</div>`;
+  }
+
+  let bodyHtml = celebrationHtml + statsHtml;
   if (sum.allEntries.length === 0) {
     bodyHtml += '<div class="today-empty">この日の来店記録はありません</div>';
   } else {
@@ -3318,6 +3591,8 @@ function recordVisitLog(tableId, tdata) {
     castIds: (tdata.castIds || []).slice(),
     castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
     castFree: tdata.castFree || '',
+    dohan: !!tdata.dohan,
+    dohanCastIds: Array.isArray(tdata.dohanCastIds) ? tdata.dohanCastIds.slice() : [],
     memo: tdata.memo || '',
     startedAt: tdata.startedAt,
     endedAt: now,
@@ -3578,12 +3853,17 @@ function openTableModal(tableId) {
     .map(c => {
       const checked = (tdata.castIds || []).includes(c.id) ? 'checked' : '';
       const cur = (tdata.castNoms && tdata.castNoms[c.id]) || 'none';
+      const isDohan = (tdata.dohanCastIds || []).includes(c.id);
       // 指名種別トグル：A / B / なし（チェックOFFのときは無効化見た目）
       const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
       return `<div class="cast-pick-row" data-cast-id="${c.id}">
         <label class="small-label" style="margin:0; flex:1; min-width:0;">
           <input type="checkbox" value="${c.id}" ${checked} class="cast-pick" data-cast-pick="${c.id}">
           ${escapeHtml(c.name)}${trialBadge}
+        </label>
+        <label class="small-label dohan-toggle ${isDohan?'is-dohan':''}" title="同伴">
+          <input type="checkbox" class="cast-dohan-pick" data-cast-dohan="${c.id}" ${isDohan?'checked':''}>
+          <span>同</span>
         </label>
         <div class="nom-toggle" data-cast-nom-toggle="${c.id}">
           <button type="button" class="nom-btn ${cur==='A'?'active a':''}" data-nom="A">A</button>
@@ -3762,6 +4042,25 @@ function openTableModal(tableId) {
             b.classList.remove('active', 'a', 'b', 'none');
           });
         }
+        // 同伴チェックもOFFにする
+        const dohanCb = document.querySelector(`#tableModalBody input.cast-dohan-pick[data-cast-dohan="${castId}"]`);
+        if (dohanCb) {
+          dohanCb.checked = false;
+          dohanCb.closest('.dohan-toggle')?.classList.remove('is-dohan');
+        }
+      }
+    });
+  });
+  // 同伴チェックボックスのトグル表示更新＆指名チェックを自動ON
+  document.querySelectorAll('#tableModalBody input.cast-dohan-pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const castId = cb.getAttribute('data-cast-dohan');
+      const wrap = cb.closest('.dohan-toggle');
+      if (wrap) wrap.classList.toggle('is-dohan', cb.checked);
+      if (cb.checked) {
+        // 同伴ONなら指名チェックも自動的にON
+        const pickCb = document.querySelector(`#tableModalBody input.cast-pick[data-cast-pick="${castId}"]`);
+        if (pickCb && !pickCb.checked) pickCb.checked = true;
       }
     });
   });
@@ -3842,7 +4141,10 @@ function checkInFromModal() {
       createNewCustomer: data.createNewCustomer,
       guests: data.guests,
       castIds: data.castIds,
+      castNoms: data.castNoms,
       castFree: data.castFree,
+      dohan: data.dohan,
+      dohanCastIds: data.dohanCastIds,
       memo: data.memo,
       startTime: data.startTime,
     });
@@ -3934,9 +4236,14 @@ function readTableModalForm() {
     // 'none' のときは castNoms に入れない（指名なし扱い）
   });
   const castFree = (document.getElementById('tblCastFree')?.value || '').trim();
+  // 同伴キャスト（指名キャストの中で同伴チェックONのもの）
+  const dohanCastIds = Array.from(document.querySelectorAll('#tableModalBody .cast-dohan-pick:checked')).map(el => el.getAttribute('data-cast-dohan'));
+  // 指名チェックが入っているキャストのみに限定
+  const dohanCastIdsFiltered = dohanCastIds.filter(cid => castIds.includes(cid));
+  const dohan = dohanCastIdsFiltered.length > 0;
   const memo = document.getElementById('tblMemo')?.value || '';
   const startTime = document.getElementById('tblStartTime')?.value || '';
-  return { customerId, customerName, createNewCustomer, guests, castIds, castNoms, castFree, memo, startTime };
+  return { customerId, customerName, createNewCustomer, guests, castIds, castNoms, castFree, dohan, dohanCastIds: dohanCastIdsFiltered, memo, startTime };
 }
 
 function saveTableInternal(closeAfter) {
@@ -3977,6 +4284,8 @@ function saveTableInternal(closeAfter) {
     castIds: data.castIds,
     castNoms: data.castNoms || {},
     castFree: data.castFree,
+    dohan: !!data.dohan,
+    dohanCastIds: (data.dohanCastIds || []).slice(),
     customerId,
     customerName: customerId ? '' : customerName,
     memo: data.memo,
@@ -4250,6 +4559,28 @@ function updateTodayShiftCount() {
   const sEl = document.getElementById('todayShiftCountShift');
   if (fEl) { fEl.innerHTML = html; fEl.className = cls; }
   if (sEl) { sEl.innerHTML = html; sEl.className = cls; }
+
+  // 本日のお祝い・イベントバナー
+  const bdays = getBirthdaysOnDate(todayStr);
+  const events = getEventsOnDate(todayStr);
+  const rows = [];
+  if (bdays.casts.length > 0) {
+    rows.push(`<div class="teb-row"><span class="teb-label">🎂 キャスト誕生日：</span><span>${bdays.casts.map(c => escapeHtml(c.name)).join('、')}</span></div>`);
+  }
+  if (bdays.staff.length > 0) {
+    rows.push(`<div class="teb-row"><span class="teb-label">🎂 スタッフ誕生日：</span><span>${bdays.staff.map(s => escapeHtml(s.name)).join('、')}</span></div>`);
+  }
+  if (bdays.customers.length > 0) {
+    rows.push(`<div class="teb-row"><span class="teb-label">🎂 お客様誕生日：</span><span>${bdays.customers.map(c => escapeHtml(withSan(displayName(c)))).join('、')}</span></div>`);
+  }
+  if (events.length > 0) {
+    rows.push(`<div class="teb-row"><span class="teb-label">🎉 イベント：</span><span>${events.map(e => escapeHtml(e.title)).join('、')}</span></div>`);
+  }
+  const evHtml = rows.length > 0 ? `<div class="today-events-banner">${rows.join('')}</div>` : '';
+  const efEl = document.getElementById('todayEventsFloor');
+  const esEl = document.getElementById('todayEventsShift');
+  if (efEl) efEl.innerHTML = evHtml;
+  if (esEl) esEl.innerHTML = evHtml;
 }
 
 // ---------- CUSTOMERS ----------
@@ -5301,6 +5632,7 @@ function renderSettings() {
   loadServerConfigUI();
   loadNotifPrefsUI();
   updatePushUI();
+  renderEventListUI();
   const vEl = document.getElementById('curAppVersion');
   if (vEl) vEl.textContent = APP_VERSION;
 }
@@ -5716,6 +6048,7 @@ function renderCastListUI() {
   root.innerHTML = list.map(c => `
     <div class="cast-list-item ${c.trial?'trial':''}">
       <input type="text" class="rename" value="${escapeHtml(c.name)}" onchange="renameCast('${c.id}', this.value)">
+      <input type="text" class="bday-input" placeholder="🎂 例: 04-15" value="${escapeHtml(c.birthday||'')}" onchange="setCastBirthday('${c.id}', this.value)" title="誕生日（MM-DD または YYYY-MM-DD）">
       <label class="small-label">
         <input type="checkbox" ${c.trial?'checked':''} onchange="toggleTrial('${c.id}', this.checked)"> 体験
       </label>
@@ -5724,6 +6057,13 @@ function renderCastListUI() {
       <button class="btn-danger btn-sm" onclick="removeCast('${c.id}')">削除</button>
     </div>
   `).join('');
+}
+function setCastBirthday(id, val) {
+  const c = state.casts.find(x => x.id === id);
+  if (!c) return;
+  c.birthday = (val || '').trim();
+  c._updated = Date.now();
+  persistSave();
 }
 function renameCast(id, name) {
   const c = state.casts.find(x => x.id === id);
@@ -5776,9 +6116,82 @@ function renderStaffListUI() {
   root.innerHTML = list.map(s => `
     <div class="staff-list-item">
       <input type="text" class="rename" value="${escapeHtml(s.name)}" onchange="renameStaff('${s.id}', this.value)">
+      <input type="text" class="bday-input" placeholder="🎂 例: 04-15" value="${escapeHtml(s.birthday||'')}" onchange="setStaffBirthday('${s.id}', this.value)" title="誕生日（MM-DD または YYYY-MM-DD）">
       <button class="btn-danger btn-sm" onclick="removeStaff('${s.id}')">削除</button>
     </div>
   `).join('');
+}
+function setStaffBirthday(id, val) {
+  const s = state.staff.find(x => x.id === id);
+  if (!s) return;
+  s.birthday = (val || '').trim();
+  s._updated = Date.now();
+  persistSave();
+}
+
+// ---------- Events ----------
+function addEvent() {
+  const title = (document.getElementById('newEventTitle').value || '').trim();
+  const start = document.getElementById('newEventStart').value;
+  const end = document.getElementById('newEventEnd').value;
+  if (!title) { alert('イベント名を入力してください'); return; }
+  if (!start) { alert('開始日を入力してください'); return; }
+  const startDate = start;
+  const endDate = end && end >= start ? end : startDate;
+  if (!Array.isArray(state.events)) state.events = [];
+  state.events.push({
+    id: genId('event'),
+    title,
+    startDate,
+    endDate,
+    _created: Date.now(),
+    _updated: Date.now(),
+    removed: false,
+  });
+  document.getElementById('newEventTitle').value = '';
+  document.getElementById('newEventStart').value = '';
+  document.getElementById('newEventEnd').value = '';
+  persistSave();
+  renderEventListUI();
+  // カレンダー再描画（履歴タブ表示中なら反映）
+  if (typeof renderTodaySummary === 'function') renderTodaySummary();
+}
+function removeEvent(id) {
+  const ev = (state.events || []).find(e => e.id === id);
+  if (!ev) return;
+  if (!confirm(`「${ev.title}」を削除しますか？`)) return;
+  ev.removed = true;
+  ev._updated = Date.now();
+  persistSave();
+  renderEventListUI();
+  if (typeof renderTodaySummary === 'function') renderTodaySummary();
+}
+function renderEventListUI() {
+  const root = document.getElementById('eventList');
+  if (!root) return;
+  const list = (state.events || []).filter(e => !e.removed)
+    .sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  if (list.length === 0) {
+    root.innerHTML = '<p style="color:#888; font-size:12px; margin:0;">登録されたイベントはありません</p>';
+    return;
+  }
+  const todayStr = currentBusinessDate();
+  root.innerHTML = list.map(ev => {
+    const range = (ev.endDate && ev.endDate !== ev.startDate)
+      ? `${ev.startDate} 〜 ${ev.endDate}`
+      : ev.startDate;
+    const isActive = ev.startDate <= todayStr && todayStr <= (ev.endDate || ev.startDate);
+    const activeBadge = isActive ? '<span class="event-active-badge">開催中</span>' : '';
+    return `
+      <div class="event-list-item">
+        <div class="event-list-main">
+          <div class="event-list-title">🎉 ${escapeHtml(ev.title)} ${activeBadge}</div>
+          <div class="event-list-range">${escapeHtml(range)}</div>
+        </div>
+        <button class="btn-danger btn-sm" onclick="removeEvent('${ev.id}')">削除</button>
+      </div>
+    `;
+  }).join('');
 }
 function renameStaff(id, name) {
   const s = state.staff.find(x => x.id === id);
@@ -5804,6 +6217,7 @@ function exportBackup() {
     shiftData: state.shiftData,
     reservations: state.reservations,
     visitLog: state.visitLog,
+    events: state.events,
     _exportedAt: Date.now()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -5831,6 +6245,7 @@ function importBackup(e) {
       if (data.shiftData) state.shiftData = data.shiftData;
       if (Array.isArray(data.reservations)) state.reservations = data.reservations;
       if (Array.isArray(data.visitLog)) state.visitLog = data.visitLog;
+      if (Array.isArray(data.events)) state.events = data.events;
       persistSave();
       alert('復元しました');
       location.reload();
@@ -6180,6 +6595,7 @@ function buildSaveData() {
     shiftData: state.shiftData,
     reservations: state.reservations,
     visitLog: state.visitLog,
+    events: state.events,
     _updatedAt: Date.now()
   };
 }
