@@ -791,6 +791,14 @@
   table.shift td.shift-cell.off {
     color: var(--text-muted);
   }
+  table.shift td.shift-cell.off-x {
+    background: #fceaea !important;
+    color: #b04040;
+    font-weight: bold;
+  }
+  table.shift td.shift-cell.unanswered {
+    color: #bbb;
+  }
   /* シフトセルが予約日 */
   table.shift td.shift-cell.has-resv {
     background: #fff4d6 !important;
@@ -1586,10 +1594,10 @@
         </span>
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
-        セルをタップで切替：— → ○（出勤）→ △（未定）→ —（休み）<br>
+        セルをタップで切替：- (未回答) → ○ (出勤) → △ (未定) → ✗ (休み) → - (未回答)<br>
         予約マーカーがある日は ○ や ① ② ③ を省略しマーカーだけ表示。<br>
         ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ○ ）。<br>
-        △（未定）は出勤扱いとしてカウントされません。
+        ○ のみが出勤扱いとしてカウントされます（△ ✗ - はカウント外）。
       </p>
     </section>
 
@@ -1868,9 +1876,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.12';
+const APP_VERSION = '2026.05.13';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.13',
+    date: '2026-05-13',
+    title: '「様」自動付与＆シフト4状態',
+    items: [
+      '「○○様様」のように「様」が二重表示される問題を修正しました。顧客名から末尾の「様」を自動で除去し、表示時にだけ「様」を付け加えます。',
+      '顧客名を登録するときは「様」抜きで入力してください（残っていた「様」は次回保存時に自動で除去されます）。',
+      'シフト管理が4状態になりました：○ 出勤、△ 未定、✗ 休み、- 未回答（タップでループ）。',
+      '予約画面のシフト警告を「出勤が未確定です」に変更しました（「未登録」だと意味が分かりづらかったため）。',
+    ],
+  },
   {
     version: '2026.05.12',
     date: '2026-05-12',
@@ -2017,21 +2036,23 @@ function shiftKey(dateStr, castId) {
   return `${dateStr}_${castId}`;
 }
 function getShift(dateStr, castId) {
-  // 出勤判定（true=出勤確定、false=休みor未定）
+  // 出勤判定（true=出勤確定、それ以外=休みor未定or未回答）
   return state.shiftData[shiftKey(dateStr, castId)] === true;
 }
 function getShiftStatus(dateStr, castId) {
-  // 'on' | 'pending' | 'off'
+  // 'on' | 'pending' | 'off' | 'unanswered'
   const v = state.shiftData[shiftKey(dateStr, castId)];
   if (v === true) return 'on';
   if (v === 'pending') return 'pending';
-  return 'off';
+  if (v === 'off') return 'off';
+  return 'unanswered';
 }
 function setShift(dateStr, castId, val) {
-  // val: true=出勤 / 'pending'=未定 / falsy=休み
+  // val: true=出勤 / 'pending'=未定 / 'off'=休み / falsy(undefined/null/false)=未回答（キー削除）
   const k = shiftKey(dateStr, castId);
   if (val === true) state.shiftData[k] = true;
   else if (val === 'pending') state.shiftData[k] = 'pending';
+  else if (val === 'off') state.shiftData[k] = 'off';
   else delete state.shiftData[k];
 }
 
@@ -2044,6 +2065,18 @@ function genId(prefix) {
 function displayName(cust) {
   if (!cust) return '';
   return (cust.nickname && cust.nickname.trim()) ? cust.nickname.trim() : (cust.name || '');
+}
+
+// 末尾の「様」「さま」「サマ」を取り除いて純粋な名前を返す
+function stripHonorific(name) {
+  if (!name) return '';
+  return String(name).replace(/[\s　]*(?:様|さま|サマ)[\s　]*$/, '').trim();
+}
+
+// 名前に「様」を付与した表示文字列を返す（既に末尾が様/さま/サマ なら付け直し）
+function withSan(name) {
+  const n = stripHonorific(name);
+  return n ? `${n}様` : '';
 }
 
 // ---------- 時間セレクト生成（15分刻み・全日対応） ----------
@@ -2279,7 +2312,7 @@ function buildTableCard(t, tdata) {
       <span class="badge-on">使用中</span>
     </div>
     <div class="info">
-      ${customerName ? `<b>${escapeHtml(customerName)}</b><br>` : ''}
+      ${customerName ? `<b>${escapeHtml(withSan(customerName))}</b><br>` : ''}
       ${tdata.guests ? `👥 ${tdata.guests}名<br>` : ''}
       ${allCastDisp ? `🌹 ${escapeHtml(allCastDisp)}` : ''}
     </div>
@@ -2370,7 +2403,7 @@ function checkIn(tableId, opts) {
       : (customerName || 'お客様');
     // 指名種別を反映した担当者表示
     const castDisp = buildCastDisplay({ castIds, castNoms, castFree }, true);
-    let body = `${custDisplay}様`;
+    let body = withSan(custDisplay) || 'お客様';
     if (guests) body += ` (${guests}名)`;
     if (castDisp) body += ` 担当:${castDisp}`;
     dispatchPushNotification({
@@ -2460,7 +2493,7 @@ function showVisitDetail(logId) {
     : `${dur}分`;
   // 指名種別を反映した担当者表示
   const allCasts = buildCastDisplay(log, true) || '—';
-  const custName = log.customerName || '（記録なし）';
+  const custName = log.customerName || '';
 
   // セット数の内訳：初回1セット + 延長履歴の集計
   const setBreakdownText = (() => {
@@ -2496,7 +2529,7 @@ function showVisitDetail(logId) {
       <h3>📋 ${escapeHtml(log.date)} 来店詳細</h3>
       <div class="cust-detail-section" style="margin-top:8px;">
         <table style="width:100%; font-size:13px; line-height:1.9; border-collapse:collapse;">
-          <tr><td style="color:#888; width:90px; vertical-align:top;">お客様</td><td><b>${escapeHtml(custName)}</b></td></tr>
+          <tr><td style="color:#888; width:90px; vertical-align:top;">お客様</td><td><b>${escapeHtml(withSan(custName) || '（記録なし）')}</b></td></tr>
           <tr><td style="color:#888; vertical-align:top;">テーブル</td><td>${escapeHtml(log.tableName || log.tableId)}</td></tr>
           <tr><td style="color:#888; vertical-align:top;">時間帯</td><td>${startStr} 〜 ${endStr}　<span style="color:#888;">(${durStr})</span></td></tr>
           <tr><td style="color:#888; vertical-align:top;">人数</td><td>${log.guests || 0}名</td></tr>
@@ -2524,7 +2557,7 @@ function showVisitDetail(logId) {
     undoCheckout(logId);
   });
   bg.querySelector('[data-delete-log]').addEventListener('click', () => {
-    if (!confirm(`この来店記録を完全に削除しますか？\n\n${escapeHtml(custName)}（${log.date} ${startStr}〜${endStr}）\n\n※削除すると元に戻せません。`)) return;
+    if (!confirm(`この来店記録を完全に削除しますか？\n\n${withSan(custName) || '（記録なし）'}（${log.date} ${startStr}〜${endStr}）\n\n※削除すると元に戻せません。`)) return;
     deleteVisitLog(logId);
     bg.remove();
   });
@@ -2570,7 +2603,7 @@ function undoCheckout(logId) {
     alert(`${getTableName(tableId)} は現在使用中です。\n別のお客様が入店中のため、退店取消はできません。`);
     return;
   }
-  if (!confirm(`${getTableName(tableId)} の退店を取り消し、使用中状態に戻しますか？\n\n顧客：${escapeHtml(log.customerName || '（記録なし）')}\n入店：${(()=>{const d=new Date(log.startedAt);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()}\nセット：${log.setCount || 1}セット`)) return;
+  if (!confirm(`${getTableName(tableId)} の退店を取り消し、使用中状態に戻しますか？\n\n顧客：${withSan(log.customerName) || '（記録なし）'}\n入店：${(()=>{const d=new Date(log.startedAt);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()}\nセット：${log.setCount || 1}セット`)) return;
   const now = Date.now();
   // 終了予定時刻を再計算：初回60分 + 延長履歴の合計分
   const setCount = log.setCount || 1;
@@ -2687,8 +2720,8 @@ function openVisitLogEditModal(logId) {
         const sel = (c.id === log.customerId) ? ' selected' : '';
         const dn = displayName(c);
         const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
-          ? `${dn}（${c.name}）`
-          : dn;
+          ? `${withSan(dn)}（${stripHonorific(c.name)}）`
+          : withSan(dn);
         return `<option value="${c.id}"${sel}>${escapeHtml(label)}</option>`;
       }))
     .join('');
@@ -3197,7 +3230,7 @@ function showDayDetailModal(dateStr) {
           : `onclick="showVisitDetail('${v.id}')"`;
         bodyHtml += `<div class="today-visit-row" ${onclickAttr}>
           <div class="row-1">
-            <span class="name">${escapeHtml(v.customerName || '（記録なし）')}　<span style="color:#888; font-weight:normal; font-size:11px;">${v.guests || 0}名</span></span>
+            <span class="name">${escapeHtml(withSan(v.customerName) || '（記録なし）')}　<span style="color:#888; font-weight:normal; font-size:11px;">${v.guests || 0}名</span></span>
             <span class="time">${startStr} 〜 ${endStr}</span>
           </div>
           <div class="row-2">
@@ -3373,7 +3406,7 @@ function updateTableTimers(renderUI) {
           custLabel = tdata.customerName;
         }
         let body = '残り15分です';
-        if (custLabel) body = `${custLabel}様　${body}`;
+        if (custLabel) body = `${withSan(custLabel)}　${body}`;
         dispatchPushNotification({
           title: `⏱ ${t.name}：残り15分`,
           body,
@@ -3565,8 +3598,8 @@ function openTableModal(tableId) {
       const dn = displayName(c);
       // 本名と異なる場合は本名を併記
       const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
-        ? `${dn}（${c.name}）`
-        : dn;
+        ? `${withSan(dn)}（${stripHonorific(c.name)}）`
+        : withSan(dn);
       return `<option value="${c.id}" ${tdata.customerId===c.id?'selected':''}>${escapeHtml(label)}</option>`;
     })).join('');
 
@@ -4050,15 +4083,16 @@ function renderShift() {
           const marksHtml = buildResvMarks(resvTypes);
           // 出勤マーク：
           // - 出勤＋予約あり → マーカーのみ
-          // - 出勤のみ → ◯ または丸数字（体験キャストで実績1〜3回目）
+          // - 出勤 → ◯ または丸数字（体験キャストで実績1〜3回目）
           // - 未定 → △
-          // - 休み → —
+          // - 休み → ✗
+          // - 未回答 → -
           let cellContent;
           let cellClass;
-          if (on && hasResv) {
+          if (status === 'on' && hasResv) {
             cellContent = marksHtml;
             cellClass = 'on';
-          } else if (on) {
+          } else if (status === 'on') {
             let mark = '○';
             if (c.trial && trialPastShiftDates && dStr <= todayStr) {
               const idx = trialPastShiftDates.indexOf(dStr);
@@ -4068,12 +4102,15 @@ function renderShift() {
             }
             cellContent = mark;
             cellClass = 'on';
-          } else if (pending) {
+          } else if (status === 'pending') {
             cellContent = '△';
             cellClass = 'pending';
+          } else if (status === 'off') {
+            cellContent = '✗';
+            cellClass = 'off-x';
           } else {
-            cellContent = '—';
-            cellClass = 'off';
+            cellContent = '-';
+            cellClass = 'unanswered';
           }
           html += `<td class="shift-cell ${cellClass}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
         });
@@ -4092,7 +4129,8 @@ function renderShift() {
           let mark, cls;
           if (status === 'on') { mark = '○'; cls = 'on'; }
           else if (status === 'pending') { mark = '△'; cls = 'pending'; }
-          else { mark = '—'; cls = 'off'; }
+          else if (status === 'off') { mark = '✗'; cls = 'off-x'; }
+          else { mark = '-'; cls = 'unanswered'; }
           html += `<td class="shift-cell ${cls}" data-date="${dStr}" data-cast="${s.id}" onclick="toggleShift('${dStr}','${s.id}')">${mark}</td>`;
         });
         html += '</tr>';
@@ -4149,12 +4187,13 @@ function buildResvMarks(types) {
   return html;
 }
 function toggleShift(dateStr, castId) {
-  // 3状態サイクル：休み(off) → 出勤(on) → 未定(pending) → 休み(off)
+  // 4状態サイクル：未回答(-) → 出勤(◯) → 未定(△) → 休み(✗) → 未回答(-)
   const cur = getShiftStatus(dateStr, castId);
   let next;
-  if (cur === 'off') next = true;            // 休み → 出勤
-  else if (cur === 'on') next = 'pending';   // 出勤 → 未定
-  else next = false;                         // 未定 → 休み
+  if (cur === 'unanswered') next = true;          // 未回答 → 出勤
+  else if (cur === 'on') next = 'pending';        // 出勤 → 未定
+  else if (cur === 'pending') next = 'off';       // 未定 → 休み
+  else next = false;                              // 休み → 未回答
   setShift(dateStr, castId, next);
   recalcAllTrialCounts();
   persistSave();
@@ -4235,9 +4274,9 @@ function renderCustomerList() {
     const lastVisitStr = lastVisit ? lastVisit.date : '—';
     const visitCount = (c.visits||[]).length;
     const bottleCount = (c.bottles||[]).length;
-    const dispName = displayName(c) || '(無名)';
+    const dispName = withSan(displayName(c)) || '(無名)';
     // ニックネームありなら本名を控えめに併記
-    const subName = (c.nickname && c.nickname.trim() && c.name) ? `<span style="font-size:11px; color:#888; font-weight:normal; margin-left:6px;">(${escapeHtml(c.name)})</span>` : '';
+    const subName = (c.nickname && c.nickname.trim() && c.name) ? `<span style="font-size:11px; color:#888; font-weight:normal; margin-left:6px;">(${escapeHtml(withSan(c.name))})</span>` : '';
     return `<div class="cust-card" onclick="openCustomerModal('${c.id}')">
       <div class="nm">${escapeHtml(dispName)}${subName}</div>
       <div class="meta">
@@ -4448,11 +4487,11 @@ function rebuildCustomerModalBody(cust) {
       <h4>基本情報</h4>
       <label class="field">
         <span class="lab">名前 *</span>
-        <input type="text" id="cstName" value="${escapeHtml(cust.name||'')}">
+        <input type="text" id="cstName" value="${escapeHtml(stripHonorific(cust.name||''))}">
       </label>
       <label class="field">
         <span class="lab">ニックネーム（あれば優先表示）</span>
-        <input type="text" id="cstNickname" value="${escapeHtml(cust.nickname||'')}" placeholder="例: タカさん、Kちゃん">
+        <input type="text" id="cstNickname" value="${escapeHtml(stripHonorific(cust.nickname||''))}" placeholder="例: タカさん、Kちゃん">
       </label>
       <label class="field">
         <span class="lab">連絡先（電話/LINE等）</span>
@@ -4508,8 +4547,9 @@ function saveCustomer() {
   if (!custEditing) return;
   const n = document.getElementById('cstName').value.trim();
   if (!n) { alert('名前を入力してください'); return; }
-  custEditing.name = n;
-  custEditing.nickname = document.getElementById('cstNickname').value.trim();
+  // 末尾の「様」「さま」「サマ」は表示時に自動付与するため、保存時は取り除く
+  custEditing.name = stripHonorific(n);
+  custEditing.nickname = stripHonorific(document.getElementById('cstNickname').value.trim());
   custEditing.phone = document.getElementById('cstPhone').value.trim();
   custEditing.birthday = document.getElementById('cstBday').value.trim();
   custEditing.memo = document.getElementById('cstMemo').value;
@@ -4672,7 +4712,7 @@ function buildReservationCardHTML(r) {
       .map(cid => state.casts.find(c => c.id === cid)?.name || '')
       .filter(Boolean);
     if (offShiftCasts.length > 0) {
-      shiftWarn = `<div class="resv-warn-block">⚠ ${escapeHtml(offShiftCasts.join('・'))} は ${dateStr} のシフト未登録</div>`;
+      shiftWarn = `<div class="resv-warn-block">⚠ ${escapeHtml(offShiftCasts.join('・'))} は ${dateStr} の出勤が未確定です</div>`;
     } else {
       shiftWarn = `<span class="resv-tag ok-shift">✓ シフトOK</span>`;
     }
@@ -4714,7 +4754,7 @@ function buildReservationCardHTML(r) {
         <div class="resv-tags">${tagsHtml}${shiftWarn.startsWith('<span') ? shiftWarn : ''}</div>
       </div>
       <div class="resv-row-mid">
-        <b>${escapeHtml(customerName)}</b>
+        <b>${escapeHtml(withSan(customerName) || '(未登録)')}</b>
         ${r.guests ? ` / 👥 ${r.guests}名` : ''}
         ${castDisplay ? ` / 🌹 ${escapeHtml(castDisplay)}` : ''}
         ${tableLabel ? ` / 🪑 ${escapeHtml(tableLabel)}` : ''}
@@ -4950,8 +4990,8 @@ function openReservationModal(id) {
     .concat(state.customers.filter(c => !c.removed).map(c => {
       const dn = displayName(c);
       const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
-        ? `${dn}（${c.name}）`
-        : dn;
+        ? `${withSan(dn)}（${stripHonorific(c.name)}）`
+        : withSan(dn);
       return `<option value="${c.id}" ${r.customerId === c.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
     })).join('');
 
@@ -5236,7 +5276,7 @@ function saveReservation() {
       }
       const cust = customerId ? state.customers.find(c => c.id === customerId) : null;
       const custName = cust ? displayName(cust) : (customerName || 'お客様');
-      let body = `${custName}様`;
+      let body = withSan(custName) || 'お客様';
       if (timeStr) body = `${timeStr} ${body}`;
       if (guests) body += ` (${guests}名)`;
       dispatchPushNotification({
@@ -6095,7 +6135,7 @@ function detectAndNotifyChanges(snap) {
       }
       const castNames = buildCastDisplay(after, true);
       let msg = `🟢 ${tName} 入店`;
-      if (custLabel) msg += `: ${custLabel}様`;
+      if (custLabel) msg += `: ${withSan(custLabel)}`;
       if (after.guests) msg += ` (${after.guests}名)`;
       if (castNames) msg += ` 担当:${castNames}`;
       showToast(msg, 'checkin');
@@ -6124,7 +6164,7 @@ function detectAndNotifyChanges(snap) {
         const custName = cust ? displayName(cust) : (r.customerName || '');
         let msg = `📖 新規予約`;
         if (timeStr) msg += ` ${timeStr}`;
-        if (custName) msg += ` ${custName}様`;
+        if (custName) msg += ` ${withSan(custName)}`;
         showToast(msg, 'resv');
       }
     });
