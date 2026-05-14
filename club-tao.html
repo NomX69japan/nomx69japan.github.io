@@ -1988,9 +1988,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.14';
+const APP_VERSION = '2026.05.14b';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.14b',
+    date: '2026-05-14',
+    title: '重要修正：データ同期＆自動延長',
+    items: [
+      '🐛 イベント情報がサーバー同期されないバグを修正しました。',
+      '🐛 まれに来店ログ・イベントがアプリ再起動で消えることがあるバグを修正しました。',
+      '自動延長の発火タイミングを「時間切れの瞬間」に変更しました（これまでは残り10分で発火していたため、退店時の合計が1セット余分になることがありました）。',
+      '退店処理時、実滞在時間に合わない余分な自動延長を自動的に取り除くようになりました。例：4時間ちょうど退店なら自動的に「4セット（初回 + 60×3）」として記録されます。',
+    ],
+  },
   {
     version: '2026.05.14',
     date: '2026-05-14',
@@ -3580,6 +3591,24 @@ function recordVisitLog(tableId, tdata) {
     const c = state.customers.find(x => x.id === tdata.customerId);
     if (c) custName = displayName(c);
   }
+  // 実滞在時間に基づき、余分な「自動延長」を末尾から削除する
+  // 例：3時間ジャストで自動延長1回多く走っていた場合、最後の自動延長を取り消す
+  const durationMin = Math.round((now - tdata.startedAt) / 60000);
+  const neededSets = Math.max(1, Math.ceil(durationMin / SET_MINUTES));
+  let extensions = Array.isArray(tdata.extensions) ? tdata.extensions.slice() : [];
+  let setCount = tdata.setCount || 1;
+  // setCount = 1（初回） + extensions.length なので、neededSets - 1 が必要な延長数
+  const neededExtensions = neededSets - 1;
+  while (extensions.length > neededExtensions && setCount > neededSets) {
+    // 末尾が自動延長なら削除（手動延長は残す）
+    const last = extensions[extensions.length - 1];
+    if (last && last.auto) {
+      extensions.pop();
+      setCount--;
+    } else {
+      break;
+    }
+  }
   const log = {
     id: genId('vlog'),
     date,
@@ -3596,10 +3625,10 @@ function recordVisitLog(tableId, tdata) {
     memo: tdata.memo || '',
     startedAt: tdata.startedAt,
     endedAt: now,
-    setCount: tdata.setCount || 1,
-    extensions: Array.isArray(tdata.extensions) ? tdata.extensions.slice() : [],
+    setCount,
+    extensions,
     autoExtend: !!tdata.autoExtend,
-    durationMin: Math.round((now - tdata.startedAt) / 60000),
+    durationMin,
     _created: now,
   };
   if (!Array.isArray(state.visitLog)) state.visitLog = [];
@@ -3690,8 +3719,9 @@ function updateTableTimers(renderUI) {
       }
       needRender = true;
     }
-    // 残り10分：自動延長フラグONなら無告知で延長（モーダル・通知なし）
-    if (!tdata.alertedCritical && remainMs > 0 && remainMin <= ALERT_10_MIN) {
+    // 残り10分：色が赤くなる目印として使う（自動延長は時間切れ時に発火）
+    // 残り0分（時間切れの瞬間）：自動延長フラグONなら無告知で延長（モーダル・通知なし）
+    if (!tdata.alertedCritical && remainMs <= 0) {
       tdata.alertedCritical = true;
       if (tdata.autoExtend) {
         extendTable(t.id, 60, { auto: true });
@@ -6491,12 +6521,27 @@ function applyServerData(payload) {
       }
     });
   }
+  // イベント（events）：IDベースで _updated 比較マージ
+  if (Array.isArray(payload.events)) {
+    if (!Array.isArray(state.events)) state.events = [];
+    payload.events.forEach(re => {
+      const idx = state.events.findIndex(e => e.id === re.id);
+      if (idx >= 0) {
+        if ((re._updated || 0) >= (state.events[idx]._updated || 0)) {
+          state.events[idx] = re;
+        }
+      } else {
+        state.events.push(re);
+      }
+    });
+  }
   // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
   try { localStorage.setItem(LS_KEY, JSON.stringify({
     pin: state.pin, casts: state.casts, staff: state.staff,
     customers: state.customers, tables: state.tables, shiftData: state.shiftData,
     reservations: state.reservations,
     visitLog: state.visitLog,
+    events: state.events,
     _updatedAt: Date.now()
   })); } catch(e) {}
 
@@ -6718,6 +6763,8 @@ try {
     pin: state.pin, casts: state.casts, staff: state.staff,
     customers: state.customers, tables: state.tables, shiftData: state.shiftData,
     reservations: state.reservations,
+    visitLog: state.visitLog,
+    events: state.events,
     _updatedAt: Date.now()
   }));
 } catch(e) {}
