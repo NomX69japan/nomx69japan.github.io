@@ -901,6 +901,59 @@
     font-weight: 600;
   }
 
+  /* ====== 複数顧客カード（入店モーダル） ====== */
+  .guest-card-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .guest-card {
+    border: 1px solid #d4af37;
+    border-radius: 8px;
+    background: #fffbf2;
+    padding: 10px 12px;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .guest-card.exited {
+    opacity: 0.55;
+    background: #f5f0e3;
+    border-color: #c0b890;
+  }
+  .guest-card-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed #e0c060;
+  }
+  .guest-card-num {
+    font-size: 12px; font-weight: 700; color: #8b6914;
+    background: #fff4d6; padding: 2px 8px; border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .guest-exited-badge {
+    font-size: 11px; color: #888;
+    background: #eee; padding: 2px 7px; border-radius: 8px;
+  }
+  .guest-card-body {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .field-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .lab-inline {
+    font-size: 11px; color: var(--text-sub);
+    flex-shrink: 0;
+    min-width: 38px;
+  }
+  .guest-card-casts {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #e0c060;
+  }
+  .guest-exit-btn {
+    background: #fff0f0 !important;
+    color: #c44 !important;
+    border-color: #f0c0c0 !important;
+  }
+
   /* 予約凡例 */
   .resv-legend {
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -1988,9 +2041,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.14b';
+const APP_VERSION = '2026.05.14c';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.14c',
+    date: '2026-05-14',
+    title: '複数顧客の入店処理（段階1）',
+    items: [
+      '入店モーダルに「＋ お客様を追加」ボタンを追加しました。同じテーブルに別々のお客様（A様・B様・C様など）を1人ずつ登録できます。',
+      '各お客様ごとに名前・人数・指名キャスト（A/B指名）・同伴をそれぞれ設定可能。複数顧客が同じテーブルでも個別に管理できます。',
+      '使用中のテーブルでは、お客様ごとに「🔴 退店」ボタンが表示されます。1人だけ先に退店させると、その顧客のみ退店扱いになりテーブルは継続使用されます。',
+      '最後の1人が退店するとテーブル全体が退店処理されます。',
+      'フロアの卓カードには複数顧客の名前が「、」区切りで併記され、退店済の人数も表示されます。',
+      '※途中入店の時刻記録・履歴の顧客別分割は次回アップデートで対応予定です。現状は1テーブル=1来店記録として記録されます。',
+    ],
+  },
   {
     version: '2026.05.14b',
     date: '2026-05-14',
@@ -2358,6 +2424,37 @@ function buildDohanDisplay(source) {
   return parts.join('、');
 }
 
+// 複数顧客モード（guestList）ヘルパー
+// tdata.guestList があり、活動中（exited=falseまたは無い）の顧客が1人以上いるか
+function hasActiveGuests(tdata) {
+  if (!tdata || !Array.isArray(tdata.guestList)) return false;
+  return tdata.guestList.some(g => g && !g.exited);
+}
+// 活動中の顧客のみ返す
+function getActiveGuests(tdata) {
+  if (!tdata || !Array.isArray(tdata.guestList)) return [];
+  return tdata.guestList.filter(g => g && !g.exited);
+}
+// 単独顧客モードのデータを guestList 形式に変換（後方互換）
+function tdataToGuestList(tdata) {
+  if (Array.isArray(tdata.guestList) && tdata.guestList.length > 0) {
+    return tdata.guestList.slice();
+  }
+  // 既存データ：単独顧客として1件の guest を作成
+  return [{
+    id: genId('g'),
+    customerId: tdata.customerId || '',
+    customerName: tdata.customerName || '',
+    guests: tdata.guests || 0,
+    castIds: (tdata.castIds || []).slice(),
+    castNoms: tdata.castNoms ? { ...tdata.castNoms } : {},
+    castFree: tdata.castFree || '',
+    dohan: !!tdata.dohan,
+    dohanCastIds: Array.isArray(tdata.dohanCastIds) ? tdata.dohanCastIds.slice() : [],
+    exited: false,
+  }];
+}
+
 // ---------- Login ----------
 function tryLogin() {
   const v = document.getElementById('pinInput').value;
@@ -2523,13 +2620,37 @@ function buildTableCard(t, tdata) {
     timerHtml = `<div class="${timerCls}" data-timer="${t.id}">${timerTxt}</div>`;
   }
 
+  // 顧客名表示：guestList があれば全活動中顧客の名前を併記、なければ単独顧客名
+  let customerNameHtml = '';
+  if (Array.isArray(tdata.guestList) && tdata.guestList.length > 0) {
+    const activeGuests = tdata.guestList.filter(g => !g.exited);
+    const names = activeGuests.map(g => {
+      const nm = g.customerId
+        ? (displayName(state.customers.find(c => c.id === g.customerId)) || '')
+        : (g.customerName || '');
+      return nm ? withSan(nm) : '';
+    }).filter(Boolean);
+    if (names.length > 1) {
+      customerNameHtml = `<b>${escapeHtml(names.join('、'))}</b><br>`;
+    } else if (names.length === 1) {
+      customerNameHtml = `<b>${escapeHtml(names[0])}</b><br>`;
+    }
+    // 退店済みがいたら表示
+    const exitedCount = tdata.guestList.filter(g => g.exited).length;
+    if (exitedCount > 0) {
+      customerNameHtml += `<span style="font-size:11px; color:#888;">(${exitedCount}名退店済)</span><br>`;
+    }
+  } else if (customerName) {
+    customerNameHtml = `<b>${escapeHtml(withSan(customerName))}</b><br>`;
+  }
+
   card.innerHTML = `
     <div class="name">
       <span>${escapeHtml(t.name)}${setBadge}${autoExtBadge}</span>
       <span class="badge-on">使用中</span>
     </div>
     <div class="info">
-      ${customerName ? `<b>${escapeHtml(withSan(customerName))}</b><br>` : ''}
+      ${customerNameHtml}
       ${tdata.guests ? `👥 ${tdata.guests}名<br>` : ''}
       ${allCastDisp ? `🌹 ${escapeHtml(allCastDisp)}` : ''}
     </div>
@@ -2599,6 +2720,7 @@ function checkIn(tableId, opts) {
     dohanCastIds,
     customerId,
     customerName: customerId ? '' : customerName, // 顧客IDがあれば未紐付け名称はクリア
+    guestList: Array.isArray(opts.guestList) ? opts.guestList.slice() : null,
     memo,
     startedAt,
     endsAt: startedAt + SET_MINUTES * 60000,
@@ -2608,8 +2730,13 @@ function checkIn(tableId, opts) {
     alertedCritical: false,
     _updated: now,
   };
-  // 顧客の来店履歴
-  if (customerId) {
+  // 顧客の来店履歴（guestListがあれば全活動中顧客に記録、なければ単独顧客に記録）
+  const activeGuests = Array.isArray(opts.guestList) ? opts.guestList.filter(g => !g.exited) : null;
+  if (activeGuests && activeGuests.length > 0) {
+    activeGuests.forEach(g => {
+      if (g.customerId) recordVisit(g.customerId, g.castIds || [], g.castNoms || {});
+    });
+  } else if (customerId) {
     recordVisit(customerId, castIds, castNoms);
   }
 
@@ -3872,27 +3999,35 @@ function playNotifSound(type) {
 
 // ---------- Table Modal ----------
 let editingTableId = null;
-function openTableModal(tableId) {
-  editingTableId = tableId;
-  const t = DEFAULT_TABLES.find(x => x.id === tableId);
-  const tdata = state.tables[tableId] || { occupied:false, guests:0, castIds:[], startedAt:null, memo:'', customerId:'', customerName:'', castFree:'' };
-  document.getElementById('tableModalTitle').textContent = `${t.name}`;
+let modalGuests = []; // 入店モーダル編集中の顧客カード配列
 
-  const castOptions = state.casts
+// 1人分の顧客カードを生成（HTML文字列）
+function buildGuestCardHtml(guest, idx, isOccupied) {
+  // 顧客選択肢
+  const custOptions = ['<option value="">（指定なし）</option>']
+    .concat(state.customers.filter(c => !c.removed).map(c => {
+      const dn = displayName(c);
+      const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
+        ? `${withSan(dn)}（${stripHonorific(c.name)}）`
+        : withSan(dn);
+      return `<option value="${c.id}" ${guest.customerId === c.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    })).join('');
+
+  // キャスト選択肢（A/B/なし＋同伴）
+  const castOptionsHtml = state.casts
     .filter(c => !c.removed)
     .map(c => {
-      const checked = (tdata.castIds || []).includes(c.id) ? 'checked' : '';
-      const cur = (tdata.castNoms && tdata.castNoms[c.id]) || 'none';
-      const isDohan = (tdata.dohanCastIds || []).includes(c.id);
-      // 指名種別トグル：A / B / なし（チェックOFFのときは無効化見た目）
+      const checked = (guest.castIds || []).includes(c.id) ? 'checked' : '';
+      const cur = (guest.castNoms && guest.castNoms[c.id]) || 'none';
+      const isDohan = (guest.dohanCastIds || []).includes(c.id);
       const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
       return `<div class="cast-pick-row" data-cast-id="${c.id}">
         <label class="small-label" style="margin:0; flex:1; min-width:0;">
-          <input type="checkbox" value="${c.id}" ${checked} class="cast-pick" data-cast-pick="${c.id}">
+          <input type="checkbox" value="${c.id}" ${checked} class="gc-cast-pick" data-cast-pick="${c.id}">
           ${escapeHtml(c.name)}${trialBadge}
         </label>
-        <label class="small-label dohan-toggle ${isDohan?'is-dohan':''}" title="同伴">
-          <input type="checkbox" class="cast-dohan-pick" data-cast-dohan="${c.id}" ${isDohan?'checked':''}>
+        <label class="small-label dohan-toggle ${isDohan?'is-dohan':''}" title="同伴" style="margin:0;">
+          <input type="checkbox" class="gc-cast-dohan" data-cast-dohan="${c.id}" ${isDohan?'checked':''}>
           <span>同</span>
         </label>
         <div class="nom-toggle" data-cast-nom-toggle="${c.id}">
@@ -3903,15 +4038,227 @@ function openTableModal(tableId) {
       </div>`;
     }).join('');
 
-  const custOptions = ['<option value="">（指定なし）</option>']
-    .concat(state.customers.filter(c=>!c.removed).map(c => {
-      const dn = displayName(c);
-      // 本名と異なる場合は本名を併記
-      const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
-        ? `${withSan(dn)}（${stripHonorific(c.name)}）`
-        : withSan(dn);
-      return `<option value="${c.id}" ${tdata.customerId===c.id?'selected':''}>${escapeHtml(label)}</option>`;
-    })).join('');
+  // 顧客モード（既存/新規）
+  const useExisting = !!guest.customerId || !guest.customerName;
+  const exitedLabel = guest.exited
+    ? `<span class="guest-exited-badge">退店済 ${guest.exitedAt ? new Date(guest.exitedAt).toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' }) : ''}</span>`
+    : '';
+  // 使用中卓の場合、各顧客カードに「退店」ボタンを表示
+  const guestExitBtn = (isOccupied && !guest.exited)
+    ? `<button type="button" class="btn-sub btn-sm guest-exit-btn" data-exit-guest="${guest.id}">🔴 退店</button>`
+    : '';
+  const removeBtn = (!isOccupied)
+    ? `<button type="button" class="btn-danger btn-sm" data-remove-guest="${guest.id}">×</button>`
+    : '';
+
+  return `
+    <div class="guest-card ${guest.exited?'exited':''}" data-guest-id="${guest.id}">
+      <div class="guest-card-head">
+        <span class="guest-card-num">お客様 ${idx + 1}</span>
+        ${exitedLabel}
+        <div style="margin-left:auto; display:flex; gap:4px;">
+          ${guestExitBtn}
+          ${removeBtn}
+        </div>
+      </div>
+      <div class="guest-card-body">
+        <div class="field-row">
+          <span class="lab-inline">既存:</span>
+          <select class="gc-customer" data-guest-id="${guest.id}" style="flex:1;" ${useExisting?'':''}>
+            ${custOptions}
+          </select>
+        </div>
+        <div class="field-row">
+          <span class="lab-inline">新規:</span>
+          <input type="text" class="gc-customer-name" data-guest-id="${guest.id}" value="${escapeHtml(guest.customerName || '')}" placeholder="お客様の名前（フリー入力）" style="flex:1;">
+        </div>
+        <div class="field-row">
+          <span class="lab-inline">人数:</span>
+          <input type="number" class="gc-guests" data-guest-id="${guest.id}" value="${guest.guests || 1}" min="0" max="20" style="width:70px;">
+          <label class="small-label" style="margin-left:auto;">
+            <input type="checkbox" class="gc-register-new" data-guest-id="${guest.id}" ${guest.customerId ? '' : 'checked'}> 新規顧客として登録
+          </label>
+        </div>
+        <div class="guest-card-casts">
+          <div class="lab-inline" style="margin-bottom:4px;">指名キャスト:</div>
+          <div class="cast-pick-list">
+            ${castOptionsHtml || '<span style="color:var(--text-muted);font-size:12px;">設定からキャストを追加してください</span>'}
+          </div>
+          <input type="text" class="gc-cast-free" data-guest-id="${guest.id}" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px; width:100%;">
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// modalGuestsから現在のフォーム入力値を取得して反映
+function syncGuestCardFromDom() {
+  modalGuests.forEach(g => {
+    const card = document.querySelector(`#guestCardList .guest-card[data-guest-id="${g.id}"]`);
+    if (!card) return;
+    g.customerId = card.querySelector('.gc-customer')?.value || '';
+    g.customerName = (card.querySelector('.gc-customer-name')?.value || '').trim();
+    g.guests = parseInt(card.querySelector('.gc-guests')?.value || '0', 10) || 0;
+    g.castFree = (card.querySelector('.gc-cast-free')?.value || '').trim();
+    g.registerNew = !!card.querySelector('.gc-register-new')?.checked;
+    // 指名キャスト
+    g.castIds = Array.from(card.querySelectorAll('.gc-cast-pick:checked')).map(el => el.value);
+    g.castNoms = {};
+    g.castIds.forEach(cid => {
+      const toggle = card.querySelector(`.nom-toggle[data-cast-nom-toggle="${cid}"]`);
+      if (!toggle) return;
+      const activeBtn = toggle.querySelector('.nom-btn.active');
+      if (!activeBtn) return;
+      const nom = activeBtn.getAttribute('data-nom');
+      if (nom === 'A' || nom === 'B') g.castNoms[cid] = nom;
+    });
+    g.dohanCastIds = Array.from(card.querySelectorAll('.gc-cast-dohan:checked'))
+      .map(el => el.getAttribute('data-cast-dohan'))
+      .filter(cid => g.castIds.includes(cid));
+    g.dohan = g.dohanCastIds.length > 0;
+  });
+}
+
+function renderGuestCardList() {
+  const root = document.getElementById('guestCardList');
+  if (!root) return;
+  const tdata = state.tables[editingTableId] || {};
+  const isOccupied = !!tdata.occupied;
+  root.innerHTML = modalGuests.map((g, idx) => buildGuestCardHtml(g, idx, isOccupied)).join('');
+  bindGuestCardHandlers();
+}
+
+function bindGuestCardHandlers() {
+  const root = document.getElementById('guestCardList');
+  if (!root) return;
+  // 顧客追加削除
+  root.querySelectorAll('[data-remove-guest]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gid = btn.getAttribute('data-remove-guest');
+      removeGuestCard(gid);
+    });
+  });
+  // 顧客ごとの退店
+  root.querySelectorAll('[data-exit-guest]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gid = btn.getAttribute('data-exit-guest');
+      exitGuestFromModal(gid);
+    });
+  });
+  // 指名トグル
+  root.querySelectorAll('.nom-toggle').forEach(toggle => {
+    const castId = toggle.getAttribute('data-cast-nom-toggle');
+    toggle.querySelectorAll('.nom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nom = btn.getAttribute('data-nom');
+        toggle.querySelectorAll('.nom-btn').forEach(b => {
+          b.classList.remove('active', 'a', 'b', 'none');
+        });
+        btn.classList.add('active', nom.toLowerCase());
+        // 同じカード内の対応する指名チェックON
+        const card = toggle.closest('.guest-card');
+        const cb = card?.querySelector(`input.gc-cast-pick[data-cast-pick="${castId}"]`);
+        if (cb) cb.checked = true;
+      });
+    });
+  });
+  // 指名チェックOFFで連動
+  root.querySelectorAll('input.gc-cast-pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (!cb.checked) {
+        const cid = cb.getAttribute('data-cast-pick');
+        const card = cb.closest('.guest-card');
+        const toggle = card?.querySelector(`.nom-toggle[data-cast-nom-toggle="${cid}"]`);
+        if (toggle) {
+          toggle.querySelectorAll('.nom-btn').forEach(b => b.classList.remove('active','a','b','none'));
+        }
+        const dohanCb = card?.querySelector(`input.gc-cast-dohan[data-cast-dohan="${cid}"]`);
+        if (dohanCb) {
+          dohanCb.checked = false;
+          dohanCb.closest('.dohan-toggle')?.classList.remove('is-dohan');
+        }
+      }
+    });
+  });
+  // 同伴チェック
+  root.querySelectorAll('input.gc-cast-dohan').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const cid = cb.getAttribute('data-cast-dohan');
+      cb.closest('.dohan-toggle')?.classList.toggle('is-dohan', cb.checked);
+      if (cb.checked) {
+        const card = cb.closest('.guest-card');
+        const pick = card?.querySelector(`input.gc-cast-pick[data-cast-pick="${cid}"]`);
+        if (pick && !pick.checked) pick.checked = true;
+      }
+    });
+  });
+}
+
+function addGuestCard() {
+  // 既存入力値を保持
+  syncGuestCardFromDom();
+  modalGuests.push({
+    id: genId('g'),
+    customerId: '',
+    customerName: '',
+    guests: 1,
+    castIds: [],
+    castNoms: {},
+    castFree: '',
+    dohan: false,
+    dohanCastIds: [],
+    exited: false,
+  });
+  renderGuestCardList();
+}
+
+function removeGuestCard(guestId) {
+  syncGuestCardFromDom();
+  if (modalGuests.length <= 1) {
+    alert('お客様は最低1名必要です。');
+    return;
+  }
+  modalGuests = modalGuests.filter(g => g.id !== guestId);
+  renderGuestCardList();
+}
+
+// 顧客ごとの退店処理（使用中卓モーダル内）
+function exitGuestFromModal(guestId) {
+  if (!editingTableId) return;
+  syncGuestCardFromDom();
+  const g = modalGuests.find(x => x.id === guestId);
+  if (!g) return;
+  const nm = withSan(g.customerName) || (g.customerId ? withSan(displayName(state.customers.find(c => c.id === g.customerId))) : 'お客様');
+  if (!confirm(`${nm} を退店扱いにしますか？\n（他のお客様はテーブルに残ります）`)) return;
+  // 活動中の顧客が他にいるか確認
+  const otherActive = modalGuests.filter(x => x.id !== guestId && !x.exited);
+  if (otherActive.length === 0) {
+    // 全員退店 → テーブル全体を退店処理
+    closeTableModal();
+    checkOut(editingTableId);
+    return;
+  }
+  // 当該顧客のみ exited にして保存
+  g.exited = true;
+  g.exitedAt = Date.now();
+  // tdataに反映＋保存
+  const tdata = state.tables[editingTableId];
+  if (tdata) {
+    tdata.guestList = modalGuests.map(x => ({ ...x }));
+    tdata._updated = Date.now();
+    persistSave();
+    renderFloor();
+  }
+  // モーダルを開き直して表示更新
+  openTableModal(editingTableId);
+  showToast(`${nm} 退店`, 'normal');
+}
+
+function openTableModal(tableId) {
+  editingTableId = tableId;
+  const t = DEFAULT_TABLES.find(x => x.id === tableId);
+  const tdata = state.tables[tableId] || { occupied:false, guests:0, castIds:[], startedAt:null, memo:'', customerId:'', customerName:'', castFree:'' };
+  document.getElementById('tableModalTitle').textContent = `${t.name}`;
 
   // 使用中ならステータス情報＋延長/退店UI
   let statusBlock = '';
@@ -3970,40 +4317,15 @@ function openTableModal(tableId) {
     `;
   }
 
-  // 顧客選択UI（既存 / 新規 切替）
-  // tdata.customerName があり customerId がない＝過去の入店時に新規記入されたが未登録のケース
-  const initialMode = (tdata.customerName && !tdata.customerId) ? 'new' : 'existing';
+  // 顧客カードUI：複数顧客（guestList）対応
+  // 既存単独データもまず guestList 形式に変換してから扱う
+  const initialGuests = tdataToGuestList(tdata);
+
   const customerBlock = `
     <div class="field">
-      <span class="lab">お客様</span>
-      <div style="display:flex; gap:6px; margin-bottom:6px;">
-        <label class="small-label">
-          <input type="radio" name="custMode" value="existing" ${initialMode==='existing'?'checked':''} data-custmode> 既存
-        </label>
-        <label class="small-label">
-          <input type="radio" name="custMode" value="new" ${initialMode==='new'?'checked':''} data-custmode> 新規
-        </label>
-      </div>
-      <div id="custModeExisting" style="display:${initialMode==='existing'?'block':'none'};">
-        <select id="tblCustomer">${custOptions}</select>
-      </div>
-      <div id="custModeNew" style="display:${initialMode==='new'?'block':'none'};">
-        <input type="text" id="tblCustomerName" value="${escapeHtml(tdata.customerName||'')}" placeholder="お客様の名前（フリー入力）">
-        <label class="small-label" style="margin-top:6px; display:block;">
-          <input type="checkbox" id="tblRegisterNew" checked> 入店と同時に顧客リストへ登録する
-        </label>
-      </div>
-    </div>
-  `;
-
-  // 担当キャスト：チェックボックス＋フリー入力
-  const castBlock = `
-    <div class="field">
-      <span class="lab">指名キャスト</span>
-      <div class="cast-pick-list">
-        ${castOptions || '<span style="color:var(--text-muted);font-size:12px;">設定からキャストを追加してください</span>'}
-      </div>
-      <input type="text" id="tblCastFree" value="${escapeHtml(tdata.castFree||'')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px;">
+      <span class="lab">お客様（複数可）</span>
+      <div id="guestCardList" class="guest-card-list"></div>
+      <button type="button" class="btn-sub btn-sm" id="addGuestBtn" style="margin-top:6px;">＋ お客様を追加</button>
     </div>
   `;
 
@@ -4014,11 +4336,6 @@ function openTableModal(tableId) {
   document.getElementById('tableModalBody').innerHTML = `
     ${statusBlock}
     ${customerBlock}
-    <label class="field">
-      <span class="lab">人数</span>
-      <input type="number" id="tblGuests" value="${tdata.guests||1}" min="0" max="20">
-    </label>
-    ${castBlock}
     ${startTimeBlock}
     <label class="field">
       <span class="lab">メモ（指名/同伴/ボトル等）</span>
@@ -4026,10 +4343,25 @@ function openTableModal(tableId) {
     </label>
   `;
 
-  // モーダル本文内のイベントバインド
-  // 顧客モードの切替
-  document.querySelectorAll('#tableModalBody [data-custmode]').forEach(el => {
-    el.addEventListener('change', toggleCustomerMode);
+  // 顧客カード描画用のデータ
+  modalGuests = initialGuests.map(g => ({
+    ...g,
+    id: g.id || genId('g'),
+    castIds: (g.castIds || []).slice(),
+    castNoms: g.castNoms ? { ...g.castNoms } : {},
+    dohanCastIds: (g.dohanCastIds || []).slice(),
+    castFree: g.castFree || '',
+    customerId: g.customerId || '',
+    customerName: g.customerName || '',
+    guests: g.guests || 1,
+    exited: !!g.exited,
+    exitedAt: g.exitedAt || null,
+  }));
+  renderGuestCardList();
+
+  // 追加ボタン
+  document.getElementById('addGuestBtn').addEventListener('click', () => {
+    addGuestCard();
   });
   // 延長ボタン
   document.querySelectorAll('#tableModalBody [data-extend-modal]').forEach(el => {
@@ -4042,56 +4374,6 @@ function openTableModal(tableId) {
   document.querySelectorAll('#tableModalBody [data-update-start]').forEach(el => {
     el.addEventListener('click', () => {
       updateStartTimeFromModal();
-    });
-  });
-  // 指名種別（A/B/なし）トグルボタン
-  document.querySelectorAll('#tableModalBody .nom-toggle').forEach(toggle => {
-    const castId = toggle.getAttribute('data-cast-nom-toggle');
-    toggle.querySelectorAll('.nom-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const nom = btn.getAttribute('data-nom');
-        // 同じグループの他のボタンの active を外す
-        toggle.querySelectorAll('.nom-btn').forEach(b => {
-          b.classList.remove('active', 'a', 'b', 'none');
-        });
-        btn.classList.add('active', nom.toLowerCase());
-        // 対応するチェックボックスを自動的にON（指名種別を選んだ＝指名している）
-        const cb = document.querySelector(`#tableModalBody input.cast-pick[data-cast-pick="${castId}"]`);
-        if (cb) cb.checked = true;
-      });
-    });
-  });
-  // チェックボックスがOFFになったら、その行の指名種別もリセット
-  document.querySelectorAll('#tableModalBody input.cast-pick').forEach(cb => {
-    cb.addEventListener('change', () => {
-      if (!cb.checked) {
-        const castId = cb.getAttribute('data-cast-pick');
-        const toggle = document.querySelector(`#tableModalBody .nom-toggle[data-cast-nom-toggle="${castId}"]`);
-        if (toggle) {
-          toggle.querySelectorAll('.nom-btn').forEach(b => {
-            b.classList.remove('active', 'a', 'b', 'none');
-          });
-        }
-        // 同伴チェックもOFFにする
-        const dohanCb = document.querySelector(`#tableModalBody input.cast-dohan-pick[data-cast-dohan="${castId}"]`);
-        if (dohanCb) {
-          dohanCb.checked = false;
-          dohanCb.closest('.dohan-toggle')?.classList.remove('is-dohan');
-        }
-      }
-    });
-  });
-  // 同伴チェックボックスのトグル表示更新＆指名チェックを自動ON
-  document.querySelectorAll('#tableModalBody input.cast-dohan-pick').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const castId = cb.getAttribute('data-cast-dohan');
-      const wrap = cb.closest('.dohan-toggle');
-      if (wrap) wrap.classList.toggle('is-dohan', cb.checked);
-      if (cb.checked) {
-        // 同伴ONなら指名チェックも自動的にON
-        const pickCb = document.querySelector(`#tableModalBody input.cast-pick[data-cast-pick="${castId}"]`);
-        if (pickCb && !pickCb.checked) pickCb.checked = true;
-      }
     });
   });
 
@@ -4160,6 +4442,38 @@ function checkInFromModal() {
   if (!data.customerId && !data.customerName && !data.castIds.length && !data.castFree && !data.guests) {
     if (!confirm('入力情報がほとんどありません。このまま入店しますか？')) return;
   }
+  // 各 guest で「新規登録」チェックがONで customerName があり customerId がない場合、顧客リストへ登録
+  const now = Date.now();
+  (data.guestList || []).forEach(g => {
+    if (g.registerNew && g.customerName && !g.customerId) {
+      const nm = stripHonorific(g.customerName);
+      if (!nm) return;
+      const newCust = {
+        id: genId('cust'),
+        name: nm,
+        nickname: '',
+        phone: '',
+        birthday: '',
+        memo: '',
+        visits: [],
+        bottles: [],
+        _created: now,
+        _updated: now,
+        removed: false
+      };
+      state.customers.push(newCust);
+      g.customerId = newCust.id;
+      g.customerName = ''; // 顧客IDが付いたのでフリー名はクリア
+    }
+  });
+  // 先頭活動中顧客を再選定
+  const firstActive = (data.guestList || []).find(g => !g.exited);
+  if (firstActive) {
+    data.customerId = firstActive.customerId || '';
+    data.customerName = firstActive.customerName || '';
+    data.createNewCustomer = false;
+  }
+
   const targetTableId = editingTableId;
   // 先にモーダルを閉じる（処理中エラーが出ても画面が固まらないように）
   closeTableModal();
@@ -4168,7 +4482,7 @@ function checkInFromModal() {
     checkIn(targetTableId, {
       customerId: data.customerId,
       customerName: data.customerName,
-      createNewCustomer: data.createNewCustomer,
+      createNewCustomer: false, // 上で処理済み
       guests: data.guests,
       castIds: data.castIds,
       castNoms: data.castNoms,
@@ -4177,6 +4491,7 @@ function checkInFromModal() {
       dohanCastIds: data.dohanCastIds,
       memo: data.memo,
       startTime: data.startTime,
+      guestList: data.guestList,
     });
   } catch(e) {
     console.error('checkIn failed:', e);
@@ -4240,40 +4555,68 @@ function saveTable() {
 }
 
 function readTableModalForm() {
-  const mode = document.querySelector('input[name="custMode"]:checked')?.value || 'existing';
-  let customerId = '';
-  let customerName = '';
-  let createNewCustomer = false;
-  if (mode === 'existing') {
-    customerId = document.getElementById('tblCustomer')?.value || '';
-  } else {
-    customerName = (document.getElementById('tblCustomerName')?.value || '').trim();
-    createNewCustomer = !!(document.getElementById('tblRegisterNew')?.checked);
-  }
-  const guests = parseInt(document.getElementById('tblGuests')?.value || '0') || 0;
-  const castIds = Array.from(document.querySelectorAll('#tableModalBody .cast-pick:checked')).map(el => el.value);
-  // 指名種別（A/B）を抽出。castIds に含まれているキャストのみ対象。
-  const castNoms = {};
-  castIds.forEach(cid => {
-    const toggle = document.querySelector(`#tableModalBody .nom-toggle[data-cast-nom-toggle="${cid}"]`);
-    if (!toggle) return;
-    const activeBtn = toggle.querySelector('.nom-btn.active');
-    if (!activeBtn) return;
-    const nom = activeBtn.getAttribute('data-nom');
-    if (nom === 'A' || nom === 'B') {
-      castNoms[cid] = nom;
-    }
-    // 'none' のときは castNoms に入れない（指名なし扱い）
-  });
-  const castFree = (document.getElementById('tblCastFree')?.value || '').trim();
-  // 同伴キャスト（指名キャストの中で同伴チェックONのもの）
-  const dohanCastIds = Array.from(document.querySelectorAll('#tableModalBody .cast-dohan-pick:checked')).map(el => el.getAttribute('data-cast-dohan'));
-  // 指名チェックが入っているキャストのみに限定
-  const dohanCastIdsFiltered = dohanCastIds.filter(cid => castIds.includes(cid));
-  const dohan = dohanCastIdsFiltered.length > 0;
+  // 顧客カードから最新値を取得
+  syncGuestCardFromDom();
+  // 全体のメモ
   const memo = document.getElementById('tblMemo')?.value || '';
-  const startTime = document.getElementById('tblStartTime')?.value || '';
-  return { customerId, customerName, createNewCustomer, guests, castIds, castNoms, castFree, dohan, dohanCastIds: dohanCastIdsFiltered, memo, startTime };
+  // 顧客カードを「先頭顧客」+「guestList全体」として返す
+  // 先頭の活動中顧客（後方互換：従来の単独顧客フィールドへ反映）
+  const firstActive = modalGuests.find(g => !g.exited) || modalGuests[0];
+  const first = firstActive || { customerId:'', customerName:'', guests:1, castIds:[], castNoms:{}, castFree:'', dohan:false, dohanCastIds:[], registerNew:false };
+  // 合計人数
+  const totalGuests = modalGuests.reduce((sum, g) => sum + (g.exited ? 0 : (g.guests || 0)), 0);
+  // 全顧客のキャストIDを集約（テーブル全体の castIds として、入店ログ通知や表示に使う）
+  const allCastIds = [];
+  const allCastNoms = {};
+  const allDohanCastIds = [];
+  modalGuests.forEach(g => {
+    if (g.exited) return;
+    (g.castIds || []).forEach(cid => {
+      if (!allCastIds.includes(cid)) allCastIds.push(cid);
+      // castNoms はマージ。複数顧客が同じキャストを指名するケースは稀だが、Aを優先採用
+      if (g.castNoms && g.castNoms[cid] && !allCastNoms[cid]) {
+        allCastNoms[cid] = g.castNoms[cid];
+      }
+    });
+    (g.dohanCastIds || []).forEach(cid => {
+      if (!allDohanCastIds.includes(cid)) allDohanCastIds.push(cid);
+    });
+  });
+  // フリーキャスト名は全顧客分を「・」で結合
+  const allCastFree = modalGuests.filter(g => !g.exited && g.castFree).map(g => g.castFree).join('・');
+
+  // guestList 形式に整形（保存用）
+  const guestList = modalGuests.map(g => ({
+    id: g.id,
+    customerId: g.customerId || '',
+    customerName: g.customerName || '',
+    guests: g.guests || 0,
+    castIds: (g.castIds || []).slice(),
+    castNoms: { ...(g.castNoms || {}) },
+    castFree: g.castFree || '',
+    dohan: !!g.dohan,
+    dohanCastIds: (g.dohanCastIds || []).slice(),
+    registerNew: !!g.registerNew,
+    exited: !!g.exited,
+    exitedAt: g.exitedAt || null,
+  }));
+
+  return {
+    // 後方互換：先頭活動中顧客の値を従来フィールドに
+    customerId: first.customerId || '',
+    customerName: first.customerName || '',
+    createNewCustomer: !!first.registerNew && !!first.customerName && !first.customerId,
+    guests: totalGuests,
+    castIds: allCastIds,
+    castNoms: allCastNoms,
+    castFree: allCastFree,
+    dohan: allDohanCastIds.length > 0,
+    dohanCastIds: allDohanCastIds,
+    memo,
+    startTime: '',
+    // 複数顧客のフル情報
+    guestList,
+  };
 }
 
 function saveTableInternal(closeAfter) {
@@ -4318,6 +4661,7 @@ function saveTableInternal(closeAfter) {
     dohanCastIds: (data.dohanCastIds || []).slice(),
     customerId,
     customerName: customerId ? '' : customerName,
+    guestList: Array.isArray(data.guestList) ? data.guestList.slice() : (prev.guestList || null),
     memo: data.memo,
     autoExtend,
     _updated: Date.now(),
