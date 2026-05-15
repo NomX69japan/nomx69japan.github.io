@@ -7,6 +7,8 @@
 <title>顧客管理</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 <style>
 :root{
   --bg:#f5f4f0;--sur:#fff;--sur2:#f0efe9;
@@ -181,6 +183,7 @@ tr:hover td{background:#fafaf8;cursor:pointer}
     <button class="btn" id="btnReport">📊 レポート</button>
     <div class="spacer"></div>
     <div id="saveInd">保存済み ✓</div>
+    <button class="btn" id="btnCloud" title="Google Drive 同期">☁️ クラウド</button>
     <button class="btn btn-p" id="btnSaveHTML" title="現在のデータを埋め込んだHTMLファイルをダウンロード">💾 HTMLとして保存</button>
     <button class="btn" id="btnBackup">バックアップ</button>
     <button class="btn" id="btnExport">↓ エクスポート</button>
@@ -339,6 +342,67 @@ tr:hover td{background:#fafaf8;cursor:pointer}
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-p" id="btnSave">保存</button>
       <button class="btn" onclick="document.getElementById('addMod').classList.add('hidden')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cloud Sync modal -->
+<div class="mbg hidden" id="cloudMod">
+  <div class="modal" style="width:520px;max-height:90vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--bdr)">
+      <div style="font-size:14px;font-weight:500">☁️ Google Drive 同期</div>
+      <button class="btn" onclick="document.getElementById('cloudMod').classList.add('hidden')" style="margin-left:auto">✕ 閉じる</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:14px">
+
+      <!-- 接続状態 -->
+      <div id="cloudStatus" class="sec" style="padding:12px 14px">
+        <div style="font-size:11px;color:var(--txt3);margin-bottom:4px">接続状態</div>
+        <div id="cloudStatusText" style="font-size:13px;font-weight:500">未接続</div>
+      </div>
+
+      <!-- 設定セクション -->
+      <details id="cloudSettings">
+        <summary style="cursor:pointer;font-size:12px;color:var(--txt2);padding:6px 0">⚙️ 設定（クライアントID・APIキー）</summary>
+        <div style="padding:10px 0;display:flex;flex-direction:column;gap:8px">
+          <div>
+            <div class="flbl">クライアントID</div>
+            <input type="text" id="gcClientId" class="inp" placeholder="xxxxx.apps.googleusercontent.com" style="font-size:11px;font-family:'DM Mono',monospace">
+          </div>
+          <div>
+            <div class="flbl">APIキー</div>
+            <input type="text" id="gcApiKey" class="inp" placeholder="AIzaSy..." style="font-size:11px;font-family:'DM Mono',monospace">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-p btn-s" onclick="saveCloudConfig()" style="font-size:11px">💾 設定を保存</button>
+            <button class="btn btn-s btn-d" onclick="clearCloudConfig()" style="font-size:11px">クリア</button>
+          </div>
+          <div style="font-size:10px;color:var(--txt3);line-height:1.5">
+            設定はこのブラウザのみに保存されます。<br>
+            別端末でも設定が必要です。
+          </div>
+        </div>
+      </details>
+
+      <!-- 操作 -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-p" id="cloudBtnSignIn" onclick="cloudSignIn()" style="padding:10px;font-size:13px">🔐 Googleでサインイン</button>
+        <button class="btn" id="cloudBtnSignOut" onclick="cloudSignOut()" style="padding:8px;font-size:12px;display:none">サインアウト</button>
+
+        <div id="cloudActions" style="display:none;flex-direction:column;gap:8px">
+          <button class="btn btn-p" onclick="cloudUpload()" style="padding:10px;font-size:13px">☁️ クラウドに保存（アップロード）</button>
+          <button class="btn" onclick="cloudDownload()" style="padding:10px;font-size:13px">⬇️ クラウドから読込（ダウンロード）</button>
+
+          <label style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--sur2);border-radius:var(--r);font-size:12px;cursor:pointer">
+            <input type="checkbox" id="cloudAutoSync" onchange="toggleAutoSync()" style="width:14px;height:14px">
+            <span>5分おきに自動でクラウドに保存</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ステータスメッセージ -->
+      <div id="cloudMsg" style="min-height:20px;font-size:11px;color:var(--txt3);padding:6px 0"></div>
+
     </div>
   </div>
 </div>
@@ -2987,6 +3051,307 @@ document.getElementById('btnDailyReport').addEventListener('click', function(){
   drSwitchView('list');
 });
 document.getElementById('dailyReportMod').addEventListener('click', function(e){ if(e.target===this) this.classList.add('hidden'); });
+
+// ============================================================
+// ☁️ Google Drive 同期
+// ============================================================
+const GC_LS_CLIENT_ID = 'crm_gc_clientid';
+const GC_LS_API_KEY   = 'crm_gc_apikey';
+const GC_LS_AUTO_SYNC = 'crm_gc_autosync';
+const GC_FILENAME = 'flexcrm_backup.json';
+const GC_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const GC_DISCOVERY = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+
+let gcTokenClient = null;
+let gcAccessToken = null;
+let gcGapiReady = false;
+let gcGisReady = false;
+let gcAutoSyncTimer = null;
+
+// ヘッダーボタン
+document.getElementById('btnCloud').addEventListener('click', function(){
+  document.getElementById('cloudMod').classList.remove('hidden');
+  cloudInitUI();
+});
+document.getElementById('cloudMod').addEventListener('click', function(e){ if(e.target===this) this.classList.add('hidden'); });
+
+function cloudMsg(msg, kind) {
+  const el = document.getElementById('cloudMsg'); if(!el) return;
+  el.textContent = msg||'';
+  el.style.color = kind==='err' ? 'var(--ng)' : kind==='ok' ? 'var(--ok-txt)' : 'var(--txt3)';
+}
+function cloudStatus(text, ok) {
+  const el = document.getElementById('cloudStatusText'); if(!el) return;
+  el.textContent = text;
+  el.style.color = ok ? 'var(--ok-txt)' : 'var(--txt2)';
+}
+
+function cloudInitUI() {
+  // 保存済み設定を画面に反映
+  const cid = localStorage.getItem(GC_LS_CLIENT_ID) || '';
+  const key = localStorage.getItem(GC_LS_API_KEY)   || '';
+  const auto = localStorage.getItem(GC_LS_AUTO_SYNC) === '1';
+  document.getElementById('gcClientId').value = cid;
+  document.getElementById('gcApiKey').value   = key;
+  document.getElementById('cloudAutoSync').checked = auto;
+
+  if(!cid || !key) {
+    cloudStatus('設定未完了 — 下の「設定」を開いてクライアントID・APIキーを入力してください', false);
+    document.getElementById('cloudSettings').open = true;
+    return;
+  }
+
+  // ライブラリ初期化
+  cloudInitClient().then(function(){
+    if(gcAccessToken) {
+      cloudStatus('✓ 接続中', true);
+      document.getElementById('cloudBtnSignIn').style.display = 'none';
+      document.getElementById('cloudBtnSignOut').style.display = '';
+      document.getElementById('cloudActions').style.display = 'flex';
+    } else {
+      cloudStatus('未接続 — 「Googleでサインイン」を押してください', false);
+      document.getElementById('cloudBtnSignIn').style.display = '';
+      document.getElementById('cloudBtnSignOut').style.display = 'none';
+      document.getElementById('cloudActions').style.display = 'none';
+    }
+  }).catch(function(e){
+    cloudStatus('初期化エラー: '+e.message, false);
+  });
+}
+
+function saveCloudConfig() {
+  const cid = document.getElementById('gcClientId').value.trim();
+  const key = document.getElementById('gcApiKey').value.trim();
+  if(!cid || !key){ cloudMsg('クライアントIDとAPIキーの両方を入力してください', 'err'); return; }
+  localStorage.setItem(GC_LS_CLIENT_ID, cid);
+  localStorage.setItem(GC_LS_API_KEY, key);
+  cloudMsg('✓ 設定を保存しました。ページをリロードしてサインインしてください', 'ok');
+  // 既存のクライアントを破棄して再初期化
+  gcTokenClient = null;
+  gcGapiReady = false;
+  gcAccessToken = null;
+  setTimeout(cloudInitUI, 500);
+}
+
+function clearCloudConfig() {
+  if(!confirm('クラウド連携の設定をクリアしますか？')) return;
+  localStorage.removeItem(GC_LS_CLIENT_ID);
+  localStorage.removeItem(GC_LS_API_KEY);
+  localStorage.removeItem(GC_LS_AUTO_SYNC);
+  document.getElementById('gcClientId').value = '';
+  document.getElementById('gcApiKey').value = '';
+  document.getElementById('cloudAutoSync').checked = false;
+  if(gcAutoSyncTimer) { clearInterval(gcAutoSyncTimer); gcAutoSyncTimer = null; }
+  cloudMsg('設定をクリアしました', 'ok');
+  cloudInitUI();
+}
+
+async function cloudInitClient() {
+  const cid = localStorage.getItem(GC_LS_CLIENT_ID);
+  const key = localStorage.getItem(GC_LS_API_KEY);
+  if(!cid || !key) throw new Error('クライアントID・APIキー未設定');
+
+  // gapi ロード
+  if(!gcGapiReady) {
+    await new Promise(function(resolve, reject){
+      if(typeof gapi === 'undefined'){ reject(new Error('Google APIライブラリ未読込（ネットワーク確認）')); return; }
+      gapi.load('client', function(){
+        gapi.client.init({
+          apiKey: key,
+          discoveryDocs: [GC_DISCOVERY]
+        }).then(function(){
+          gcGapiReady = true; resolve();
+        }).catch(function(e){ reject(new Error('gapi初期化失敗: '+(e.details||e.message||e))); });
+      });
+    });
+  }
+
+  // GIS トークンクライアント生成
+  if(!gcTokenClient) {
+    if(typeof google === 'undefined' || !google.accounts){
+      throw new Error('Google Identity Services 未読込（ネットワーク確認）');
+    }
+    gcTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: cid,
+      scope: GC_SCOPES,
+      callback: function(resp){
+        if(resp.error){
+          cloudMsg('認証エラー: '+resp.error, 'err');
+          return;
+        }
+        gcAccessToken = resp.access_token;
+        gapi.client.setToken({access_token: gcAccessToken});
+        cloudStatus('✓ サインイン成功', true);
+        document.getElementById('cloudBtnSignIn').style.display = 'none';
+        document.getElementById('cloudBtnSignOut').style.display = '';
+        document.getElementById('cloudActions').style.display = 'flex';
+        cloudMsg('✓ サインインしました', 'ok');
+        // 自動同期復元
+        const auto = localStorage.getItem(GC_LS_AUTO_SYNC) === '1';
+        if(auto){ startAutoSync(); }
+      }
+    });
+  }
+}
+
+function cloudSignIn() {
+  cloudInitClient().then(function(){
+    cloudMsg('Googleの認証画面を開きます...', '');
+    gcTokenClient.requestAccessToken({prompt: 'consent'});
+  }).catch(function(e){
+    cloudMsg('エラー: '+e.message, 'err');
+  });
+}
+
+function cloudSignOut() {
+  if(gcAccessToken){
+    google.accounts.oauth2.revoke(gcAccessToken, function(){});
+    gcAccessToken = null;
+    gapi.client.setToken(null);
+  }
+  cloudStatus('サインアウトしました', false);
+  document.getElementById('cloudBtnSignIn').style.display = '';
+  document.getElementById('cloudBtnSignOut').style.display = 'none';
+  document.getElementById('cloudActions').style.display = 'none';
+  if(gcAutoSyncTimer){ clearInterval(gcAutoSyncTimer); gcAutoSyncTimer = null; }
+  cloudMsg('サインアウト完了', 'ok');
+}
+
+// JSONバックアップ形式を生成
+function cloudBuildJson() {
+  return {
+    version: 3,
+    exported: new Date().toISOString(),
+    data: customers,
+    dailyReports: dailyReports,
+    appointments: appointments
+  };
+}
+
+// Drive上の既存ファイルを検索
+async function cloudFindFile() {
+  const resp = await gapi.client.drive.files.list({
+    q: "name='"+GC_FILENAME+"' and trashed=false",
+    fields: 'files(id, name, modifiedTime, size)',
+    spaces: 'drive',
+    pageSize: 10
+  });
+  const files = resp.result.files || [];
+  // 最新のものを返す
+  files.sort(function(a,b){ return (b.modifiedTime||'').localeCompare(a.modifiedTime||''); });
+  return files[0] || null;
+}
+
+async function cloudUpload() {
+  try {
+    cloudMsg('☁️ アップロード中...', '');
+    const obj = cloudBuildJson();
+    const json = JSON.stringify(obj);
+    const sizeKb = Math.round(json.length / 1024);
+
+    const existing = await cloudFindFile();
+    const metadata = { name: GC_FILENAME, mimeType: 'application/json' };
+    const boundary = 'foo_bar_baz_'+Date.now();
+    const delim = '\r\n--'+boundary+'\r\n';
+    const closeDelim = '\r\n--'+boundary+'--';
+    const body = delim
+      + 'Content-Type: application/json; charset=UTF-8\r\n\r\n'
+      + JSON.stringify(metadata)
+      + delim
+      + 'Content-Type: application/json\r\n\r\n'
+      + json
+      + closeDelim;
+
+    let url, method;
+    if(existing){
+      url = 'https://www.googleapis.com/upload/drive/v3/files/'+existing.id+'?uploadType=multipart';
+      method = 'PATCH';
+    } else {
+      url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+      method = 'POST';
+    }
+
+    const resp = await gapi.client.request({
+      path: url,
+      method: method,
+      params: {uploadType: 'multipart'},
+      headers: {'Content-Type': 'multipart/related; boundary="'+boundary+'"'},
+      body: body
+    });
+
+    cloudMsg('✓ '+(existing?'更新':'新規作成')+'しました（'+sizeKb+'KB）', 'ok');
+  } catch(e) {
+    console.error(e);
+    cloudMsg('❌ アップロード失敗: '+(e.result&&e.result.error&&e.result.error.message||e.message||'不明なエラー'), 'err');
+  }
+}
+
+async function cloudDownload() {
+  try {
+    cloudMsg('⬇️ ダウンロード中...', '');
+    const existing = await cloudFindFile();
+    if(!existing){
+      cloudMsg('クラウド上にバックアップファイルがありません。先にアップロードしてください', 'err');
+      return;
+    }
+    const resp = await gapi.client.drive.files.get({
+      fileId: existing.id,
+      alt: 'media'
+    });
+    const obj = typeof resp.result === 'string' ? JSON.parse(resp.result) : resp.result;
+    const arr = obj.data || obj;
+    if(!Array.isArray(arr)) throw new Error('フォーマットが正しくありません');
+
+    if(!confirm('クラウドから '+arr.length+'件 の顧客データを読み込みます。\n現在のデータと置き換えますか？\n（既存の各顧客が上書きされます）\n\nクラウド最終更新: '+new Date(existing.modifiedTime).toLocaleString('ja-JP'))) {
+      cloudMsg('キャンセルしました', '');
+      return;
+    }
+
+    // 置換
+    customers = arr.map(function(c){
+      if(!c.files) c.files=[];
+      if(!c.health) c.health=[];
+      if(!c.sessions) c.sessions=[];
+      if(!c.tags) c.tags=[];
+      return c;
+    });
+    if(obj.dailyReports && Array.isArray(obj.dailyReports)) dailyReports = obj.dailyReports;
+    if(obj.appointments && Array.isArray(obj.appointments)) {
+      appointments = obj.appointments;
+      try { saveAppts(); } catch(e){}
+    }
+    await save();
+    renderAll();
+    cloudMsg('✓ '+arr.length+'件読み込みました（日報 '+dailyReports.length+'件含む）', 'ok');
+  } catch(e) {
+    console.error(e);
+    cloudMsg('❌ ダウンロード失敗: '+(e.result&&e.result.error&&e.result.error.message||e.message||'不明なエラー'), 'err');
+  }
+}
+
+function toggleAutoSync() {
+  const on = document.getElementById('cloudAutoSync').checked;
+  localStorage.setItem(GC_LS_AUTO_SYNC, on?'1':'0');
+  if(on){
+    startAutoSync();
+    cloudMsg('✓ 自動同期ON（5分おき）', 'ok');
+  } else {
+    if(gcAutoSyncTimer){ clearInterval(gcAutoSyncTimer); gcAutoSyncTimer = null; }
+    cloudMsg('自動同期OFF', '');
+  }
+}
+
+function startAutoSync() {
+  if(gcAutoSyncTimer) clearInterval(gcAutoSyncTimer);
+  gcAutoSyncTimer = setInterval(function(){
+    if(gcAccessToken){
+      console.log('[Auto-sync] uploading...');
+      cloudUpload();
+    }
+  }, 5*60*1000); // 5分
+}
+
+
 
 
 document.getElementById('calPrev').addEventListener('click', function(){ calMonth--; if(calMonth<0){calMonth=11;calYear--;} drawCal(); });
