@@ -2049,9 +2049,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.15';
+const APP_VERSION = '2026.05.15b';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.15b',
+    date: '2026-05-15',
+    title: '重要修正：通知連打＆履歴復活の修正',
+    items: [
+      '🐛 「残り15分」の通知が同じ卓に対して何度も繰り返し届くバグを修正しました。サーバー同期で他端末の状態を取り込んだとき、通知済みフラグが上書きされて再発火していたのが原因です。',
+      '🐛 自動延長ONの卓でも残り15分アラートが鳴っていた問題を修正しました。自動延長中はお客様への確認が不要なので、アラートも鳴らないようになります。',
+      '🐛 履歴を削除しても、しばらくすると復活してしまうバグを修正しました。サーバー同期側に削除情報が伝わらず、別端末から戻ってきていたのが原因です。',
+      '今後、削除した来店記録はサーバー上では「削除済」として保存され、別端末でも同期されます（完全削除ではないため、必要なら後で復旧も可能です）。',
+      '通知の重複防止に追加の安全装置を入れました（同じ卓の同じセッションでは、何があっても15分通知は1回だけ）。',
+    ],
+  },
   {
     version: '2026.05.15',
     date: '2026-05-15',
@@ -2518,6 +2530,22 @@ function initApp() {
     state.tables.YOSHITSU = state.tables.P2;
     delete state.tables.P2;
   }
+  // 通知済みフラグの掃除：現在使用中でない卓のキーは削除
+  try {
+    const activeKeys = new Set();
+    Object.keys(state.tables || {}).forEach(tid => {
+      const td = state.tables[tid];
+      if (td && td.occupied && td.startedAt) {
+        activeKeys.add(`tao_notified_warn_${tid}_${td.startedAt}`);
+      }
+    });
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('tao_notified_warn_') && !activeKeys.has(k)) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch(e) {}
   // テーブル初期化（不足分のみ追加）
   if (!state.tables) state.tables = {};
   DEFAULT_TABLES.forEach(t => {
@@ -2842,7 +2870,7 @@ function checkOut(tableId) {
 // 来店ログ詳細モーダル（顧客来店履歴タップ・本日集計から呼ばれる）
 function showVisitDetail(logId) {
   if (!Array.isArray(state.visitLog)) return;
-  const log = state.visitLog.find(x => x.id === logId);
+  const log = state.visitLog.find(x => x.id === logId && !x.removed);
   if (!log) {
     alert('来店記録が見つかりません');
     return;
@@ -2944,10 +2972,12 @@ function showVisitDetail(logId) {
 // 来店ログを完全削除
 function deleteVisitLog(logId) {
   if (!Array.isArray(state.visitLog)) return;
-  const log = state.visitLog.find(x => x.id === logId);
+  const log = state.visitLog.find(x => x.id === logId && !x.removed);
   if (!log) return;
-  // visitLogから削除
-  state.visitLog = state.visitLog.filter(x => x.id !== logId);
+  // 論理削除：removed フラグを立てて _updated を更新（物理削除すると
+  // サーバー同期で他端末から復活してしまうため）
+  log.removed = true;
+  log._updated = Date.now();
   // 顧客のvisitsからもlogId参照を持つ要素を削除（紐づきがある場合）
   if (log.customerId) {
     const cust = state.customers.find(c => c.id === log.customerId);
@@ -2965,7 +2995,7 @@ function deleteVisitLog(logId) {
 // 退店取消：来店ログを削除し、卓を「使用中」状態に復活させる
 function undoCheckout(logId) {
   if (!Array.isArray(state.visitLog)) return;
-  const log = state.visitLog.find(x => x.id === logId);
+  const log = state.visitLog.find(x => x.id === logId && !x.removed);
   if (!log) return;
   const tableId = log.tableId;
   if (!tableId) {
@@ -3013,8 +3043,9 @@ function undoCheckout(logId) {
     alertedCritical: false,
     _updated: now,
   };
-  // 来店ログから削除
-  state.visitLog = state.visitLog.filter(x => x.id !== logId);
+  // 来店ログを論理削除（サーバー同期で復活しないように）
+  log.removed = true;
+  log._updated = now;
   // 顧客のvisitsからもlogId参照を削除
   if (log.customerId) {
     const cust = state.customers.find(c => c.id === log.customerId);
@@ -3032,7 +3063,7 @@ function undoCheckout(logId) {
 // 来店ログ編集モーダル
 function openVisitLogEditModal(logId) {
   if (!Array.isArray(state.visitLog)) return;
-  const log = state.visitLog.find(x => x.id === logId);
+  const log = state.visitLog.find(x => x.id === logId && !x.removed);
   if (!log) return;
 
   const splitHHMM = (ts) => {
@@ -3270,7 +3301,7 @@ function openVisitLogEditModal(logId) {
 
 // 来店ログ編集の保存
 function saveVisitLogEdit(logId, bg) {
-  const log = state.visitLog.find(x => x.id === logId);
+  const log = state.visitLog.find(x => x.id === logId && !x.removed);
   if (!log) return;
 
   const tableId = bg.querySelector('#vleTable').value || '';
@@ -3401,7 +3432,7 @@ function getCalendarYM() {
 
 // 指定日付（営業日）の集計を返す（visitLog + 進行中卓 + シフト出勤数）
 function getDateSummary(dateStr) {
-  const completed = (state.visitLog || []).filter(v => v.date === dateStr);
+  const completed = (state.visitLog || []).filter(v => !v.removed && v.date === dateStr);
   // その日に進行中の卓があるかは、営業日が一致する時のみ
   const todayStr = currentBusinessDate();
   const ongoing = [];
@@ -3859,27 +3890,36 @@ function updateTableTimers(renderUI) {
     const remainMin = Math.ceil(remainMs / 60000);
 
     // 残り15分アラート（バナー表示。設定により Push 通知も送る）
-    if (!tdata.alertedWarn && remainMs > 0 && remainMin <= ALERT_15_MIN) {
+    // 自動延長ONの卓はアラート不要（時間切れで自動的に延長されるため、お客様への確認が不要）
+    if (!tdata.alertedWarn && !tdata.autoExtend && remainMs > 0 && remainMin <= ALERT_15_MIN) {
       tdata.alertedWarn = true;
-      if (notifPrefs.enabled && notifPrefs.events.timer) {
-        showToast(`⏱ ${t.name}：残り15分です`, 'warn');
-      }
-      // バックグラウンド Push 通知（端末を閉じてても届く）
-      if (notifPrefs.events.timerPush) {
-        let custLabel = '';
-        if (tdata.customerId) {
-          const c = state.customers.find(x => x.id === tdata.customerId);
-          if (c) custLabel = displayName(c);
-        } else if (tdata.customerName) {
-          custLabel = tdata.customerName;
+      // 永続的な重複防止キー：tableId + startedAt で「同一セッションでは1回だけ通知」を保証
+      const notifyKey = `tao_notified_warn_${t.id}_${tdata.startedAt}`;
+      const alreadyNotified = (() => {
+        try { return !!localStorage.getItem(notifyKey); } catch(e) { return false; }
+      })();
+      if (!alreadyNotified) {
+        try { localStorage.setItem(notifyKey, '1'); } catch(e) {}
+        if (notifPrefs.enabled && notifPrefs.events.timer) {
+          showToast(`⏱ ${t.name}：残り15分です`, 'warn');
         }
-        let body = '残り15分です';
-        if (custLabel) body = `${withSan(custLabel)}　${body}`;
-        dispatchPushNotification({
-          title: `⏱ ${t.name}：残り15分`,
-          body,
-          type: 'timer',
-        });
+        // バックグラウンド Push 通知（端末を閉じてても届く）
+        if (notifPrefs.events.timerPush) {
+          let custLabel = '';
+          if (tdata.customerId) {
+            const c = state.customers.find(x => x.id === tdata.customerId);
+            if (c) custLabel = displayName(c);
+          } else if (tdata.customerName) {
+            custLabel = tdata.customerName;
+          }
+          let body = '残り15分です';
+          if (custLabel) body = `${withSan(custLabel)}　${body}`;
+          dispatchPushNotification({
+            title: `⏱ ${t.name}：残り15分`,
+            body,
+            type: 'timer',
+          });
+        }
       }
       needRender = true;
     }
@@ -5120,10 +5160,15 @@ function renderCustomerList() {
     return;
   }
 
+  // 削除済みログIDの集合（来店回数のカウント等で除外するため）
+  const removedLogIds = new Set(
+    (state.visitLog || []).filter(v => v.removed).map(v => v.id)
+  );
   list.innerHTML = filtered.map(c => {
-    const lastVisit = (c.visits||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const activeVisits = (c.visits || []).filter(v => !v.logId || !removedLogIds.has(v.logId));
+    const lastVisit = activeVisits.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
     const lastVisitStr = lastVisit ? lastVisit.date : '—';
-    const visitCount = (c.visits||[]).length;
+    const visitCount = activeVisits.length;
     const bottleCount = (c.bottles||[]).length;
     const dispName = withSan(displayName(c)) || '(無名)';
     // ニックネームありなら本名を控えめに併記
@@ -5300,7 +5345,13 @@ function reopenWithEditing() {
 }
 function rebuildCustomerModalBody(cust) {
   // 来店履歴は日付降順で表示。logIdがあれば詳細表示可能。
-  const indexedVisits = (cust.visits||[]).map((v, idx) => ({ ...v, _origIdx: idx }));
+  // ただし、対応する visitLog が removed されていれば除外する。
+  const removedLogIds = new Set(
+    (state.visitLog || []).filter(v => v.removed).map(v => v.id)
+  );
+  const indexedVisits = (cust.visits||[])
+    .filter(v => !v.logId || !removedLogIds.has(v.logId))
+    .map((v, idx) => ({ ...v, _origIdx: idx }));
   indexedVisits.sort((a, b) => b.date.localeCompare(a.date));
   const visitsRowsHtml = indexedVisits.map((v) => {
     const castNames = (v.castIds||[]).map(cid => state.casts.find(x=>x.id===cid)?.name || '').filter(Boolean).join('・');
@@ -6954,6 +7005,16 @@ function applyServerData(payload) {
       const incomingTs = incoming._updated || 0;
       const currentTs = current._updated || 0;
       if (incomingTs >= currentTs) {
+        // 同一テーブルが継続使用中（startedAt が同じ）なら、ローカル端末固有のアラートフラグを保護する。
+        // これがないと、サーバー同期のたびに alertedWarn/alertedCritical が false に戻り、同じ卓で何度も通知が発火する。
+        const sameSession = incoming.occupied && current.occupied &&
+                            incoming.startedAt && current.startedAt &&
+                            incoming.startedAt === current.startedAt;
+        if (sameSession) {
+          // ローカル側で既に通知済みなら、その状態を維持
+          if (current.alertedWarn) incoming.alertedWarn = true;
+          if (current.alertedCritical) incoming.alertedCritical = true;
+        }
         state.tables[tid] = incoming;
       }
     });
@@ -7002,11 +7063,19 @@ function applyServerData(payload) {
       }
     });
   }
-  // 来店ログ（visitLog）：IDベースで追加、既存はそのまま
+  // 来店ログ（visitLog）：IDベースで _updated 比較マージ、removed フラグも尊重
   if (Array.isArray(payload.visitLog)) {
     if (!Array.isArray(state.visitLog)) state.visitLog = [];
     payload.visitLog.forEach(rl => {
-      if (!state.visitLog.find(x => x.id === rl.id)) {
+      const idx = state.visitLog.findIndex(x => x.id === rl.id);
+      if (idx >= 0) {
+        // 既存：新しい方を採用（removed=true も伝搬する）
+        const localTs = state.visitLog[idx]._updated || state.visitLog[idx]._created || 0;
+        const remoteTs = rl._updated || rl._created || 0;
+        if (remoteTs >= localTs) {
+          state.visitLog[idx] = rl;
+        }
+      } else {
         state.visitLog.push(rl);
       }
     });
