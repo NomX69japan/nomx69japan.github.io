@@ -783,6 +783,14 @@
     cursor: pointer;
     min-width: 70px;
     position: relative;
+    text-align: center;
+    /* 記号表示用のフォント指定：iOS/Androidで揃える */
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    font-feature-settings: "palt";
+    letter-spacing: 0;
+    vertical-align: middle;
   }
   table.shift td.shift-cell.on {
     background: var(--on-bg) !important;
@@ -1741,10 +1749,10 @@
         </span>
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
-        セルをタップで切替：- (未回答) → ○ (出勤) → △ (未定) → ✗ (休み) → - (未回答)<br>
-        予約マーカーがある日は ○ や ① ② ③ を省略しマーカーだけ表示。<br>
-        ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ○ ）。<br>
-        ○ のみが出勤扱いとしてカウントされます（△ ✗ - はカウント外）。
+        セルをタップで切替：− (未回答) → ◯ (出勤) → △ (未定) → × (休み) → − (未回答)<br>
+        予約マーカーがある日は ◯ や ① ② ③ を省略しマーカーだけ表示。<br>
+        ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ◯ ）。<br>
+        ◯ のみが出勤扱いとしてカウントされます（△ × − はカウント外）。
       </p>
     </section>
 
@@ -2041,9 +2049,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.14c';
+const APP_VERSION = '2026.05.15';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.15',
+    date: '2026-05-15',
+    title: 'テーブル移動＆シフト記号調整',
+    items: [
+      '入店中のテーブル移動機能を追加しました。使用中卓モーダルから「📍 テーブル移動」ボタンで、空席テーブルを選んで移動できます。',
+      'テーブルを移動しても、入店時刻・キャスト指名・延長履歴などはそのまま引き継がれます。',
+      '履歴詳細でテーブル移動の履歴が「T1 → 洋室」のように矢印付きで表示されます。日付別の来店一覧にも📍マークで移動が分かるようになりました。',
+      'シフトの記号（◯△×−）の表示をiOS/Android共通で整えました。Androidで太字すぎたり位置がずれる問題を修正しています。',
+    ],
+  },
   {
     version: '2026.05.14c',
     date: '2026-05-14',
@@ -2878,7 +2897,14 @@ function showVisitDetail(logId) {
       <div class="cust-detail-section" style="margin-top:8px;">
         <table style="width:100%; font-size:13px; line-height:1.9; border-collapse:collapse;">
           <tr><td style="color:#888; width:90px; vertical-align:top;">お客様</td><td><b>${escapeHtml(withSan(custName) || '（記録なし）')}</b></td></tr>
-          <tr><td style="color:#888; vertical-align:top;">テーブル</td><td>${escapeHtml(log.tableName || log.tableId)}</td></tr>
+          <tr><td style="color:#888; vertical-align:top;">テーブル</td><td>${(() => {
+            const moves = Array.isArray(log.tableMoves) ? log.tableMoves : [];
+            if (moves.length === 0) return escapeHtml(log.tableName || log.tableId);
+            // 入店時の最初のテーブル → 順番に → 退店時のテーブル（log.tableName）
+            const parts = [moves[0].fromTableName];
+            moves.forEach(m => parts.push(m.toTableName));
+            return parts.map(p => escapeHtml(p)).join(' <span style="color:#b87a00;">→</span> ');
+          })()}</td></tr>
           <tr><td style="color:#888; vertical-align:top;">時間帯</td><td>${startStr} 〜 ${endStr}　<span style="color:#888;">(${durStr})</span></td></tr>
           <tr><td style="color:#888; vertical-align:top;">人数</td><td>${log.guests || 0}名</td></tr>
           <tr><td style="color:#888; vertical-align:top;">担当キャスト</td><td>${escapeHtml(allCasts)}</td></tr>
@@ -2981,6 +3007,7 @@ function undoCheckout(logId) {
     endsAt,
     setCount,
     extensions,
+    tableMoves: Array.isArray(log.tableMoves) ? log.tableMoves.slice() : [],
     autoExtend: !!log.autoExtend,
     alertedWarn: false,
     alertedCritical: false,
@@ -3636,6 +3663,14 @@ function showDayDetailModal(dateStr) {
         const memoSnippet = v.memo
           ? `<br>📝 ${escapeHtml(v.memo.length > 60 ? v.memo.slice(0, 60)+'…' : v.memo)}`
           : '';
+        // テーブル移動情報
+        const tblMoves = Array.isArray(v.tableMoves) ? v.tableMoves : [];
+        let movesSnippet = '';
+        if (tblMoves.length > 0) {
+          const parts = [tblMoves[0].fromTableName];
+          tblMoves.forEach(m => parts.push(m.toTableName));
+          movesSnippet = `<br>📍 ${parts.map(p => escapeHtml(p)).join(' → ')}`;
+        }
         const onclickAttr = v.ongoing
           ? `onclick="showOngoingDetail('${v.tableId}')"`
           : `onclick="showVisitDetail('${v.id}')"`;
@@ -3646,6 +3681,7 @@ function showDayDetailModal(dateStr) {
           </div>
           <div class="row-2">
             🌹 ${escapeHtml(allCasts)}　／　${v.setCount || 1}セット
+            ${movesSnippet}
             ${memoSnippet}
           </div>
         </div>`;
@@ -3756,6 +3792,7 @@ function recordVisitLog(tableId, tdata) {
     extensions,
     autoExtend: !!tdata.autoExtend,
     durationMin,
+    tableMoves: Array.isArray(tdata.tableMoves) ? tdata.tableMoves.slice() : [],
     _created: now,
   };
   if (!Array.isArray(state.visitLog)) state.visitLog = [];
@@ -4293,6 +4330,7 @@ function openTableModal(tableId) {
         <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
           <button type="button" class="btn btn-sm" data-extend-modal="30">+30分延長</button>
           <button type="button" class="btn btn-sm" data-extend-modal="60">+60分延長</button>
+          <button type="button" class="btn-sub btn-sm" data-move-table>📍 テーブル移動</button>
         </div>
         <details style="margin-top:10px; background:#f7f3e8; border:1px dashed #d4af37; border-radius:6px; padding:8px;">
           <summary style="cursor:pointer; font-size:12px; color:#8b6914;">⏱ 入店時刻を変更する</summary>
@@ -4374,6 +4412,12 @@ function openTableModal(tableId) {
   document.querySelectorAll('#tableModalBody [data-update-start]').forEach(el => {
     el.addEventListener('click', () => {
       updateStartTimeFromModal();
+    });
+  });
+  // テーブル移動ボタン
+  document.querySelectorAll('#tableModalBody [data-move-table]').forEach(el => {
+    el.addEventListener('click', () => {
+      openMoveTableDialog();
     });
   });
 
@@ -4552,6 +4596,108 @@ function updateStartTimeFromModal() {
 // モーダル「保存」ボタン（使用中の編集のみ）
 function saveTable() {
   saveTableInternal(true);
+}
+
+// テーブル移動ダイアログ：空席テーブル一覧を表示
+function openMoveTableDialog() {
+  if (!editingTableId) return;
+  const tdata = state.tables[editingTableId];
+  if (!tdata || !tdata.occupied) return;
+  const currentName = getTableName(editingTableId);
+
+  // 空席テーブル一覧（同種別を上に、別種別を下に）
+  const t = DEFAULT_TABLES.find(x => x.id === editingTableId);
+  const sameType = DEFAULT_TABLES.filter(x => x.id !== editingTableId && x.type === t.type && !(state.tables[x.id] && state.tables[x.id].occupied));
+  const otherType = DEFAULT_TABLES.filter(x => x.id !== editingTableId && x.type !== t.type && !(state.tables[x.id] && state.tables[x.id].occupied));
+  const buildBtn = (tt) => {
+    const label = tt.type === 'private' ? `🛋 ${tt.name}` : `🪑 ${tt.name}`;
+    return `<button type="button" class="btn btn-sm move-target-btn" data-move-to="${tt.id}" style="min-width:90px;">${label}</button>`;
+  };
+  const sameHtml = sameType.length > 0 ? sameType.map(buildBtn).join('') : '<span style="color:#888; font-size:12px;">空きなし</span>';
+  const otherHtml = otherType.length > 0 ? otherType.map(buildBtn).join('') : '<span style="color:#888; font-size:12px;">空きなし</span>';
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1900;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <h3 style="margin-top:0;">📍 テーブル移動</h3>
+      <p style="font-size:13px; color:var(--text-sub); margin:0 0 12px;">
+        <b>${escapeHtml(currentName)}</b> から移動先を選んでください。<br>
+        <span style="font-size:11px;">入店時刻・キャスト指名・延長履歴などはそのまま引き継ぎます。</span>
+      </p>
+      <div style="margin-bottom:12px;">
+        <p style="font-size:11px; color:var(--text-sub); margin:0 0 4px;">${t.type==='private'?'個室':'通常卓'}（同種別）</p>
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">${sameHtml}</div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <p style="font-size:11px; color:var(--text-sub); margin:0 0 4px;">${t.type==='private'?'通常卓':'個室'}（別種別）</p>
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">${otherHtml}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-sub btn-sm" data-cancel-move style="flex:1;">キャンセル</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.querySelector('[data-cancel-move]').addEventListener('click', close);
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  bg.querySelectorAll('[data-move-to]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const toId = btn.getAttribute('data-move-to');
+      const toName = getTableName(toId);
+      if (!confirm(`${currentName} → ${toName} に移動しますか？`)) return;
+      moveTable(editingTableId, toId);
+      close();
+      closeTableModal();
+    });
+  });
+}
+
+// テーブル移動本体：tdata を fromId から toId にコピー、fromId は空席に
+function moveTable(fromId, toId) {
+  const tdata = state.tables[fromId];
+  if (!tdata || !tdata.occupied) return;
+  const toTdata = state.tables[toId];
+  if (toTdata && toTdata.occupied) {
+    alert('移動先が使用中です');
+    return;
+  }
+  const now = Date.now();
+  // 移動履歴を蓄積
+  const tableMoves = Array.isArray(tdata.tableMoves) ? tdata.tableMoves.slice() : [];
+  tableMoves.push({
+    fromTableId: fromId,
+    fromTableName: getTableName(fromId),
+    toTableId: toId,
+    toTableName: getTableName(toId),
+    at: now,
+  });
+  // 移動先にデータをセット
+  state.tables[toId] = {
+    ...tdata,
+    tableMoves,
+    _updated: now,
+  };
+  // 元テーブルを空席に
+  state.tables[fromId] = {
+    occupied: false,
+    guests: 0,
+    castIds: [],
+    castNoms: {},
+    castFree: '',
+    customerId: '',
+    customerName: '',
+    memo: '',
+    startedAt: null,
+    endsAt: null,
+    setCount: 0,
+    _updated: now,
+  };
+  persistSave();
+  renderFloor();
+  showToast(`${getTableName(fromId)} → ${getTableName(toId)} に移動しました`, 'normal');
 }
 
 function readTableModalForm() {
@@ -4776,7 +4922,7 @@ function renderShift() {
             cellContent = marksHtml;
             cellClass = 'on';
           } else if (status === 'on') {
-            let mark = '○';
+            let mark = '◯';
             if (c.trial && trialPastShiftDates && dStr <= todayStr) {
               const idx = trialPastShiftDates.indexOf(dStr);
               if (idx === 0) mark = '①';
@@ -4789,10 +4935,10 @@ function renderShift() {
             cellContent = '△';
             cellClass = 'pending';
           } else if (status === 'off') {
-            cellContent = '✗';
+            cellContent = '×';
             cellClass = 'off-x';
           } else {
-            cellContent = '-';
+            cellContent = '−';
             cellClass = 'unanswered';
           }
           html += `<td class="shift-cell ${cellClass}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
@@ -4810,10 +4956,10 @@ function renderShift() {
           const dStr = localDateStr(d);
           const status = getShiftStatus(dStr, s.id);
           let mark, cls;
-          if (status === 'on') { mark = '○'; cls = 'on'; }
+          if (status === 'on') { mark = '◯'; cls = 'on'; }
           else if (status === 'pending') { mark = '△'; cls = 'pending'; }
-          else if (status === 'off') { mark = '✗'; cls = 'off-x'; }
-          else { mark = '-'; cls = 'unanswered'; }
+          else if (status === 'off') { mark = '×'; cls = 'off-x'; }
+          else { mark = '−'; cls = 'unanswered'; }
           html += `<td class="shift-cell ${cls}" data-date="${dStr}" data-cast="${s.id}" onclick="toggleShift('${dStr}','${s.id}')">${mark}</td>`;
         });
         html += '</tr>';
