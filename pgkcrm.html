@@ -361,6 +361,13 @@ tr:hover td{background:#fafaf8;cursor:pointer}
         <div id="cloudStatusText" style="font-size:13px;font-weight:500">未接続</div>
       </div>
 
+      <!-- 軽量同期の説明 -->
+      <div style="padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--r);font-size:10px;line-height:1.6;color:#9a3412">
+        <b>軽量同期モード</b>：顧客データ・健康記録・セッション・日報を同期します。
+        <b>添付ファイル（写真等）はクラウド対象外</b>のため、各端末に個別保存されます。
+        必要な時は「バックアップ」のJSONエクスポートで端末間移行してください。
+      </div>
+
       <!-- 設定セクション -->
       <details id="cloudSettings">
         <summary style="cursor:pointer;font-size:12px;color:var(--txt2);padding:6px 0">⚙️ 設定（クライアントID・APIキー）</summary>
@@ -3217,14 +3224,30 @@ function cloudSignOut() {
   cloudMsg('サインアウト完了', 'ok');
 }
 
-// JSONバックアップ形式を生成
+// JSONバックアップ形式を生成（添付バイナリは除外して軽量化）
 function cloudBuildJson() {
+  // customers をディープコピーして files[].data を除去
+  const lightCustomers = customers.map(function(c){
+    const copy = Object.assign({}, c);
+    if(Array.isArray(c.files) && c.files.length){
+      copy.files = c.files.map(function(f){
+        // dataフィールド（base64バイナリ）を除く、メタ情報のみ保存
+        const m = {};
+        Object.keys(f).forEach(function(k){
+          if(k !== 'data') m[k] = f[k];
+        });
+        return m;
+      });
+    }
+    return copy;
+  });
   return {
-    version: 3,
+    version: 4,
     exported: new Date().toISOString(),
-    data: customers,
+    data: lightCustomers,
     dailyReports: dailyReports,
-    appointments: appointments
+    appointments: appointments,
+    _meta: { attachmentsExcluded: true }
   };
 }
 
@@ -3279,7 +3302,7 @@ async function cloudUpload() {
       body: body
     });
 
-    cloudMsg('✓ '+(existing?'更新':'新規作成')+'しました（'+sizeKb+'KB）', 'ok');
+    cloudMsg('✓ '+(existing?'更新':'新規作成')+'しました（'+sizeKb+'KB｜軽量同期）', 'ok');
   } catch(e) {
     console.error(e);
     cloudMsg('❌ アップロード失敗: '+(e.result&&e.result.error&&e.result.error.message||e.message||'不明なエラー'), 'err');
@@ -3302,17 +3325,42 @@ async function cloudDownload() {
     const arr = obj.data || obj;
     if(!Array.isArray(arr)) throw new Error('フォーマットが正しくありません');
 
-    if(!confirm('クラウドから '+arr.length+'件 の顧客データを読み込みます。\n現在のデータと置き換えますか？\n（既存の各顧客が上書きされます）\n\nクラウド最終更新: '+new Date(existing.modifiedTime).toLocaleString('ja-JP'))) {
+    const isLight = obj._meta && obj._meta.attachmentsExcluded;
+    const sizeKb = Math.round(JSON.stringify(obj).length/1024);
+    const msg = 'クラウドから '+arr.length+'件 の顧客データを読み込みます。\n'
+      +'現在のデータと置き換えますか？\n'
+      +(isLight?'（軽量同期：添付ファイルは現在の端末のものが保持されます）\n':'')
+      +'\nクラウド最終更新: '+new Date(existing.modifiedTime).toLocaleString('ja-JP')
+      +'\nサイズ: '+sizeKb+'KB';
+    if(!confirm(msg)) {
       cloudMsg('キャンセルしました', '');
       return;
     }
 
-    // 置換
+    // 既存添付バイナリを保持するためのマップ（顧客ID → ファイルID → dataバイナリ）
+    const localFilesMap = {};
+    customers.forEach(function(c){
+      if(!c.files || !c.files.length) return;
+      localFilesMap[c.id] = {};
+      c.files.forEach(function(f){
+        if(f.data) localFilesMap[c.id][f.id] = f.data;
+      });
+    });
+
+    // 置換（添付バイナリは既存ローカルから復元）
     customers = arr.map(function(c){
       if(!c.files) c.files=[];
       if(!c.health) c.health=[];
       if(!c.sessions) c.sessions=[];
       if(!c.tags) c.tags=[];
+      // 添付バイナリ復元
+      if(c.files.length && localFilesMap[c.id]){
+        c.files.forEach(function(f){
+          if(!f.data && localFilesMap[c.id][f.id]){
+            f.data = localFilesMap[c.id][f.id];
+          }
+        });
+      }
       return c;
     });
     if(obj.dailyReports && Array.isArray(obj.dailyReports)) dailyReports = obj.dailyReports;
@@ -3322,7 +3370,17 @@ async function cloudDownload() {
     }
     await save();
     renderAll();
-    cloudMsg('✓ '+arr.length+'件読み込みました（日報 '+dailyReports.length+'件含む）', 'ok');
+
+    // 添付が欠落している件数を数える
+    let missingFiles = 0;
+    customers.forEach(function(c){
+      (c.files||[]).forEach(function(f){ if(!f.data) missingFiles++; });
+    });
+    let okMsg = '✓ '+arr.length+'件読み込みました（日報 '+dailyReports.length+'件含む）';
+    if(isLight && missingFiles>0){
+      okMsg += '\n※ '+missingFiles+'件の添付ファイルがこの端末にはありません。元の端末でJSONバックアップを取得して読込してください。';
+    }
+    cloudMsg(okMsg, 'ok');
   } catch(e) {
     console.error(e);
     cloudMsg('❌ ダウンロード失敗: '+(e.result&&e.result.error&&e.result.error.message||e.message||'不明なエラー'), 'err');
