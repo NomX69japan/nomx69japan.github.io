@@ -909,6 +909,145 @@
     font-weight: 600;
   }
 
+  /* ====== オーダー機能 ====== */
+  .order-cat-tabs { overflow-x: auto; }
+  .order-cat-tab {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-sub);
+    font-weight: 500;
+  }
+  .order-cat-tab.active {
+    color: #8b6914;
+    border-bottom-color: #d4af37;
+    font-weight: 700;
+  }
+  .order-item-btn:hover, .order-item-btn:active {
+    background: #fff4d6 !important;
+  }
+  /* 卓モーダル内のオーダー一覧 */
+  .order-summary-details {
+    background: #fafafa;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 10px;
+  }
+  .order-summary-body {
+    padding-bottom: 6px;
+  }
+  .order-cat-block + .order-cat-block { margin-top: 6px; }
+  .order-cat-head {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8b6914;
+    padding: 4px 0;
+    border-bottom: 1px dashed #e0c060;
+    margin-bottom: 4px;
+  }
+  .order-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 13px;
+  }
+  .order-name {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .order-qty-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .order-qty-btn {
+    width: 26px; height: 26px;
+    padding: 0; border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .order-qty {
+    min-width: 24px;
+    text-align: center;
+    font-weight: 600;
+  }
+  .order-del-btn {
+    width: 24px; height: 24px;
+    padding: 0; border-radius: 50%;
+    border: 1px solid #f0c0c0;
+    background: #fff0f0;
+    color: #c44;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    margin-left: 4px;
+  }
+  /* 卓カードのオーダーバッジ */
+  .table-order-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fff4d6;
+    color: #8b6914;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  /* 商品マスタ管理 */
+  .menu-cat-block { margin-bottom: 12px; }
+  .menu-cat-head {
+    font-size: 12px;
+    font-weight: 700;
+    color: #8b6914;
+    padding: 4px 0;
+    border-bottom: 1px dashed #e0c060;
+    margin-bottom: 6px;
+  }
+  .menu-item-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 0;
+  }
+  .menu-name-input {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  .menu-cat-select {
+    padding: 5px 4px;
+    font-size: 12px;
+    width: 90px;
+  }
+  @media (max-width: 600px) {
+    .menu-item-row { flex-wrap: wrap; }
+    .menu-name-input { flex-basis: 100%; }
+  }
+  /* 履歴詳細・卓カードでのオーダー表示 */
+  .visit-orders-block {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+  .visit-orders-cat {
+    color: #8b6914;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+
   /* ====== 複数顧客カード（入店モーダル） ====== */
   .guest-card-list {
     display: flex; flex-direction: column; gap: 10px;
@@ -2029,6 +2168,8 @@ function persistLoad() {
     if (Array.isArray(data.reservations)) state.reservations = data.reservations;
     if (Array.isArray(data.visitLog)) state.visitLog = data.visitLog;
     if (Array.isArray(data.events)) state.events = data.events;
+    if (Array.isArray(data.menuItems)) state.menuItems = data.menuItems;
+    if (Array.isArray(data.menuCategories)) state.menuCategories = data.menuCategories;
   } catch(e) {
     console.error('persistLoad failed', e);
   }
@@ -2049,9 +2190,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.15b';
+const APP_VERSION = '2026.05.16';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.16',
+    date: '2026-05-16',
+    title: '📝 オーダー入力機能',
+    items: [
+      '使用中の卓モーダルに「📝 オーダー追加」ボタンが追加されました。',
+      'タップでドリンク・ボトル・シャンパン・ピッチャー・フードのタブ付きパネルが開き、商品をワンタップで追加できます。同じ商品を続けてタップすると数量が増えます。',
+      '卓カードに「📦 X品 / Y点」のオーダーバッジが表示され、各オーダー内容も一覧できます。',
+      '複数顧客モードのときは、誰のオーダーかを選んで記録できます。',
+      '初期商品マスタは約23品をプリセット。商品とカテゴリは「⚙ 商品を編集」から自由に追加・編集・削除・並び替えできます。',
+      '退店後の履歴詳細にも「📦 オーダー一覧」がカテゴリ別に表示されます。',
+    ],
+  },
   {
     version: '2026.05.15b',
     date: '2026-05-15',
@@ -2179,8 +2333,45 @@ const state = {
   reservations: [],
   visitLog: [], // 退店時に記録される来店履歴
   events: [],   // 店舗イベント（誕生日・記念日・キャンペーンなど。{id, title, startDate, endDate}）
+  menuItems: [], // オーダー商品マスタ {id, name, category, sortOrder, removed}
+  menuCategories: [], // カテゴリマスタ {id, name, sortOrder, removed}
   weekOffset: 0,
 };
+
+// デフォルト商品マスタ（state.menuItemsが空の時にだけ投入される）
+const DEFAULT_MENU_ITEMS = [
+  // ドリンク
+  { name: 'Lビール', category: 'ドリンク' },
+  { name: '生ビール', category: 'ドリンク' },
+  { name: '店長ビール', category: 'ドリンク' },
+  { name: '烏龍ハイ', category: 'ドリンク' },
+  { name: '緑茶ハイ', category: 'ドリンク' },
+  { name: '玄米P', category: 'ドリンク' },
+  { name: 'アセロラワイン', category: 'ドリンク' },
+  { name: 'ジンジャエール', category: 'ドリンク' },
+  { name: '炭酸', category: 'ドリンク' },
+  { name: '緑茶', category: 'ドリンク' },
+  { name: '烏龍茶', category: 'ドリンク' },
+  // ボトル
+  { name: '焼酎（麦）', category: 'ボトル' },
+  { name: '焼酎（芋）', category: 'ボトル' },
+  { name: 'ウイスキー', category: 'ボトル' },
+  // シャンパン
+  { name: 'モエ', category: 'シャンパン' },
+  { name: 'ヴーヴ', category: 'シャンパン' },
+  { name: 'ドンペリ白', category: 'シャンパン' },
+  // ピッチャー
+  { name: 'ピッチャー（緑茶）', category: 'ピッチャー' },
+  { name: 'ピッチャー（烏龍茶）', category: 'ピッチャー' },
+  { name: 'ピッチャー（水）', category: 'ピッチャー' },
+  // フード
+  { name: 'おつまみ盛合せ', category: 'フード' },
+  { name: 'チーズ盛', category: 'フード' },
+  { name: 'ナッツ', category: 'フード' },
+];
+
+// デフォルトカテゴリ（表示順）
+const DEFAULT_CATEGORIES = ['ドリンク', 'ボトル', 'シャンパン', 'ピッチャー', 'フード'];
 
 // 通知設定（端末ごとにlocalStorageへ保存。サーバー同期しない）
 const LS_NOTIF = 'tao_lite_notif';
@@ -2699,7 +2890,13 @@ function buildTableCard(t, tdata) {
     <div class="info">
       ${customerNameHtml}
       ${tdata.guests ? `👥 ${tdata.guests}名<br>` : ''}
-      ${allCastDisp ? `🌹 ${escapeHtml(allCastDisp)}` : ''}
+      ${allCastDisp ? `🌹 ${escapeHtml(allCastDisp)}<br>` : ''}
+      ${(() => {
+        const orders = (tdata.orders || []).filter(o => !o.removed);
+        if (orders.length === 0) return '';
+        const totalQty = orders.reduce((s,o)=>s+(o.qty||1),0);
+        return `<span class="table-order-badge">📦 ${orders.length}品 / ${totalQty}点</span>`;
+      })()}
     </div>
     ${tdata.memo ? `<div class="memo-pre">${escapeHtml(tdata.memo)}</div>` : ''}
     ${timerHtml}
@@ -2938,6 +3135,37 @@ function showVisitDetail(logId) {
           <tr><td style="color:#888; vertical-align:top;">担当キャスト</td><td>${escapeHtml(allCasts)}</td></tr>
           ${log.dohan && (log.dohanCastIds||[]).length > 0 ? `<tr><td style="color:#888; vertical-align:top;">同伴</td><td><span style="background:#fff4d6; color:#8a6a0a; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">${escapeHtml(buildDohanDisplay(log) || 'あり')}</span></td></tr>` : ''}
           <tr><td style="color:#888; vertical-align:top;">セット数</td><td>${setBreakdownText}</td></tr>
+          ${(() => {
+            const orders = (log.orders || []).filter(o => !o.removed);
+            if (orders.length === 0) return '';
+            const byCat = {};
+            orders.forEach(o => {
+              const c = o.category || 'その他';
+              if (!byCat[c]) byCat[c] = [];
+              byCat[c].push(o);
+            });
+            const catOrder = ['ドリンク', 'ボトル', 'シャンパン', 'ピッチャー', 'フード', '酒類', 'その他'];
+            const cats = catOrder.filter(c => byCat[c])
+              .concat(Object.keys(byCat).filter(c => !catOrder.includes(c)));
+            const ordersHtml = cats.map(cat => {
+              const items = byCat[cat].map(o => {
+                const gname = (() => {
+                  if (!o.byGuestId || !Array.isArray(log.guestList)) return '';
+                  const g = log.guestList.find(x => x.id === o.byGuestId);
+                  if (!g) return '';
+                  const nm = g.customerId
+                    ? withSan(displayName(state.customers.find(c => c.id === g.customerId)))
+                    : withSan(g.customerName);
+                  return nm || '';
+                })();
+                const gtag = gname ? `<span style="font-size:10px; color:#8b6914; background:#fff4d6; padding:0 5px; border-radius:6px; margin-left:4px;">${escapeHtml(gname)}</span>` : '';
+                return `${escapeHtml(o.itemName)} ×${o.qty}${gtag}`;
+              }).join('、');
+              return `<div style="margin-bottom:3px;"><span class="visit-orders-cat">${escapeHtml(cat)}：</span>${items}</div>`;
+            }).join('');
+            const totalQty = orders.reduce((s,o)=>s+(o.qty||1),0);
+            return `<tr><td style="color:#888; vertical-align:top;">オーダー</td><td><div style="font-size:12px;"><b style="color:#8b6914;">📦 ${orders.length}品 / ${totalQty}点</b></div><div class="visit-orders-block">${ordersHtml}</div></td></tr>`;
+          })()}
           ${log.memo ? `<tr><td style="color:#888; vertical-align:top;">メモ</td><td style="white-space:pre-wrap;">${escapeHtml(log.memo)}</td></tr>` : ''}
         </table>
       </div>
@@ -3038,6 +3266,7 @@ function undoCheckout(logId) {
     setCount,
     extensions,
     tableMoves: Array.isArray(log.tableMoves) ? log.tableMoves.slice() : [],
+    orders: Array.isArray(log.orders) ? log.orders.map(o => ({ ...o })) : [],
     autoExtend: !!log.autoExtend,
     alertedWarn: false,
     alertedCritical: false,
@@ -3824,6 +4053,8 @@ function recordVisitLog(tableId, tdata) {
     autoExtend: !!tdata.autoExtend,
     durationMin,
     tableMoves: Array.isArray(tdata.tableMoves) ? tdata.tableMoves.slice() : [],
+    orders: Array.isArray(tdata.orders) ? tdata.orders.filter(o => !o.removed).map(o => ({ ...o })) : [],
+    guestList: Array.isArray(tdata.guestList) ? tdata.guestList.map(g => ({ ...g })) : null,
     _created: now,
   };
   if (!Array.isArray(state.visitLog)) state.visitLog = [];
@@ -4371,7 +4602,9 @@ function openTableModal(tableId) {
           <button type="button" class="btn btn-sm" data-extend-modal="30">+30分延長</button>
           <button type="button" class="btn btn-sm" data-extend-modal="60">+60分延長</button>
           <button type="button" class="btn-sub btn-sm" data-move-table>📍 テーブル移動</button>
+          <button type="button" class="btn btn-sm" data-open-order style="background:#d4af37; color:#fff;">📝 オーダー追加</button>
         </div>
+        <div id="ordersInModal" style="margin-top:10px;"></div>
         <details style="margin-top:10px; background:#f7f3e8; border:1px dashed #d4af37; border-radius:6px; padding:8px;">
           <summary style="cursor:pointer; font-size:12px; color:#8b6914;">⏱ 入店時刻を変更する</summary>
           <div style="margin-top:8px;">
@@ -4460,6 +4693,14 @@ function openTableModal(tableId) {
       openMoveTableDialog();
     });
   });
+  // オーダー追加ボタン
+  document.querySelectorAll('#tableModalBody [data-open-order]').forEach(el => {
+    el.addEventListener('click', () => {
+      openOrderPanel(editingTableId);
+    });
+  });
+  // モーダル内のオーダー一覧を描画
+  renderOrdersInModal();
 
   // ボタン領域を状況に応じて切り替え
   buildTableModalFooter(tdata.occupied);
@@ -4739,6 +4980,565 @@ function moveTable(fromId, toId) {
   renderFloor();
   showToast(`${getTableName(fromId)} → ${getTableName(toId)} に移動しました`, 'normal');
 }
+
+// =====================================================
+// オーダー機能
+// =====================================================
+
+// 商品カテゴリの一覧を取得（menuCategories から sortOrder 順で）
+function getMenuCategories() {
+  const cats = (state.menuCategories || [])
+    .filter(c => !c.removed && c.name)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+    .map(c => c.name);
+  if (cats.length > 0) return cats;
+  // フォールバック：menuItems から動的抽出
+  const set = new Set();
+  (state.menuItems || []).forEach(m => {
+    if (!m.removed && m.category) set.add(m.category);
+  });
+  return Array.from(set).length > 0 ? Array.from(set) : ['その他'];
+}
+
+// オーダー追加パネルを開く
+function openOrderPanel(tableId) {
+  if (!tableId) return;
+  const tdata = state.tables[tableId];
+  if (!tdata || !tdata.occupied) return;
+  const categories = getMenuCategories();
+  const initialCat = categories[0];
+
+  // 顧客選択肢（複数顧客モード時のみ表示）
+  let guestSelectorHtml = '';
+  if (Array.isArray(tdata.guestList) && tdata.guestList.length > 1) {
+    const activeGuests = tdata.guestList.filter(g => !g.exited);
+    if (activeGuests.length > 1) {
+      const opts = activeGuests.map(g => {
+        const nm = g.customerId
+          ? withSan(displayName(state.customers.find(c => c.id === g.customerId)))
+          : withSan(g.customerName);
+        return `<option value="${g.id}">${escapeHtml(nm || 'お客様')}</option>`;
+      }).join('');
+      guestSelectorHtml = `
+        <div style="margin-bottom:10px; padding:8px; background:#fff8e7; border:1px dashed #d4af37; border-radius:6px;">
+          <label style="font-size:11px; color:#8b6914; display:block; margin-bottom:4px;">どなたのオーダー？</label>
+          <select id="orderForGuestId" style="width:100%; padding:6px 8px;">
+            <option value="">テーブル全体（誰でも）</option>
+            ${opts}
+          </select>
+        </div>
+      `;
+    }
+  }
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1850;
+  bg.id = 'orderPanelBg';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:520px; max-height:90vh; display:flex; flex-direction:column;">
+      <h3 style="margin-top:0; flex-shrink:0;">📝 ${escapeHtml(getTableName(tableId))} オーダー追加</h3>
+      ${guestSelectorHtml}
+      <div class="order-cat-tabs" style="flex-shrink:0; display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid var(--border);">
+        ${categories.map((c, i) => `<button type="button" class="order-cat-tab ${i===0?'active':''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}
+      </div>
+      <div id="orderItemGrid" style="flex:1; overflow-y:auto; padding:4px 0;"></div>
+      <div style="flex-shrink:0; padding-top:10px; border-top:1px solid var(--border); display:flex; gap:6px;">
+        <button type="button" class="btn-sub btn-sm" data-close-order style="flex:1;">閉じる</button>
+        <button type="button" class="btn btn-sm" data-manage-menu>⚙ 商品を編集</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  renderOrderItemGrid(tableId, initialCat);
+
+  bg.querySelectorAll('.order-cat-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      bg.querySelectorAll('.order-cat-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderOrderItemGrid(tableId, tab.getAttribute('data-cat'));
+    });
+  });
+  bg.querySelector('[data-close-order]').addEventListener('click', () => bg.remove());
+  bg.querySelector('[data-manage-menu]').addEventListener('click', () => {
+    bg.remove();
+    openMenuManageDialog();
+  });
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+}
+
+// カテゴリ別商品グリッドを描画
+function renderOrderItemGrid(tableId, category) {
+  const grid = document.getElementById('orderItemGrid');
+  if (!grid) return;
+  const items = (state.menuItems || [])
+    .filter(m => !m.removed && m.category === category)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  if (items.length === 0) {
+    grid.innerHTML = '<p style="color:#888; font-size:12px; padding:12px; text-align:center;">このカテゴリに商品が登録されていません</p>';
+    return;
+  }
+  grid.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px;">
+      ${items.map(item => `
+        <button type="button" class="order-item-btn" data-item-id="${item.id}" style="
+          padding:10px 8px; background:#fffbf2; border:1px solid #d4af37;
+          border-radius:6px; font-size:13px; cursor:pointer;
+          color:var(--text); font-weight:500; text-align:center;
+          transition:background 0.15s;
+        ">
+          ${escapeHtml(item.name)}
+        </button>
+      `).join('')}
+    </div>
+  `;
+  grid.querySelectorAll('.order-item-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const itemId = btn.getAttribute('data-item-id');
+      addOrderToTable(tableId, itemId);
+      // フィードバック演出
+      btn.style.background = '#d4af37';
+      btn.style.color = '#fff';
+      setTimeout(() => {
+        btn.style.background = '#fffbf2';
+        btn.style.color = '';
+      }, 200);
+    });
+  });
+}
+
+// オーダーをテーブルに追加（同じ商品×同じ顧客なら数量+1、なければ新規）
+function addOrderToTable(tableId, itemId) {
+  const tdata = state.tables[tableId];
+  if (!tdata || !tdata.occupied) return;
+  const item = (state.menuItems || []).find(m => m.id === itemId);
+  if (!item) return;
+  if (!Array.isArray(tdata.orders)) tdata.orders = [];
+  // 顧客選択
+  const guestSelEl = document.getElementById('orderForGuestId');
+  const forGuestId = guestSelEl ? (guestSelEl.value || '') : '';
+  // 既存の同一オーダーを探す（同じ商品 × 同じ顧客割り当て）
+  const existing = tdata.orders.find(o =>
+    !o.removed && o.itemId === itemId && (o.byGuestId || '') === forGuestId
+  );
+  if (existing) {
+    existing.qty = (existing.qty || 1) + 1;
+    existing._updated = Date.now();
+  } else {
+    tdata.orders.push({
+      id: genId('order'),
+      itemId: item.id,
+      itemName: item.name,
+      category: item.category,
+      qty: 1,
+      byGuestId: forGuestId || '',
+      at: Date.now(),
+      _updated: Date.now(),
+    });
+  }
+  tdata._updated = Date.now();
+  persistSave();
+  renderFloor();
+  renderOrdersInModal();
+  showToast(`${item.name} を追加`, 'normal');
+}
+
+// モーダル内の現在のオーダー一覧描画
+function renderOrdersInModal() {
+  const root = document.getElementById('ordersInModal');
+  if (!root || !editingTableId) return;
+  const tdata = state.tables[editingTableId];
+  if (!tdata) { root.innerHTML = ''; return; }
+  const orders = (tdata.orders || []).filter(o => !o.removed);
+  if (orders.length === 0) {
+    root.innerHTML = '<p style="font-size:11px; color:#888; margin:0; padding:8px; text-align:center; background:#fafafa; border-radius:6px;">オーダーまだありません</p>';
+    return;
+  }
+  // カテゴリ別にグルーピング
+  const byCat = {};
+  orders.forEach(o => {
+    const c = o.category || 'その他';
+    if (!byCat[c]) byCat[c] = [];
+    byCat[c].push(o);
+  });
+  // 顧客名解決
+  const guestName = (gid) => {
+    if (!gid) return '';
+    const g = (tdata.guestList || []).find(x => x.id === gid);
+    if (!g) return '';
+    const nm = g.customerId
+      ? withSan(displayName(state.customers.find(c => c.id === g.customerId)))
+      : withSan(g.customerName);
+    return nm || '';
+  };
+  const sections = Object.keys(byCat).map(cat => {
+    const rows = byCat[cat].map(o => {
+      const gname = guestName(o.byGuestId);
+      const gnameHtml = gname ? `<span style="font-size:10px; color:#8b6914; background:#fff4d6; padding:1px 6px; border-radius:8px; margin-left:6px;">${escapeHtml(gname)}</span>` : '';
+      return `
+        <div class="order-row" data-order-id="${o.id}">
+          <span class="order-name">${escapeHtml(o.itemName)}${gnameHtml}</span>
+          <span class="order-qty-ctrl">
+            <button type="button" class="order-qty-btn" data-qty-delta="-1">−</button>
+            <span class="order-qty">${o.qty}</span>
+            <button type="button" class="order-qty-btn" data-qty-delta="1">＋</button>
+            <button type="button" class="order-del-btn" data-order-del title="削除">×</button>
+          </span>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="order-cat-block">
+        <div class="order-cat-head">${escapeHtml(cat)}</div>
+        ${rows}
+      </div>
+    `;
+  }).join('');
+  root.innerHTML = `
+    <details class="order-summary-details" open>
+      <summary style="cursor:pointer; font-size:13px; font-weight:600; color:#8b6914; padding:6px 0;">
+        📦 オーダー一覧（${orders.length}件 / ${orders.reduce((s,o)=>s+(o.qty||1),0)}点）
+      </summary>
+      <div class="order-summary-body">${sections}</div>
+    </details>
+  `;
+  // ハンドラ
+  root.querySelectorAll('.order-row').forEach(row => {
+    const orderId = row.getAttribute('data-order-id');
+    row.querySelectorAll('[data-qty-delta]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const delta = parseInt(btn.getAttribute('data-qty-delta'), 10);
+        changeOrderQty(editingTableId, orderId, delta);
+      });
+    });
+    row.querySelector('[data-order-del]')?.addEventListener('click', () => {
+      removeOrder(editingTableId, orderId);
+    });
+  });
+}
+
+function changeOrderQty(tableId, orderId, delta) {
+  const tdata = state.tables[tableId];
+  if (!tdata) return;
+  const o = (tdata.orders || []).find(x => x.id === orderId);
+  if (!o) return;
+  o.qty = Math.max(0, (o.qty || 0) + delta);
+  if (o.qty === 0) {
+    o.removed = true;
+  }
+  o._updated = Date.now();
+  tdata._updated = Date.now();
+  persistSave();
+  renderFloor();
+  renderOrdersInModal();
+}
+
+function removeOrder(tableId, orderId) {
+  const tdata = state.tables[tableId];
+  if (!tdata) return;
+  const o = (tdata.orders || []).find(x => x.id === orderId);
+  if (!o) return;
+  if (!confirm(`「${o.itemName}」を取り消しますか？`)) return;
+  o.removed = true;
+  o._updated = Date.now();
+  tdata._updated = Date.now();
+  persistSave();
+  renderFloor();
+  renderOrdersInModal();
+}
+
+// 商品マスタ管理ダイアログ
+function openMenuManageDialog() {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1860;
+  bg.id = 'menuManageBg';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:540px; max-height:90vh; display:flex; flex-direction:column;">
+      <h3 style="margin-top:0; flex-shrink:0;">⚙ 商品マスタ編集</h3>
+      <div class="menu-manage-tabs" style="flex-shrink:0; display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid var(--border);">
+        <button type="button" class="menu-manage-tab order-cat-tab active" data-tab="items">商品</button>
+        <button type="button" class="menu-manage-tab order-cat-tab" data-tab="cats">カテゴリ</button>
+      </div>
+      <div id="menuManageContent" style="flex:1; overflow-y:auto; padding:4px 0;"></div>
+      <div id="menuManageFooter" style="flex-shrink:0; padding-top:10px; border-top:1px solid var(--border);"></div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  let currentTab = 'items';
+  const renderTab = (tab) => {
+    currentTab = tab;
+    bg.querySelectorAll('.menu-manage-tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+    });
+    if (tab === 'items') {
+      renderMenuManageList();
+      renderMenuManageFooterItems();
+    } else {
+      renderCategoryManageList();
+      renderMenuManageFooterCats();
+    }
+  };
+  bg.querySelectorAll('.menu-manage-tab').forEach(t => {
+    t.addEventListener('click', () => renderTab(t.getAttribute('data-tab')));
+  });
+  renderTab('items');
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  window._menuManageBg = bg;
+}
+function closeMenuManageDialog() {
+  if (window._menuManageBg) {
+    window._menuManageBg.remove();
+    window._menuManageBg = null;
+  }
+}
+
+function renderMenuManageFooterItems() {
+  const root = document.getElementById('menuManageFooter');
+  if (!root) return;
+  const cats = getMenuCategories();
+  const catOpts = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  root.innerHTML = `
+    <div style="display:flex; gap:6px; margin-bottom:6px;">
+      <input type="text" id="newMenuName" placeholder="商品名（例: 赤ワイン）" style="flex:2; padding:6px 8px; font-size:13px;">
+      <select id="newMenuCat" style="flex:1; padding:6px 8px; font-size:13px;">${catOpts}</select>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button type="button" class="btn btn-sm" onclick="addMenuItem()" style="flex:1;">＋ 商品を追加</button>
+      <button type="button" class="btn-sub btn-sm" onclick="closeMenuManageDialog()">閉じる</button>
+    </div>
+  `;
+}
+
+function renderMenuManageFooterCats() {
+  const root = document.getElementById('menuManageFooter');
+  if (!root) return;
+  root.innerHTML = `
+    <div style="display:flex; gap:6px; margin-bottom:6px;">
+      <input type="text" id="newCategoryName" placeholder="カテゴリ名（例: ボトル、シャンパン）" style="flex:1; padding:6px 8px; font-size:13px;">
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button type="button" class="btn btn-sm" onclick="addCategory()" style="flex:1;">＋ カテゴリを追加</button>
+      <button type="button" class="btn-sub btn-sm" onclick="closeMenuManageDialog()">閉じる</button>
+    </div>
+  `;
+}
+
+function renderMenuManageList() {
+  const root = document.getElementById('menuManageContent');
+  if (!root) return;
+  const list = (state.menuItems || []).filter(m => !m.removed);
+  if (list.length === 0) {
+    root.innerHTML = '<p style="color:#888; font-size:12px; padding:12px; text-align:center;">商品が登録されていません</p>';
+    return;
+  }
+  // カテゴリ別に
+  const byCat = {};
+  list.forEach(m => {
+    const c = m.category || 'その他';
+    if (!byCat[c]) byCat[c] = [];
+    byCat[c].push(m);
+  });
+  Object.keys(byCat).forEach(c => byCat[c].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
+  const cats = getMenuCategories();
+  // 動的なカテゴリ選択肢
+  const catOpts = (selected) => cats.map(c =>
+    `<option value="${escapeHtml(c)}" ${c===selected?'selected':''}>${escapeHtml(c)}</option>`
+  ).join('');
+  // 表示順：state.menuCategoriesの順、それに含まれない（孤立した）カテゴリは末尾
+  const displayCats = cats.filter(c => byCat[c])
+    .concat(Object.keys(byCat).filter(c => !cats.includes(c)));
+  root.innerHTML = displayCats.map(c => `
+    <div class="menu-cat-block">
+      <div class="menu-cat-head">${escapeHtml(c)}${!cats.includes(c)?'<span style="font-size:10px; color:#c44; margin-left:6px;">（カテゴリ未登録）</span>':''}</div>
+      ${byCat[c].map(m => `
+        <div class="menu-item-row">
+          <input type="text" class="menu-name-input" value="${escapeHtml(m.name)}" onchange="renameMenuItem('${m.id}', this.value)">
+          <select class="menu-cat-select" onchange="changeMenuCategory('${m.id}', this.value)">${catOpts(m.category)}</select>
+          <button type="button" class="btn-danger btn-sm" onclick="removeMenuItem('${m.id}')">削除</button>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function renderCategoryManageList() {
+  const root = document.getElementById('menuManageContent');
+  if (!root) return;
+  const list = (state.menuCategories || [])
+    .filter(c => !c.removed)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  // 各カテゴリの所属商品数を集計
+  const counts = {};
+  (state.menuItems || []).forEach(m => {
+    if (m.removed) return;
+    counts[m.category] = (counts[m.category] || 0) + 1;
+  });
+  if (list.length === 0) {
+    root.innerHTML = '<p style="color:#888; font-size:12px; padding:12px; text-align:center;">カテゴリが登録されていません</p>';
+    return;
+  }
+  root.innerHTML = `
+    <p style="color:#888; font-size:11px; margin:0 0 8px;">▲▼ で並び替え（オーダーパネルのタブ順に反映）</p>
+    ${list.map((c, idx) => `
+      <div class="menu-item-row" style="background:#fffbf2; border:1px solid #d4af37; border-radius:6px; padding:6px 8px; margin-bottom:5px;">
+        <div style="display:flex; flex-direction:column; gap:1px; flex-shrink:0;">
+          <button type="button" class="btn-sub btn-sm cat-move-btn" onclick="moveCategoryUp('${c.id}')" ${idx===0?'disabled':''} style="padding:0 6px; font-size:10px; line-height:1.4;">▲</button>
+          <button type="button" class="btn-sub btn-sm cat-move-btn" onclick="moveCategoryDown('${c.id}')" ${idx===list.length-1?'disabled':''} style="padding:0 6px; font-size:10px; line-height:1.4;">▼</button>
+        </div>
+        <input type="text" class="menu-name-input" value="${escapeHtml(c.name)}" onchange="renameCategory('${c.id}', this.value)">
+        <span style="font-size:11px; color:#888; flex-shrink:0; min-width:50px; text-align:right;">${counts[c.name] || 0}品</span>
+        <button type="button" class="btn-danger btn-sm" onclick="removeCategory('${c.id}')">削除</button>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ===== カテゴリ操作 =====
+function addCategory() {
+  const name = (document.getElementById('newCategoryName').value || '').trim();
+  if (!name) { alert('カテゴリ名を入力してください'); return; }
+  // 重複チェック
+  const exists = (state.menuCategories || []).find(c => !c.removed && c.name === name);
+  if (exists) { alert('そのカテゴリは既に存在します'); return; }
+  if (!Array.isArray(state.menuCategories)) state.menuCategories = [];
+  const maxSort = state.menuCategories.filter(c => !c.removed)
+    .reduce((m, x) => Math.max(m, x.sortOrder || 0), 0);
+  state.menuCategories.push({
+    id: genId('cat'),
+    name,
+    sortOrder: maxSort + 1,
+    _created: Date.now(),
+    _updated: Date.now(),
+    removed: false,
+  });
+  document.getElementById('newCategoryName').value = '';
+  persistSave();
+  renderCategoryManageList();
+}
+
+function renameCategory(id, newName) {
+  newName = (newName || '').trim();
+  if (!newName) { alert('カテゴリ名を入力してください'); return; }
+  const c = (state.menuCategories || []).find(x => x.id === id);
+  if (!c) return;
+  const oldName = c.name;
+  if (oldName === newName) return;
+  // 重複チェック
+  const dup = (state.menuCategories || []).find(x => x.id !== id && !x.removed && x.name === newName);
+  if (dup) { alert('そのカテゴリ名は既に使われています'); return; }
+  c.name = newName;
+  c._updated = Date.now();
+  // このカテゴリに属する商品も更新
+  (state.menuItems || []).forEach(m => {
+    if (m.category === oldName) {
+      m.category = newName;
+      m._updated = Date.now();
+    }
+  });
+  persistSave();
+  renderCategoryManageList();
+}
+
+function removeCategory(id) {
+  const c = (state.menuCategories || []).find(x => x.id === id);
+  if (!c) return;
+  // 所属商品の数をカウント
+  const itemCount = (state.menuItems || []).filter(m => !m.removed && m.category === c.name).length;
+  if (itemCount > 0) {
+    if (!confirm(`「${c.name}」カテゴリには ${itemCount} 件の商品があります。\nカテゴリを削除すると、それらの商品もアクセスできなくなります。\n本当に削除しますか？`)) return;
+  } else {
+    if (!confirm(`「${c.name}」カテゴリを削除しますか？`)) return;
+  }
+  c.removed = true;
+  c._updated = Date.now();
+  persistSave();
+  renderCategoryManageList();
+}
+
+function moveCategoryUp(id) {
+  const list = (state.menuCategories || [])
+    .filter(c => !c.removed)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const idx = list.findIndex(c => c.id === id);
+  if (idx <= 0) return;
+  // sortOrder を入れ替え
+  const cur = list[idx];
+  const prev = list[idx - 1];
+  const tmp = cur.sortOrder;
+  cur.sortOrder = prev.sortOrder;
+  prev.sortOrder = tmp;
+  cur._updated = Date.now();
+  prev._updated = Date.now();
+  persistSave();
+  renderCategoryManageList();
+}
+
+function moveCategoryDown(id) {
+  const list = (state.menuCategories || [])
+    .filter(c => !c.removed)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const idx = list.findIndex(c => c.id === id);
+  if (idx < 0 || idx >= list.length - 1) return;
+  const cur = list[idx];
+  const next = list[idx + 1];
+  const tmp = cur.sortOrder;
+  cur.sortOrder = next.sortOrder;
+  next.sortOrder = tmp;
+  cur._updated = Date.now();
+  next._updated = Date.now();
+  persistSave();
+  renderCategoryManageList();
+}
+
+function addMenuItem() {
+  const name = (document.getElementById('newMenuName').value || '').trim();
+  const category = document.getElementById('newMenuCat').value;
+  if (!name) { alert('商品名を入力してください'); return; }
+  if (!Array.isArray(state.menuItems)) state.menuItems = [];
+  const maxSort = state.menuItems.filter(m => !m.removed && m.category === category)
+    .reduce((m, x) => Math.max(m, x.sortOrder || 0), 0);
+  state.menuItems.push({
+    id: genId('menu'),
+    name,
+    category,
+    sortOrder: maxSort + 1,
+    _created: Date.now(),
+    _updated: Date.now(),
+    removed: false,
+  });
+  document.getElementById('newMenuName').value = '';
+  persistSave();
+  renderMenuManageList();
+}
+
+function renameMenuItem(id, name) {
+  const m = (state.menuItems || []).find(x => x.id === id);
+  if (!m) return;
+  m.name = (name || '').trim() || m.name;
+  m._updated = Date.now();
+  persistSave();
+}
+
+function changeMenuCategory(id, category) {
+  const m = (state.menuItems || []).find(x => x.id === id);
+  if (!m) return;
+  m.category = category;
+  m._updated = Date.now();
+  persistSave();
+  renderMenuManageList();
+}
+
+function removeMenuItem(id) {
+  const m = (state.menuItems || []).find(x => x.id === id);
+  if (!m) return;
+  if (!confirm(`「${m.name}」を削除しますか？`)) return;
+  m.removed = true;
+  m._updated = Date.now();
+  persistSave();
+  renderMenuManageList();
+}
+
 
 function readTableModalForm() {
   // 顧客カードから最新値を取得
@@ -6789,6 +7589,8 @@ function exportBackup() {
     reservations: state.reservations,
     visitLog: state.visitLog,
     events: state.events,
+    menuItems: state.menuItems,
+    menuCategories: state.menuCategories,
     _exportedAt: Date.now()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -6817,6 +7619,8 @@ function importBackup(e) {
       if (Array.isArray(data.reservations)) state.reservations = data.reservations;
       if (Array.isArray(data.visitLog)) state.visitLog = data.visitLog;
       if (Array.isArray(data.events)) state.events = data.events;
+      if (Array.isArray(data.menuItems)) state.menuItems = data.menuItems;
+      if (Array.isArray(data.menuCategories)) state.menuCategories = data.menuCategories;
       persistSave();
       alert('復元しました');
       location.reload();
@@ -7094,6 +7898,34 @@ function applyServerData(payload) {
       }
     });
   }
+  // メニュー商品マスタ：IDベースで _updated 比較マージ
+  if (Array.isArray(payload.menuItems)) {
+    if (!Array.isArray(state.menuItems)) state.menuItems = [];
+    payload.menuItems.forEach(rm => {
+      const idx = state.menuItems.findIndex(m => m.id === rm.id);
+      if (idx >= 0) {
+        if ((rm._updated || 0) >= (state.menuItems[idx]._updated || 0)) {
+          state.menuItems[idx] = rm;
+        }
+      } else {
+        state.menuItems.push(rm);
+      }
+    });
+  }
+  // メニューカテゴリマスタ：IDベースで _updated 比較マージ
+  if (Array.isArray(payload.menuCategories)) {
+    if (!Array.isArray(state.menuCategories)) state.menuCategories = [];
+    payload.menuCategories.forEach(rc => {
+      const idx = state.menuCategories.findIndex(c => c.id === rc.id);
+      if (idx >= 0) {
+        if ((rc._updated || 0) >= (state.menuCategories[idx]._updated || 0)) {
+          state.menuCategories[idx] = rc;
+        }
+      } else {
+        state.menuCategories.push(rc);
+      }
+    });
+  }
   // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
   try { localStorage.setItem(LS_KEY, JSON.stringify({
     pin: state.pin, casts: state.casts, staff: state.staff,
@@ -7101,6 +7933,8 @@ function applyServerData(payload) {
     reservations: state.reservations,
     visitLog: state.visitLog,
     events: state.events,
+    menuItems: state.menuItems,
+    menuCategories: state.menuCategories,
     _updatedAt: Date.now()
   })); } catch(e) {}
 
@@ -7200,6 +8034,8 @@ function buildSaveData() {
     reservations: state.reservations,
     visitLog: state.visitLog,
     events: state.events,
+    menuItems: state.menuItems,
+    menuCategories: state.menuCategories,
     _updatedAt: Date.now()
   };
 }
@@ -7314,6 +8150,29 @@ function escapeHtml(s) {
 persistLoad();
 loadNotifPrefs();
 loadPushState();
+// カテゴリマスタ初期化
+if (!Array.isArray(state.menuCategories) || state.menuCategories.length === 0) {
+  state.menuCategories = DEFAULT_CATEGORIES.map((name, i) => ({
+    id: genId('cat'),
+    name,
+    sortOrder: i,
+    _created: Date.now(),
+    _updated: Date.now(),
+    removed: false,
+  }));
+}
+// メニュー初期化：未登録ならデフォルトメニューを投入
+if (!Array.isArray(state.menuItems) || state.menuItems.length === 0) {
+  state.menuItems = DEFAULT_MENU_ITEMS.map((m, i) => ({
+    id: genId('menu'),
+    name: m.name,
+    category: m.category,
+    sortOrder: i,
+    _created: Date.now(),
+    _updated: Date.now(),
+    removed: false,
+  }));
+}
 // 既存データの体験キャストカウントを再計算（過去のバグで未反映だった分も復旧）
 recalcAllTrialCounts();
 // 再計算結果をローカルストレージに保存（次回起動時から正しい値で起動）
@@ -7324,6 +8183,8 @@ try {
     reservations: state.reservations,
     visitLog: state.visitLog,
     events: state.events,
+    menuItems: state.menuItems,
+    menuCategories: state.menuCategories,
     _updatedAt: Date.now()
   }));
 } catch(e) {}
