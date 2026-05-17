@@ -2869,38 +2869,81 @@ function staffSelectHTML(id, sel) {
 function customerSelectHTML(id, selCid) {
   const sel = customers.find(function(c){ return c.id===selCid; });
   const selName = sel ? (sel.name||'') : '';
-  let html = '<input type="text" id="'+id+'" class="inp" list="dr_cust_list" value="'+esc(selName)+'" placeholder="顧客名を入力" data-cid="'+(selCid||'')+'" oninput="onCustomerInput(this)" autocomplete="off">';
-  // datalistは共通で1つ
-  if(!document.getElementById('dr_cust_list')) {
-    let dl = '<datalist id="dr_cust_list">';
-    customers.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','ja'); }).forEach(function(c){
-      dl += '<option value="'+esc(c.name||'')+'" data-cid="'+c.id+'">'+esc(c.kana||'')+(c.code?' / '+esc(c.code):'')+'</option>';
-    });
-    dl += '</datalist>';
-    html += dl;
+  return '<input type="text" id="'+id+'" class="inp" list="dr_cust_list" value="'+esc(selName)+'" placeholder="顧客名・カナ・コードで検索" data-cid="'+(selCid||'')+'" oninput="onCustomerInput(this)" autocomplete="off" style="font-size:12px">';
+}
+
+// datalist本体を必要に応じて再生成（顧客一覧が変わった時に呼ぶ）
+function ensureCustomerDatalist() {
+  let dl = document.getElementById('dr_cust_list');
+  if(!dl){
+    dl = document.createElement('datalist');
+    dl.id = 'dr_cust_list';
+    // モーダルの外、bodyの末尾に置く（再描画で消えないように）
+    document.body.appendChild(dl);
   }
-  return html;
+  // 中身を最新の顧客一覧で再構築
+  const opts = customers.slice().sort(function(a,b){ return (a.kana||a.name||'').localeCompare(b.kana||b.name||'','ja'); }).map(function(c){
+    // value にカナ・コード等も含めることで複数キーワードでヒットしやすく
+    const label = (c.kana||'') + (c.code?' / '+c.code:'');
+    return '<option value="'+esc(c.name||'')+'">'+esc(label)+'</option>';
+  }).join('');
+  dl.innerHTML = opts;
 }
 
 function onCustomerInput(inp) {
   const name = inp.value.trim();
-  const match = customers.find(function(c){ return (c.name||'') === name; });
+
+  // まず完全一致を探す
+  let match = customers.find(function(c){ return (c.name||'') === name; });
+
+  // 完全一致しなければ、空白を取り除いて再度一致を試す（"福呂直子" と "福呂 直子" の差を吸収）
+  if(!match && name){
+    const norm = name.replace(/[\s　]+/g,'');
+    match = customers.find(function(c){
+      return (c.name||'').replace(/[\s　]+/g,'') === norm;
+    });
+  }
+
+  // それでもダメなら、部分一致（前方一致）で1件だけヒットする場合は採用
+  if(!match && name){
+    const norm = name.replace(/[\s　]+/g,'');
+    const candidates = customers.filter(function(c){
+      const cn = (c.name||'').replace(/[\s　]+/g,'');
+      const ck = (c.kana||'').replace(/[\s　]+/g,'');
+      return cn.indexOf(norm)>=0 || ck.indexOf(norm)>=0;
+    });
+    if(candidates.length === 1) match = candidates[0];
+  }
+
   inp.dataset.cid = match ? match.id : '';
+
   // インジケータ
   const par = inp.parentElement;
   let ind = par.querySelector('.cust-match-ind');
   if(!ind) {
     ind = document.createElement('span');
     ind.className = 'cust-match-ind';
-    ind.style.cssText = 'font-size:10px;margin-left:6px';
+    ind.style.cssText = 'font-size:10px;margin-left:6px;white-space:nowrap';
     par.appendChild(ind);
   }
   if(match){
-    ind.textContent = '✓ '+(match.code||match.id.slice(-4));
+    ind.textContent = '✓ '+(match.code||match.id.slice(-4))+(match.kana?' '+match.kana:'');
     ind.style.color = 'var(--ok-txt)';
   } else if(name){
-    ind.textContent = '⚠ 該当顧客なし';
-    ind.style.color = 'var(--ng)';
+    // 候補を数える
+    const norm = name.replace(/[\s　]+/g,'');
+    const cnt = customers.filter(function(c){
+      const cn = (c.name||'').replace(/[\s　]+/g,'');
+      const ck = (c.kana||'').replace(/[\s　]+/g,'');
+      return cn.indexOf(norm)>=0 || ck.indexOf(norm)>=0;
+    }).length;
+    if(cnt > 1){
+      ind.textContent = '候補 '+cnt+'件（絞り込み or 完全一致が必要）';
+      ind.style.color = 'var(--ng)';
+    } else {
+      ind.textContent = '⚠ 該当顧客なし';
+      ind.style.color = 'var(--ng)';
+    }
   } else {
     ind.textContent = '';
   }
@@ -2910,6 +2953,8 @@ function renderDREntries() {
   const c = window._drCurrent;
   const ent = document.getElementById('dr_entries');
   if(!ent || !c) return;
+  // 顧客datalistを最新化
+  ensureCustomerDatalist();
   let html = '';
   (c.entries||[]).forEach(function(e, i){
     html += '<div class="sec" style="padding:0;overflow:hidden;margin-bottom:10px">'
@@ -2978,10 +3023,34 @@ async function drSave() {
   if(!cur.date){ alert('日付を入力してください'); return; }
   if(!cur.staff){ alert('担当者を入力してください'); return; }
 
+  // ★ 保存前に最終マッチ試行：未マッチで顧客名が入力されているentriesを部分一致でも再検索
+  (cur.entries||[]).forEach(function(e){
+    if(e.cid) return; // 既にマッチ済み
+    const raw = (e._custName||'').trim();
+    if(!raw) return;
+    // 完全一致
+    let m = customers.find(function(c){ return (c.name||'')===raw; });
+    if(!m){
+      const norm = raw.replace(/[\s　]+/g,'');
+      m = customers.find(function(c){ return (c.name||'').replace(/[\s　]+/g,'')===norm; });
+    }
+    if(!m){
+      const norm = raw.replace(/[\s　]+/g,'');
+      const cands = customers.filter(function(c){
+        const cn = (c.name||'').replace(/[\s　]+/g,'');
+        const ck = (c.kana||'').replace(/[\s　]+/g,'');
+        return cn.indexOf(norm)>=0 || ck.indexOf(norm)>=0;
+      });
+      if(cands.length === 1) m = cands[0];
+    }
+    if(m) e.cid = m.id;
+  });
+
   // 顧客未マッチの確認
   const unmatched = (cur.entries||[]).filter(function(e){ return e._custName && !e.cid; });
   if(unmatched.length){
-    if(!confirm(unmatched.length+'件の個別報告で顧客が選択されていません。\nそのまま保存しますか？\n（保存しても、それらの記録は顧客履歴には追加されません）')) return;
+    const names = unmatched.map(function(e){ return '・'+e._custName; }).join('\n');
+    if(!confirm(unmatched.length+'件の個別報告で顧客が選択されていません。\n\n未マッチ:\n'+names+'\n\nそのまま保存しますか？\n（保存しても、それらの記録は顧客履歴には追加されません）')) return;
   }
 
   // 内容が空のentriesを除外
