@@ -2205,9 +2205,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.16c';
+const APP_VERSION = '2026.05.16d';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.16d',
+    date: '2026-05-16',
+    title: '商品の重複問題を修正',
+    items: [
+      '🐛 デフォルト商品（Lビールなど）が消しても消しても復活する問題を修正しました。複数端末で本番化された直後に、それぞれの端末で別IDで同じ商品が登録されていたのが原因です。',
+      '起動時に同名・同カテゴリの重複商品を自動的に1件に統合します。',
+      '削除時にも、同名の重複レコードがあれば一緒に削除するようにしました。',
+      'カテゴリ削除でも同様の対策を入れています。',
+    ],
+  },
   {
     version: '2026.05.16c',
     date: '2026-05-16',
@@ -5499,6 +5510,13 @@ function removeCategory(id) {
   }
   c.removed = true;
   c._updated = Date.now();
+  // 同名カテゴリの重複レコードも一緒に削除（複数端末で重複登録された場合の対策）
+  (state.menuCategories || []).forEach(other => {
+    if (other.id !== c.id && !other.removed && other.name === c.name) {
+      other.removed = true;
+      other._updated = Date.now();
+    }
+  });
   persistSave();
   renderCategoryManageList();
 }
@@ -5582,6 +5600,16 @@ function removeMenuItem(id) {
   if (!confirm(`「${m.name}」を削除しますか？`)) return;
   m.removed = true;
   m._updated = Date.now();
+  // 念のため、同名・同カテゴリの重複レコードも一緒に削除する
+  // （複数端末で重複登録された場合、片方だけ削除しても画面上では残り続けるため）
+  (state.menuItems || []).forEach(other => {
+    if (other.id !== m.id && !other.removed
+        && other.name === m.name
+        && (other.category || '') === (m.category || '')) {
+      other.removed = true;
+      other._updated = Date.now();
+    }
+  });
   persistSave();
   renderMenuManageList();
 }
@@ -8271,6 +8299,28 @@ if (!Array.isArray(state.menuCategories) || state.menuCategories.length === 0) {
       seen[c.name] = toKeep;
     } else {
       seen[c.name] = c;
+    }
+  });
+})();
+// 同名商品の重複統合：同様の理由で、商品も同じ名前で別IDが複数登録されるケースがある。
+(function dedupeMenuItems() {
+  if (!Array.isArray(state.menuItems)) return;
+  const seen = {};
+  state.menuItems.forEach(m => {
+    if (m.removed) return;
+    if (!m.name) return;
+    // 同じ「名前 × カテゴリ」の組み合わせで重複判定
+    const key = `${m.name}__${m.category || ''}`;
+    if (seen[key]) {
+      const existing = seen[key];
+      const keepExisting = (existing._created || 0) <= (m._created || 0);
+      const toRemove = keepExisting ? m : existing;
+      const toKeep = keepExisting ? existing : m;
+      toRemove.removed = true;
+      toRemove._updated = Date.now();
+      seen[key] = toKeep;
+    } else {
+      seen[key] = m;
     }
   });
 })();
