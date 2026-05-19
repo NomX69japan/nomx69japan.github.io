@@ -2288,9 +2288,23 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.17b';
+const APP_VERSION = '2026.05.18';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.18',
+    date: '2026-05-18',
+    title: '予約で複数顧客の対応',
+    items: [
+      '予約作成・編集モーダルが複数顧客カード型UIになりました。「＋ お客様を追加」で何人でも追加できます。',
+      '各お客様カードに「同伴」「来店予定」のチェックを付けられます（両方OFFも、両方ONも可）。',
+      '合計人数は各カードの人数を自動合算。お客様情報欄の右上に「2組 / 合計 3名」のように表示されます。',
+      '予約一覧では代表顧客（先頭のお客様）の名前を表示。複数顧客の場合は「、」で併記し、（同伴1・来店2）のような内訳も表示します。',
+      '指名キャストや人数は各顧客カードごとに設定できるので、「○○様は同伴1名・指名ちえ」「△△様は来店2名・指名なし」のような細かい予約が組めます。',
+      '来店確認（チェックイン）時は、これまで通り代表顧客1人だけ入店します。残りのお客様は入店後に「お客様を追加」で順次対応してください。',
+      '既存の予約データ（1顧客のみ）は自動で1カード形式に変換されます（編集すれば多人数化も可）。',
+    ],
+  },
   {
     version: '2026.05.17b',
     date: '2026-05-17',
@@ -6712,9 +6726,33 @@ function renderReservations() {
 }
 
 function buildReservationCardHTML(r) {
-  // 顧客名表示
-  const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
-  const customerName = cust ? displayName(cust) : (r.customerName || '(未登録)');
+  // 顧客名表示（guestList があれば全員併記、なければ単独顧客）
+  let customerName = '';
+  let extraGroupNote = '';
+  if (Array.isArray(r.guestList) && r.guestList.length > 0) {
+    const names = r.guestList.map(g => {
+      if (g.customerId) {
+        const c = state.customers.find(x => x.id === g.customerId);
+        return c ? displayName(c) : '';
+      }
+      return g.customerName || '';
+    }).filter(Boolean);
+    customerName = names.join('、') || '(未登録)';
+    if (r.guestList.length > 1) {
+      // 同伴・来店組の内訳を簡略表記
+      const dohanCount = r.guestList.filter(g => g.dohan).length;
+      const visitCount = r.guestList.filter(g => g.visit).length;
+      const parts = [];
+      if (dohanCount > 0) parts.push(`同伴${dohanCount}`);
+      if (visitCount > 0) parts.push(`来店${visitCount}`);
+      if (parts.length > 0) {
+        extraGroupNote = `<span style="font-size:11px; color:#8b6914; margin-left:6px;">（${parts.join('・')}）</span>`;
+      }
+    }
+  } else {
+    const cust = r.customerId ? state.customers.find(c => c.id === r.customerId) : null;
+    customerName = cust ? displayName(cust) : (r.customerName || '(未登録)');
+  }
 
   // キャスト名表示（A/B指名種別あり）
   const castDisplay = buildCastDisplay(r, true);
@@ -6797,7 +6835,7 @@ function buildReservationCardHTML(r) {
         <div class="resv-tags">${tagsHtml}${shiftWarn.startsWith('<span') ? shiftWarn : ''}</div>
       </div>
       <div class="resv-row-mid">
-        <b>${escapeHtml(withSan(customerName) || '(未登録)')}</b>
+        <b>${escapeHtml(withSan(customerName) || '(未登録)')}</b>${extraGroupNote}
         ${r.guests ? ` / 👥 ${r.guests}名` : ''}
         ${castDisplay ? ` / 🌹 ${escapeHtml(castDisplay)}` : ''}
         ${tableLabel ? ` / 🪑 ${escapeHtml(tableLabel)}` : ''}
@@ -6996,6 +7034,198 @@ function openTablePickModal(message, onPick) {
 
 // 予約モーダル
 let editingResvId = null;
+let modalResvGuests = []; // 予約モーダル編集中の顧客カード配列
+
+// 予約モーダル：1顧客カードのHTMLを生成
+function buildResvGuestCardHtml(guest, idx) {
+  // 顧客選択肢
+  const custOpts = ['<option value="">（未登録 or 新規）</option>']
+    .concat(state.customers.filter(c => !c.removed).map(c => {
+      const dn = displayName(c);
+      const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
+        ? `${withSan(dn)}（${stripHonorific(c.name)}）`
+        : withSan(dn);
+      const selected = guest.customerId === c.id ? 'selected' : '';
+      return `<option value="${c.id}" ${selected}>${escapeHtml(label)}</option>`;
+    })).join('');
+
+  // キャスト選択肢
+  const castOpts = state.casts.filter(c => !c.removed).map(c => {
+    const checked = (guest.castIds || []).includes(c.id) ? 'checked' : '';
+    const cur = (guest.castNoms && guest.castNoms[c.id]) || 'none';
+    const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
+    return `<div class="cast-pick-row" data-rg-cast-row="${guest.id}_${c.id}">
+      <label class="small-label" style="margin:0; flex:1; min-width:0;">
+        <input type="checkbox" value="${c.id}" ${checked} class="rg-cast-pick" data-rg-cast-pick="${guest.id}_${c.id}">
+        ${escapeHtml(c.name)}${trialBadge}
+      </label>
+      <div class="nom-toggle" data-rg-nom-toggle="${guest.id}_${c.id}">
+        <button type="button" class="nom-btn ${cur==='A'?'active a':''}" data-nom="A">A</button>
+        <button type="button" class="nom-btn ${cur==='B'?'active b':''}" data-nom="B">B</button>
+        <button type="button" class="nom-btn ${cur==='none'?'active none':''}" data-nom="none">なし</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const dohanChecked = guest.dohan ? 'checked' : '';
+  const visitChecked = guest.visit ? 'checked' : '';
+
+  return `
+    <div class="guest-card" data-rg-id="${guest.id}">
+      <div class="guest-card-head">
+        <span class="guest-card-num">お客様 ${idx+1}</span>
+        <div style="display:flex; gap:6px; margin-left:auto;">
+          <label class="small-label" style="margin:0;">
+            <input type="checkbox" class="rg-dohan" ${dohanChecked}> 同伴
+          </label>
+          <label class="small-label" style="margin:0;">
+            <input type="checkbox" class="rg-visit" ${visitChecked}> 来店予定
+          </label>
+        </div>
+        ${idx > 0 ? `<button type="button" class="btn-danger btn-sm" onclick="removeResvGuestCard('${guest.id}')" style="padding:2px 8px;">×</button>` : ''}
+      </div>
+      <div class="guest-card-body">
+        <div class="field-row">
+          <span class="lab-inline">既存</span>
+          <select class="rg-customer-id" style="flex:1; padding:5px 6px; font-size:13px;">${custOpts}</select>
+        </div>
+        <div class="field-row">
+          <span class="lab-inline">新規</span>
+          <input type="text" class="rg-customer-name" value="${escapeHtml(guest.customerName || '')}" placeholder="フリー入力" style="flex:1; padding:5px 6px; font-size:13px;">
+        </div>
+        <div class="field-row">
+          <span class="lab-inline">人数</span>
+          <input type="number" class="rg-guests" value="${guest.guests || 1}" min="1" max="20" style="width:80px; padding:5px 6px; font-size:13px;">
+          <span style="font-size:11px; color:var(--text-sub); margin-left:6px;">名</span>
+        </div>
+        <div class="guest-card-casts">
+          <div style="font-size:11px; color:var(--text-sub); margin-bottom:4px;">指名キャスト</div>
+          ${castOpts || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
+          <input type="text" class="rg-cast-free" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px; width:100%; padding:5px 6px; font-size:12px;">
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 顧客カードDOM → modalResvGuests に同期
+function syncResvGuestCardFromDom() {
+  document.querySelectorAll('#resvGuestCardList .guest-card').forEach(card => {
+    const gid = card.getAttribute('data-rg-id');
+    const g = modalResvGuests.find(x => x.id === gid);
+    if (!g) return;
+    g.customerId = card.querySelector('.rg-customer-id')?.value || '';
+    g.customerName = (card.querySelector('.rg-customer-name')?.value || '').trim();
+    g.guests = parseInt(card.querySelector('.rg-guests')?.value, 10) || 1;
+    g.castIds = Array.from(card.querySelectorAll('.rg-cast-pick:checked')).map(cb => cb.value);
+    // castNoms
+    g.castNoms = {};
+    g.castIds.forEach(cid => {
+      const toggle = card.querySelector(`.nom-toggle[data-rg-nom-toggle="${gid}_${cid}"]`);
+      if (!toggle) return;
+      const activeBtn = toggle.querySelector('.nom-btn.active');
+      if (!activeBtn) return;
+      const nom = activeBtn.getAttribute('data-nom');
+      if (nom === 'A' || nom === 'B') {
+        g.castNoms[cid] = nom;
+      }
+    });
+    g.castFree = (card.querySelector('.rg-cast-free')?.value || '').trim();
+    g.dohan = !!card.querySelector('.rg-dohan')?.checked;
+    g.visit = !!card.querySelector('.rg-visit')?.checked;
+  });
+}
+
+// 顧客カード一覧描画
+function renderResvGuestCardList() {
+  const root = document.getElementById('resvGuestCardList');
+  if (!root) return;
+  root.innerHTML = modalResvGuests.map((g, i) => buildResvGuestCardHtml(g, i)).join('');
+  bindResvGuestCardHandlers();
+  updateResvGuestTotalLabel();
+}
+
+// 合計人数ラベル更新
+function updateResvGuestTotalLabel() {
+  const el = document.getElementById('resvGuestTotalLabel');
+  if (!el) return;
+  syncResvGuestCardFromDom();
+  const total = modalResvGuests.reduce((s, g) => s + (g.guests || 0), 0);
+  const groups = modalResvGuests.length;
+  if (groups <= 1) {
+    el.textContent = `合計 ${total}名`;
+  } else {
+    el.textContent = `${groups}組 / 合計 ${total}名`;
+  }
+}
+
+// 顧客カードのハンドラ登録
+function bindResvGuestCardHandlers() {
+  document.querySelectorAll('#resvGuestCardList .guest-card').forEach(card => {
+    const gid = card.getAttribute('data-rg-id');
+    // A/B/なしトグル
+    card.querySelectorAll('.nom-toggle').forEach(toggle => {
+      const cid = toggle.getAttribute('data-rg-nom-toggle').split('_')[1];
+      toggle.querySelectorAll('.nom-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const nom = btn.getAttribute('data-nom');
+          toggle.querySelectorAll('.nom-btn').forEach(b => {
+            b.classList.remove('active', 'a', 'b', 'none');
+          });
+          btn.classList.add('active', nom.toLowerCase());
+          // 対応するチェックボックスを自動的にON
+          const cb = card.querySelector(`.rg-cast-pick[data-rg-cast-pick="${gid}_${cid}"]`);
+          if (cb) cb.checked = true;
+        });
+      });
+    });
+    // チェックボックスOFF時にA/B/なしリセット
+    card.querySelectorAll('.rg-cast-pick').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (!cb.checked) {
+          const cid = cb.getAttribute('data-rg-cast-pick').split('_')[1];
+          const toggle = card.querySelector(`.nom-toggle[data-rg-nom-toggle="${gid}_${cid}"]`);
+          if (toggle) {
+            toggle.querySelectorAll('.nom-btn').forEach(b => {
+              b.classList.remove('active', 'a', 'b', 'none');
+            });
+          }
+        }
+      });
+    });
+    // 人数変更時に合計更新
+    card.querySelector('.rg-guests')?.addEventListener('input', updateResvGuestTotalLabel);
+  });
+}
+
+// 顧客カード追加
+function addResvGuestCard() {
+  syncResvGuestCardFromDom();
+  modalResvGuests.push({
+    id: genId('rg'),
+    customerId: '',
+    customerName: '',
+    guests: 1,
+    castIds: [],
+    castNoms: {},
+    castFree: '',
+    dohan: false,
+    visit: true,
+  });
+  renderResvGuestCardList();
+}
+
+// 顧客カード削除
+function removeResvGuestCard(guestId) {
+  syncResvGuestCardFromDom();
+  if (modalResvGuests.length <= 1) {
+    alert('お客様は最低1名必要です');
+    return;
+  }
+  modalResvGuests = modalResvGuests.filter(g => g.id !== guestId);
+  renderResvGuestCardList();
+}
+
 function openReservationModal(id) {
   editingResvId = id;
   let r;
@@ -7035,26 +7265,31 @@ function openReservationModal(id) {
       const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
         ? `${withSan(dn)}（${stripHonorific(c.name)}）`
         : withSan(dn);
-      return `<option value="${c.id}" ${r.customerId === c.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      return `<option value="${c.id}">${escapeHtml(label)}</option>`;
     })).join('');
 
-  // キャスト選択肢
-  const castOptions = state.casts.filter(c => !c.removed).map(c => {
-    const checked = (r.castIds || []).includes(c.id) ? 'checked' : '';
-    const cur = (r.castNoms && r.castNoms[c.id]) || 'none';
-    const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
-    return `<div class="cast-pick-row" data-cast-id="${c.id}">
-      <label class="small-label" style="margin:0; flex:1; min-width:0;">
-        <input type="checkbox" value="${c.id}" ${checked} class="resv-cast-pick" data-resv-cast-pick="${c.id}">
-        ${escapeHtml(c.name)}${trialBadge}
-      </label>
-      <div class="nom-toggle" data-resv-nom-toggle="${c.id}">
-        <button type="button" class="nom-btn ${cur==='A'?'active a':''}" data-nom="A">A</button>
-        <button type="button" class="nom-btn ${cur==='B'?'active b':''}" data-nom="B">B</button>
-        <button type="button" class="nom-btn ${cur==='none'?'active none':''}" data-nom="none">なし</button>
-      </div>
-    </div>`;
-  }).join('');
+  // 予約モーダル用 modalResvGuests を初期化
+  // 既存の予約データから guestList を復元（後方互換）
+  if (Array.isArray(r.guestList) && r.guestList.length > 0) {
+    modalResvGuests = r.guestList.map(g => ({ ...g }));
+  } else {
+    // 旧データ → 1顧客として初期化
+    modalResvGuests = [{
+      id: genId('rg'),
+      customerId: r.customerId || '',
+      customerName: r.customerName || '',
+      guests: r.guests || 1,
+      castIds: (r.castIds || []).slice(),
+      castNoms: r.castNoms ? { ...r.castNoms } : {},
+      castFree: r.castFree || '',
+      dohan: (r.types || []).includes('dohan'),  // 旧データの「同伴」タグから推測
+      visit: true,  // 旧データはすべて来店予定として扱う
+    }];
+  }
+  // 新規の場合は空の1カード
+  if (!id && modalResvGuests.length === 1 && !modalResvGuests[0].customerId && !modalResvGuests[0].customerName) {
+    // 何もない初期状態
+  }
 
   // テーブル選択肢
   const tableOptions = ['<option value="">（指定なし）</option>']
@@ -7114,26 +7349,15 @@ function openReservationModal(id) {
       <div style="display:flex; flex-wrap:wrap;">${typeChecks}</div>
     </div>
 
-    <label class="field">
-      <span class="lab">お客様（既存から選択）</span>
-      <select id="resvCustomer">${custOptions}</select>
-    </label>
-    <label class="field">
-      <span class="lab">お客様（フリー入力 / 新規）</span>
-      <input type="text" id="resvCustomerName" value="${escapeHtml(r.customerName || '')}" placeholder="既存を選択しない場合の名前">
-    </label>
-
-    <label class="field">
-      <span class="lab">人数</span>
-      <input type="number" id="resvGuests" value="${r.guests || 1}" min="1" max="20">
-    </label>
-
     <div class="field">
-      <span class="lab">指名キャスト</span>
-      <div class="cast-pick-list">
-        ${castOptions || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span class="lab" style="margin:0;">お客様情報</span>
+        <span id="resvGuestTotalLabel" style="font-size:13px; color:#8b6914; font-weight:600;"></span>
       </div>
-      <input type="text" id="resvCastFree" value="${escapeHtml(r.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px;">
+      <div id="resvGuestCardList" class="guest-card-list"></div>
+      <button type="button" class="btn-sub btn-sm" onclick="addResvGuestCard()" style="margin-top:8px; width:100%;">
+        ＋ お客様を追加
+      </button>
     </div>
 
     <label class="field">
@@ -7147,40 +7371,12 @@ function openReservationModal(id) {
     </label>
   `;
 
+  // 顧客カード一覧を描画
+  renderResvGuestCardList();
+
   // フッター
   buildResvModalFooter(!!id);
   document.getElementById('resvModalBg').classList.add('active');
-
-  // 予約モーダル：A/B/なしトグルのイベント
-  document.querySelectorAll('#resvModalBody .nom-toggle[data-resv-nom-toggle]').forEach(toggle => {
-    const castId = toggle.getAttribute('data-resv-nom-toggle');
-    toggle.querySelectorAll('.nom-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const nom = btn.getAttribute('data-nom');
-        toggle.querySelectorAll('.nom-btn').forEach(b => {
-          b.classList.remove('active', 'a', 'b', 'none');
-        });
-        btn.classList.add('active', nom.toLowerCase());
-        // 対応するチェックボックスを自動的にON
-        const cb = document.querySelector(`#resvModalBody input.resv-cast-pick[data-resv-cast-pick="${castId}"]`);
-        if (cb) cb.checked = true;
-      });
-    });
-  });
-  // チェックボックスがOFFになったら、その行の指名種別もリセット
-  document.querySelectorAll('#resvModalBody input.resv-cast-pick').forEach(cb => {
-    cb.addEventListener('change', () => {
-      if (!cb.checked) {
-        const castId = cb.getAttribute('data-resv-cast-pick');
-        const toggle = document.querySelector(`#resvModalBody .nom-toggle[data-resv-nom-toggle="${castId}"]`);
-        if (toggle) {
-          toggle.querySelectorAll('.nom-btn').forEach(b => {
-            b.classList.remove('active', 'a', 'b', 'none');
-          });
-        }
-      }
-    });
-  });
 }
 
 function buildResvModalFooter(isEdit) {
@@ -7247,28 +7443,33 @@ function saveReservation() {
     return;
   }
 
-  const customerId = document.getElementById('resvCustomer').value || '';
-  const customerName = (document.getElementById('resvCustomerName').value || '').trim();
-  if (!customerId && !customerName) {
+  // 顧客カードから最新値を取得
+  syncResvGuestCardFromDom();
+  // 1人以上に顧客情報が必要
+  const hasAnyCustomer = modalResvGuests.some(g => g.customerId || g.customerName);
+  if (!hasAnyCustomer) {
     alert('お客様情報（既存選択またはフリー入力）が必要です');
     return;
   }
-
-  const guests = parseInt(document.getElementById('resvGuests').value, 10) || 1;
-  const castIds = Array.from(document.querySelectorAll('.resv-cast-pick:checked')).map(el => el.value);
-  // 指名種別（A/B）を予約モーダルから抽出
+  // 後方互換：先頭顧客の情報を従来フィールドに反映
+  const first = modalResvGuests[0];
+  const customerId = first.customerId || '';
+  const customerName = first.customerId ? '' : (first.customerName || '');
+  const guests = modalResvGuests.reduce((s, g) => s + (g.guests || 0), 0);
+  // テーブル全体のキャストIDを集約（カードを横断したA/B指名の最後勝ちでマージ）
+  const castIdsSet = new Set();
   const castNoms = {};
-  castIds.forEach(cid => {
-    const toggle = document.querySelector(`#resvModalBody .nom-toggle[data-resv-nom-toggle="${cid}"]`);
-    if (!toggle) return;
-    const activeBtn = toggle.querySelector('.nom-btn.active');
-    if (!activeBtn) return;
-    const nom = activeBtn.getAttribute('data-nom');
-    if (nom === 'A' || nom === 'B') {
-      castNoms[cid] = nom;
-    }
+  const castFreeList = [];
+  modalResvGuests.forEach(g => {
+    (g.castIds || []).forEach(cid => castIdsSet.add(cid));
+    Object.keys(g.castNoms || {}).forEach(cid => {
+      if (g.castNoms[cid] === 'A' || g.castNoms[cid] === 'B') castNoms[cid] = g.castNoms[cid];
+    });
+    if (g.castFree) castFreeList.push(g.castFree);
   });
-  const castFree = (document.getElementById('resvCastFree').value || '').trim();
+  const castIds = Array.from(castIdsSet);
+  const castFree = castFreeList.join('・');
+  const guestList = modalResvGuests.map(g => ({ ...g }));
   const tableId = document.getElementById('resvTable').value || '';
   const memo = document.getElementById('resvMemo').value || '';
 
@@ -7277,11 +7478,12 @@ function saveReservation() {
     const r = state.reservations.find(x => x.id === editingResvId);
     if (r) {
       r.customerId = customerId;
-      r.customerName = customerId ? '' : customerName;
+      r.customerName = customerName;
       r.guests = guests;
       r.castIds = castIds;
       r.castNoms = castNoms;
       r.castFree = castFree;
+      r.guestList = guestList;
       r.datetime = datetime;
       r.types = types;
       r.tableId = tableId;
@@ -7292,11 +7494,12 @@ function saveReservation() {
     state.reservations.push({
       id: genId('resv'),
       customerId,
-      customerName: customerId ? '' : customerName,
+      customerName,
       guests,
       castIds,
       castNoms,
       castFree,
+      guestList,
       datetime,
       types,
       tableId,
