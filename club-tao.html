@@ -431,6 +431,40 @@
     font-weight: 600;
     text-align: center;
     letter-spacing: 0.04em;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px 14px;
+  }
+  .today-count-banner .banner-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .today-count-banner .banner-section + .banner-section {
+    border-left: 1px solid #d4af37;
+    padding-left: 14px;
+  }
+  .today-count-banner .banner-sub {
+    font-size: 13px;
+    color: #6a5418;
+    font-weight: 500;
+  }
+  .today-count-banner .banner-sub + .banner-sub {
+    margin-left: 10px;
+  }
+  .today-count-banner .banner-notice {
+    color: #c44d00;
+  }
+  .today-count-banner .banner-clickable {
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .today-count-banner .banner-clickable:hover,
+  .today-count-banner .banner-clickable:active {
+    opacity: 0.7;
   }
   .today-count-banner .count-main {
     font-size: 16px;
@@ -447,6 +481,41 @@
     background: #f5f1ea;
     border-color: #ddd6c8;
     color: #888;
+  }
+  /* 連絡事項モーダル内のスタイル */
+  .notice-section {
+    margin-bottom: 14px;
+  }
+  .notice-section-title {
+    font-size: 12px;
+    color: #8b6914;
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed #d4af37;
+    font-weight: 700;
+  }
+  .notice-row {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px dashed #eee;
+  }
+  .notice-row:last-child { border-bottom: none; }
+  .notice-name {
+    flex-shrink: 0;
+    min-width: 80px;
+    color: #b8860b;
+    font-weight: 600;
+  }
+  .notice-text {
+    flex: 1;
+    color: var(--text);
+    word-break: break-word;
+  }
+  @media (max-width: 600px) {
+    .notice-row { flex-direction: column; gap: 2px; }
+    .notice-name { min-width: 0; font-size: 12px; }
   }
 
   /* テーブル選択グリッド（来店確認用） */
@@ -2205,9 +2274,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.16d';
+const APP_VERSION = '2026.05.17';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.17',
+    date: '2026-05-17',
+    title: '本日の予約件数・連絡事項を表示',
+    items: [
+      'フロア・シフトの「本日出勤」バナーに「📖 予約：X件」「📌 連絡事項：X件」をコンパクトに併記するようにしました。',
+      'バナーの右側部分をタップすると、本日の予約件数と連絡事項の詳細モーダルが開きます。予約タブへのジャンプボタン付き。',
+      '連絡事項は、顧客メモ・本日出勤キャストのメモに「【連絡事項】サプライズ用意」のように書くと、自動で拾われます。',
+      '対応表記：[連絡事項]xxx、【連絡事項】xxx の両方OK。複数行ある場合は各行が個別の連絡事項として表示されます。',
+    ],
+  },
   {
     version: '2026.05.16d',
     date: '2026-05-16',
@@ -5965,6 +6045,119 @@ function recalcAllTrialCounts() {
 }
 
 // 本日のキャスト出勤数を集計してフロア・シフト両方のバナーに表示
+// 本日（営業日基準）の予約件数を取得（削除済みを除く）
+function getTodayReservationCount() {
+  const todayStr = currentBusinessDate();
+  if (!Array.isArray(state.reservations)) return 0;
+  return state.reservations.filter(r => {
+    if (r.removed) return false;
+    if (!r.datetime) return false;
+    // 予約日時の営業日を判定
+    const d = new Date(r.datetime);
+    if (isNaN(d.getTime())) return false;
+    return businessDateStr(d) === todayStr;
+  }).length;
+}
+
+// メモから「【連絡事項】xxx」「[連絡事項]xxx」行を抽出
+// 1メモにつき複数行マッチ可、各マッチをトリム済み文字列で返す
+function extractNoticesFromMemo(memo) {
+  if (!memo) return [];
+  const lines = String(memo).split(/\r?\n/);
+  const results = [];
+  const re = /^\s*[\[【]\s*連絡事項\s*[\]】]\s*[:：]?\s*(.*)$/;
+  lines.forEach(line => {
+    const m = line.match(re);
+    if (m) {
+      const text = (m[1] || '').trim();
+      if (text) results.push(text);
+    }
+  });
+  return results;
+}
+
+// 本日チェックすべき連絡事項を集める
+// 顧客メモ：全顧客から抽出（顧客の絞り込みなし、店舗全体のお知らせとして拾う）
+// キャストメモ：今日出勤キャストのみ
+// 戻り値: [{source, name, text}, ...]
+function getTodayNotices() {
+  const results = [];
+  const todayStr = currentBusinessDate();
+  // 顧客メモから
+  (state.customers || []).forEach(c => {
+    if (c.removed) return;
+    const notices = extractNoticesFromMemo(c.memo);
+    notices.forEach(text => {
+      results.push({
+        source: 'customer',
+        name: withSan(displayName(c)) || withSan(c.name) || 'お客様',
+        text,
+      });
+    });
+  });
+  // キャストメモから（今日出勤者のみ）
+  (state.casts || []).forEach(c => {
+    if (c.removed) return;
+    if (!getShift(todayStr, c.id)) return;
+    const notices = extractNoticesFromMemo(c.memo);
+    notices.forEach(text => {
+      results.push({
+        source: 'cast',
+        name: c.name || '',
+        text,
+      });
+    });
+  });
+  return results;
+}
+
+// 本日の連絡事項一覧モーダルを表示
+function showTodayNoticesModal() {
+  const notices = getTodayNotices();
+  const reservationCount = getTodayReservationCount();
+  let bodyHtml = '';
+  if (reservationCount > 0) {
+    bodyHtml += `<div style="margin-bottom:14px; padding:8px 12px; background:#fff8e7; border-left:4px solid #d4af37; border-radius:4px; font-size:13px;">
+      📖 本日の予約：<b>${reservationCount}件</b>
+      <button class="btn-sub btn-sm" style="margin-left:8px;" onclick="document.querySelectorAll('.modal-bg.active').forEach(b=>b.remove()); document.querySelector('.nav-btn[data-page=\\'reservations\\']').click();">予約タブで見る</button>
+    </div>`;
+  }
+  if (notices.length === 0) {
+    bodyHtml += '<p style="color:#888; font-size:12px;">連絡事項はありません。<br><br><span style="font-size:11px;">顧客メモ・キャストメモに <b>【連絡事項】◯◯</b> と書くと、ここに表示されます。</span></p>';
+  } else {
+    // 顧客とキャストでグループ化
+    const custNotices = notices.filter(n => n.source === 'customer');
+    const castNotices = notices.filter(n => n.source === 'cast');
+    if (custNotices.length > 0) {
+      bodyHtml += '<div class="notice-section"><h4 class="notice-section-title">👤 お客様</h4>';
+      bodyHtml += custNotices.map(n => `<div class="notice-row"><span class="notice-name">${escapeHtml(n.name)}</span><span class="notice-text">${escapeHtml(n.text)}</span></div>`).join('');
+      bodyHtml += '</div>';
+    }
+    if (castNotices.length > 0) {
+      bodyHtml += '<div class="notice-section"><h4 class="notice-section-title">🌹 キャスト</h4>';
+      bodyHtml += castNotices.map(n => `<div class="notice-row"><span class="notice-name">${escapeHtml(n.name)}</span><span class="notice-text">${escapeHtml(n.text)}</span></div>`).join('');
+      bodyHtml += '</div>';
+    }
+  }
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1750;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:440px; max-height:88vh; overflow-y:auto;">
+      <h3 style="margin-top:0;">📌 本日の予約・連絡事項</h3>
+      ${bodyHtml}
+      <p style="font-size:11px; color:#aaa; margin-top:14px; padding-top:10px; border-top:1px dashed var(--border);">
+        💡 顧客カードやキャスト情報のメモ欄に「<b>【連絡事項】</b>サプライズ用意」のように書くと、自動でここに集まります。
+      </p>
+      <div style="margin-top:10px;">
+        <button class="btn-main" style="width:100%;" onclick="this.closest('.modal-bg').remove()">閉じる</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+}
+
 function updateTodayShiftCount() {
   const todayStr = currentBusinessDate();
   const activeCasts = (state.casts || []).filter(c => !c.removed);
@@ -5977,17 +6170,32 @@ function updateTodayShiftCount() {
       if (c.trial) trial++;
     }
   });
+  // 予約件数と連絡事項
+  const resvCount = getTodayReservationCount();
+  const noticeCount = getTodayNotices().length;
   // バナーHTML生成
   let html, cls;
   if (total === 0) {
-    html = '本日の出勤キャストはまだ登録されていません';
+    html = '<span class="banner-section">本日の出勤キャストはまだ登録されていません</span>';
     cls = 'today-count-banner empty';
   } else {
-    html = `本日出勤：<span class="count-main">${total}名</span>`;
+    html = `<span class="banner-section">本日出勤：<span class="count-main">${total}名</span>`;
     if (trial > 0) {
       html += `<span class="count-trial">（うち体験：${trial}名）</span>`;
     }
+    html += '</span>';
     cls = 'today-count-banner';
+  }
+  // 予約件数・連絡事項を追加（区切り＋クリックで詳細）
+  if (resvCount > 0 || noticeCount > 0) {
+    html += '<span class="banner-section banner-clickable" onclick="showTodayNoticesModal()">';
+    if (resvCount > 0) {
+      html += `<span class="banner-sub">📖 予約：<b>${resvCount}件</b></span>`;
+    }
+    if (noticeCount > 0) {
+      html += `<span class="banner-sub banner-notice">📌 連絡事項：<b>${noticeCount}件</b></span>`;
+    }
+    html += '</span>';
   }
   // フロアタブとシフトタブの両方を更新
   const fEl = document.getElementById('todayShiftCountFloor');
