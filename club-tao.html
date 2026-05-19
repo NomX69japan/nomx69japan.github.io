@@ -1557,6 +1557,7 @@
     padding: 8px; background: var(--surface); border-radius: 6px;
     margin-bottom: 6px; font-size: 13px;
     border: 1px solid var(--border);
+    flex-wrap: wrap;
   }
   .cast-list-item.trial, .staff-list-item.trial {
     background: #f5e8c5;
@@ -1568,6 +1569,19 @@
   .cast-list-item .bday-input, .staff-list-item .bday-input {
     width: 110px; padding: 4px 6px; font-size: 11px;
     flex-shrink: 0;
+  }
+  .cast-list-item .cast-memo-input {
+    width: 100%;
+    padding: 5px 8px;
+    font-size: 12px;
+    border: 1px dashed #d4af37;
+    border-radius: 4px;
+    background: #fffbf2;
+    resize: vertical;
+    min-height: 38px;
+    font-family: inherit;
+    margin-top: 4px;
+    order: 100;
   }
   /* スマホでは折り返す */
   @media (max-width: 600px) {
@@ -2274,9 +2288,19 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.17';
+const APP_VERSION = '2026.05.17b';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.17b',
+    date: '2026-05-17',
+    title: '連絡事項：予約メモ対応＆キャストメモUI追加',
+    items: [
+      '🎯 予約のメモも「【連絡事項】◯◯」の抽出対象になりました。本日の予約に書いた連絡事項がフロアに自動表示されます。',
+      '🎯 キャスト管理にメモ入力欄が無かったので追加しました（設定 → キャスト管理 → 各キャスト名の下にメモ欄）。',
+      'モーダルでは予約 / 顧客 / キャストでセクション分けして見やすく表示します。',
+    ],
+  },
   {
     version: '2026.05.17',
     date: '2026-05-17',
@@ -6079,6 +6103,7 @@ function extractNoticesFromMemo(memo) {
 // 本日チェックすべき連絡事項を集める
 // 顧客メモ：全顧客から抽出（顧客の絞り込みなし、店舗全体のお知らせとして拾う）
 // キャストメモ：今日出勤キャストのみ
+// 予約メモ：本日の予約のみ
 // 戻り値: [{source, name, text}, ...]
 function getTodayNotices() {
   const results = [];
@@ -6108,6 +6133,33 @@ function getTodayNotices() {
       });
     });
   });
+  // 予約メモから（本日の予約のみ）
+  (state.reservations || []).forEach(r => {
+    if (r.removed) return;
+    if (!r.datetime) return;
+    const d = new Date(r.datetime);
+    if (isNaN(d.getTime())) return;
+    if (businessDateStr(d) !== todayStr) return;
+    const notices = extractNoticesFromMemo(r.memo);
+    notices.forEach(text => {
+      // 予約の表示名を組み立て：顧客名 or 「予約X時」
+      let nm = '';
+      if (r.customerId) {
+        const cust = (state.customers || []).find(c => c.id === r.customerId);
+        if (cust) nm = withSan(displayName(cust));
+      } else if (r.customerName) {
+        nm = withSan(r.customerName);
+      }
+      if (!nm) {
+        nm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} の予約`;
+      }
+      results.push({
+        source: 'reservation',
+        name: nm,
+        text,
+      });
+    });
+  });
   return results;
 }
 
@@ -6123,11 +6175,17 @@ function showTodayNoticesModal() {
     </div>`;
   }
   if (notices.length === 0) {
-    bodyHtml += '<p style="color:#888; font-size:12px;">連絡事項はありません。<br><br><span style="font-size:11px;">顧客メモ・キャストメモに <b>【連絡事項】◯◯</b> と書くと、ここに表示されます。</span></p>';
+    bodyHtml += '<p style="color:#888; font-size:12px;">連絡事項はありません。<br><br><span style="font-size:11px;">顧客メモ・キャストメモ・予約メモに <b>【連絡事項】◯◯</b> と書くと、ここに表示されます。</span></p>';
   } else {
-    // 顧客とキャストでグループ化
+    // 顧客・キャスト・予約でグループ化
     const custNotices = notices.filter(n => n.source === 'customer');
     const castNotices = notices.filter(n => n.source === 'cast');
+    const resvNotices = notices.filter(n => n.source === 'reservation');
+    if (resvNotices.length > 0) {
+      bodyHtml += '<div class="notice-section"><h4 class="notice-section-title">📖 本日の予約</h4>';
+      bodyHtml += resvNotices.map(n => `<div class="notice-row"><span class="notice-name">${escapeHtml(n.name)}</span><span class="notice-text">${escapeHtml(n.text)}</span></div>`).join('');
+      bodyHtml += '</div>';
+    }
     if (custNotices.length > 0) {
       bodyHtml += '<div class="notice-section"><h4 class="notice-section-title">👤 お客様</h4>';
       bodyHtml += custNotices.map(n => `<div class="notice-row"><span class="notice-name">${escapeHtml(n.name)}</span><span class="notice-text">${escapeHtml(n.text)}</span></div>`).join('');
@@ -7709,8 +7767,16 @@ function renderCastListUI() {
       ${c.trial ? `<span class="trial-badge">${c.trialCount||0}/3</span>` : ''}
       ${c.trial ? `<button class="btn btn-sm" onclick="convertToMember('${c.id}')">本採用</button>` : ''}
       <button class="btn-danger btn-sm" onclick="removeCast('${c.id}')">削除</button>
+      <textarea class="cast-memo-input" placeholder="📝 メモ（【連絡事項】◯◯ と書くとフロアに表示）" rows="2" onchange="setCastMemo('${c.id}', this.value)">${escapeHtml(c.memo||'')}</textarea>
     </div>
   `).join('');
+}
+function setCastMemo(id, val) {
+  const c = state.casts.find(x => x.id === id);
+  if (!c) return;
+  c.memo = val || '';
+  c._updated = Date.now();
+  persistSave();
 }
 function setCastBirthday(id, val) {
   const c = state.casts.find(x => x.id === id);
