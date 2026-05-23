@@ -2147,6 +2147,9 @@
         <div class="body">
           <p style="color:#888; font-size:11px; margin:0 0 8px;">商品マスタとカテゴリを編集します。入店処理せずに編集できるので、他のスタッフに通知が飛びません。</p>
           <button class="btn btn-sm" onclick="openMenuManageDialog()">⚙ 商品・カテゴリを編集</button>
+          <hr style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+          <p style="color:#888; font-size:11px; margin:0 0 8px;">⚠ 緊急用：重複しまくる場合は、全商品を一度完全リセットしてください。すべての商品とカテゴリが「削除済み」になり、固定IDのデフォルト商品のみ再投入されます。</p>
+          <button class="btn-danger btn-sm" onclick="resetOrderMaster()">🗑 オーダー商品を初期状態に戻す</button>
         </div>
       </details>
 
@@ -2288,9 +2291,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.18';
+const APP_VERSION = '2026.05.19';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.19',
+    date: '2026-05-19',
+    title: '🔧 オーダー商品の重複問題を根本対策',
+    items: [
+      '🐛 Lビール・生ビール・店長ビールなどデフォルト商品がいくら削除しても復活する問題を根本対策しました。',
+      '【原因】複数端末で初回起動するたびに、ランダムなIDで同じ「Lビール」が新規登録され、サーバー同期で全部混ざっていました。',
+      '【対策】デフォルト商品・カテゴリのIDを「menu_default_lbeer」などの固定IDに変更。全端末で同じIDを使うため、サーバー同期で1つに自動マージされます。',
+      '起動時に、過去のランダムIDの重複データをすべて自動クリーンアップ。固定IDのレコードに統合されます。',
+      '削除した商品は「未来の日時で削除フラグを立てる」ようにし、他端末から古いデータが同期で戻ってきても復活しないようになりました。',
+      '⚠ 緊急用：それでも重複する場合は、設定 → 📦オーダー商品管理 → 「🗑 オーダー商品を初期状態に戻す」で完全リセットできます。',
+    ],
+  },
   {
     version: '2026.05.18',
     date: '2026-05-18',
@@ -2504,39 +2520,47 @@ const state = {
 };
 
 // デフォルト商品マスタ（state.menuItemsが空の時にだけ投入される）
+// 固定IDを使うことで、複数端末で初回投入したときも同じIDになり、サーバー同期で
+// 自動的に1つにマージされる（別IDの重複が発生しない）
 const DEFAULT_MENU_ITEMS = [
   // ドリンク
-  { name: 'Lビール', category: 'ドリンク' },
-  { name: '生ビール', category: 'ドリンク' },
-  { name: '店長ビール', category: 'ドリンク' },
-  { name: '烏龍ハイ', category: 'ドリンク' },
-  { name: '緑茶ハイ', category: 'ドリンク' },
-  { name: '玄米P', category: 'ドリンク' },
-  { name: 'アセロラワイン', category: 'ドリンク' },
-  { name: 'ジンジャエール', category: 'ドリンク' },
-  { name: '炭酸', category: 'ドリンク' },
-  { name: '緑茶', category: 'ドリンク' },
-  { name: '烏龍茶', category: 'ドリンク' },
+  { id: 'menu_default_lbeer',       name: 'Lビール',       category: 'ドリンク' },
+  { id: 'menu_default_namabeer',    name: '生ビール',      category: 'ドリンク' },
+  { id: 'menu_default_tencho',      name: '店長ビール',    category: 'ドリンク' },
+  { id: 'menu_default_oolong_hai',  name: '烏龍ハイ',      category: 'ドリンク' },
+  { id: 'menu_default_ryokucha_hai',name: '緑茶ハイ',      category: 'ドリンク' },
+  { id: 'menu_default_genmaip',     name: '玄米P',         category: 'ドリンク' },
+  { id: 'menu_default_acerola',     name: 'アセロラワイン',category: 'ドリンク' },
+  { id: 'menu_default_ginger',      name: 'ジンジャエール',category: 'ドリンク' },
+  { id: 'menu_default_tansan',      name: '炭酸',          category: 'ドリンク' },
+  { id: 'menu_default_ryokucha',    name: '緑茶',          category: 'ドリンク' },
+  { id: 'menu_default_oolong',      name: '烏龍茶',        category: 'ドリンク' },
   // ボトル
-  { name: '焼酎（麦）', category: 'ボトル' },
-  { name: '焼酎（芋）', category: 'ボトル' },
-  { name: 'ウイスキー', category: 'ボトル' },
+  { id: 'menu_default_shochu_mugi', name: '焼酎(麦)',      category: 'ボトル' },
+  { id: 'menu_default_shochu_imo',  name: '焼酎(芋)',      category: 'ボトル' },
+  { id: 'menu_default_whisky',      name: 'ウイスキー',    category: 'ボトル' },
   // シャンパン
-  { name: 'モエ', category: 'シャンパン' },
-  { name: 'ヴーヴ', category: 'シャンパン' },
-  { name: 'ドンペリ白', category: 'シャンパン' },
+  { id: 'menu_default_moet',        name: 'モエ',          category: 'シャンパン' },
+  { id: 'menu_default_veuve',       name: 'ヴーヴ',        category: 'シャンパン' },
+  { id: 'menu_default_donper_w',    name: 'ドンペリ白',    category: 'シャンパン' },
   // ピッチャー
-  { name: 'ピッチャー（緑茶）', category: 'ピッチャー' },
-  { name: 'ピッチャー（烏龍茶）', category: 'ピッチャー' },
-  { name: 'ピッチャー（水）', category: 'ピッチャー' },
+  { id: 'menu_default_pit_ryokucha',name: 'ピッチャー(緑茶)',  category: 'ピッチャー' },
+  { id: 'menu_default_pit_oolong',  name: 'ピッチャー(烏龍茶)',category: 'ピッチャー' },
+  { id: 'menu_default_pit_water',   name: 'ピッチャー(水)',    category: 'ピッチャー' },
   // フード
-  { name: 'おつまみ盛合せ', category: 'フード' },
-  { name: 'チーズ盛', category: 'フード' },
-  { name: 'ナッツ', category: 'フード' },
+  { id: 'menu_default_otsumami',    name: 'おつまみ盛合せ',category: 'フード' },
+  { id: 'menu_default_cheese',      name: 'チーズ盛',      category: 'フード' },
+  { id: 'menu_default_nuts',        name: 'ナッツ',        category: 'フード' },
 ];
 
-// デフォルトカテゴリ（表示順）
-const DEFAULT_CATEGORIES = ['ドリンク', 'ボトル', 'シャンパン', 'ピッチャー', 'フード'];
+// デフォルトカテゴリ（表示順）。同じく固定IDで全端末共通
+const DEFAULT_CATEGORIES = [
+  { id: 'cat_default_drink',     name: 'ドリンク' },
+  { id: 'cat_default_bottle',    name: 'ボトル' },
+  { id: 'cat_default_champagne', name: 'シャンパン' },
+  { id: 'cat_default_pitcher',   name: 'ピッチャー' },
+  { id: 'cat_default_food',      name: 'フード' },
+];
 
 // 通知設定（端末ごとにlocalStorageへ保存。サーバー同期しない）
 const LS_NOTIF = 'tao_lite_notif';
@@ -5424,6 +5448,55 @@ function removeOrder(tableId, orderId) {
 }
 
 // 商品マスタ管理ダイアログ
+// 緊急用：オーダー商品マスタを完全リセットして固定IDのデフォルト商品のみに戻す
+function resetOrderMaster() {
+  if (!confirm('オーダー商品とカテゴリをすべて削除し、デフォルトの状態に戻します。\nユーザーが追加した商品もすべて削除されます。\n本当に実行しますか？')) return;
+  if (!confirm('もう一度確認します。\n本当にオーダー商品を初期化しますか？（取り消しできません）')) return;
+
+  const FUTURE_TS = Date.now() + 10 * 365 * 24 * 60 * 60 * 1000;
+  if (!Array.isArray(state.menuCategories)) state.menuCategories = [];
+  if (!Array.isArray(state.menuItems)) state.menuItems = [];
+
+  // 全カテゴリを削除（固定IDも含む）
+  state.menuCategories.forEach(c => {
+    c.removed = true;
+    c._updated = FUTURE_TS;
+  });
+  // 全商品を削除（固定IDも含む）
+  state.menuItems.forEach(m => {
+    m.removed = true;
+    m._updated = FUTURE_TS;
+  });
+  // 固定IDのデフォルトカテゴリ・商品を再投入
+  DEFAULT_CATEGORIES.forEach((d, idx) => {
+    state.menuCategories.push({
+      id: d.id,
+      name: d.name,
+      sortOrder: idx,
+      _created: Date.now(),
+      _updated: Date.now(),
+      removed: false,
+    });
+  });
+  DEFAULT_MENU_ITEMS.forEach((d, idx) => {
+    state.menuItems.push({
+      id: d.id,
+      name: d.name,
+      category: d.category,
+      sortOrder: idx,
+      _created: Date.now(),
+      _updated: Date.now(),
+      removed: false,
+    });
+  });
+  persistSave();
+  alert('オーダー商品を初期状態に戻しました。');
+  // 開いている可能性のあるダイアログを閉じて再表示
+  if (window._menuManageBg) {
+    closeMenuManageDialog();
+  }
+}
+
 function openMenuManageDialog() {
   const bg = document.createElement('div');
   bg.className = 'modal-bg active';
@@ -5626,13 +5699,15 @@ function removeCategory(id) {
   } else {
     if (!confirm(`「${c.name}」カテゴリを削除しますか？`)) return;
   }
+  // サーバー同期で復活しないように、_updated に未来時刻を使う
+  const FUTURE_TS = Date.now() + 10 * 365 * 24 * 60 * 60 * 1000;
   c.removed = true;
-  c._updated = Date.now();
+  c._updated = FUTURE_TS;
   // 同名カテゴリの重複レコードも一緒に削除（複数端末で重複登録された場合の対策）
   (state.menuCategories || []).forEach(other => {
     if (other.id !== c.id && !other.removed && other.name === c.name) {
       other.removed = true;
-      other._updated = Date.now();
+      other._updated = FUTURE_TS;
     }
   });
   persistSave();
@@ -5716,8 +5791,10 @@ function removeMenuItem(id) {
   const m = (state.menuItems || []).find(x => x.id === id);
   if (!m) return;
   if (!confirm(`「${m.name}」を削除しますか？`)) return;
+  // サーバー同期で復活しないように、_updated に未来時刻を使う（他端末の古いデータに上書きされない）
+  const FUTURE_TS = Date.now() + 10 * 365 * 24 * 60 * 60 * 1000;
   m.removed = true;
-  m._updated = Date.now();
+  m._updated = FUTURE_TS;
   // 念のため、同名・同カテゴリの重複レコードも一緒に削除する
   // （複数端末で重複登録された場合、片方だけ削除しても画面上では残り続けるため）
   (state.menuItems || []).forEach(other => {
@@ -5725,7 +5802,7 @@ function removeMenuItem(id) {
         && other.name === m.name
         && (other.category || '') === (m.category || '')) {
       other.removed = true;
-      other._updated = Date.now();
+      other._updated = FUTURE_TS;
     }
   });
   persistSave();
@@ -8468,7 +8545,13 @@ function applyServerData(payload) {
     payload.menuItems.forEach(rm => {
       const idx = state.menuItems.findIndex(m => m.id === rm.id);
       if (idx >= 0) {
-        if ((rm._updated || 0) >= (state.menuItems[idx]._updated || 0)) {
+        const local = state.menuItems[idx];
+        // ローカル側が removed:true ならサーバー側で復活させない（_updated 比較を上書き）
+        if (local.removed && !rm.removed) {
+          // ローカル削除を尊重：受信データの removed フラグだけ true で上書き
+          rm = { ...rm, removed: true, _updated: Math.max(local._updated || 0, rm._updated || 0) };
+        }
+        if ((rm._updated || 0) >= (local._updated || 0)) {
           state.menuItems[idx] = rm;
         }
       } else {
@@ -8482,7 +8565,11 @@ function applyServerData(payload) {
     payload.menuCategories.forEach(rc => {
       const idx = state.menuCategories.findIndex(c => c.id === rc.id);
       if (idx >= 0) {
-        if ((rc._updated || 0) >= (state.menuCategories[idx]._updated || 0)) {
+        const local = state.menuCategories[idx];
+        if (local.removed && !rc.removed) {
+          rc = { ...rc, removed: true, _updated: Math.max(local._updated || 0, rc._updated || 0) };
+        }
+        if ((rc._updated || 0) >= (local._updated || 0)) {
           state.menuCategories[idx] = rc;
         }
       } else {
@@ -8722,97 +8809,155 @@ function escapeHtml(s) {
 persistLoad();
 loadNotifPrefs();
 loadPushState();
-// カテゴリマスタ初期化
-if (!Array.isArray(state.menuCategories) || state.menuCategories.length === 0) {
-  state.menuCategories = DEFAULT_CATEGORIES.map((name, i) => ({
-    id: genId('cat'),
-    name,
-    sortOrder: i,
-    _created: Date.now(),
-    _updated: Date.now(),
-    removed: false,
-  }));
-}
-// 旧データのマイグレーション：「酒類」→「ドリンク」
-(state.menuItems || []).forEach(m => {
-  if (m.category === '酒類') {
-    m.category = 'ドリンク';
-    m._updated = Date.now();
-  }
-});
-// 古い「酒類」カテゴリが残っていれば削除フラグ＆「ドリンク」未登録なら追加
-(function migrateSakeruiToDrink() {
-  if (!Array.isArray(state.menuCategories)) return;
-  const sake = state.menuCategories.find(c => !c.removed && c.name === '酒類');
-  if (sake) {
-    const drink = state.menuCategories.find(c => !c.removed && c.name === 'ドリンク');
-    if (drink) {
-      // 既に「ドリンク」あり → 「酒類」を削除
-      sake.removed = true;
-      sake._updated = Date.now();
-    } else {
-      // 「ドリンク」なし → 「酒類」を「ドリンク」にリネーム
-      sake.name = 'ドリンク';
-      sake._updated = Date.now();
+
+// =====================================================
+// オーダーマスタの大掃除＋固定ID対応（v2026.05.19）
+// 複数端末で別IDの DEFAULT が混在していた問題を根本対策する。
+// 1) 旧データ（ランダムID）の同名アイテム・カテゴリを removed:true にする
+// 2) 固定IDのものが無ければ、ここで新規に追加（固定IDなので全端末同じID）
+// 3) サーバー同期で復活しないよう、削除データの _updated には未来時刻を入れる
+// =====================================================
+(function cleanupAndSeedOrderMaster() {
+  const FUTURE_TS = Date.now() + 10 * 365 * 24 * 60 * 60 * 1000; // 10年先（サーバー同期での復活を防ぐ）
+  if (!Array.isArray(state.menuCategories)) state.menuCategories = [];
+  if (!Array.isArray(state.menuItems)) state.menuItems = [];
+
+  // --- カテゴリ：固定IDで再構築 ---
+  // 旧データの「酒類」→「ドリンク」へリネーム
+  state.menuCategories.forEach(c => {
+    if (!c.removed && c.name === '酒類') {
+      c.name = 'ドリンク';
+      c._updated = Date.now();
     }
-  }
-})();
-// 同名カテゴリの重複統合：複数端末で同期したとき同じ名前のカテゴリが
-// 別IDで重複登録されることがあるため、起動時に整理する。
-(function dedupeMenuCategories() {
-  if (!Array.isArray(state.menuCategories)) return;
-  const seen = {};
+  });
+  // ランダムIDの DEFAULT 名カテゴリは全部 removed:true（固定IDのものに移行）
+  const defaultCatNames = new Set(DEFAULT_CATEGORIES.map(d => d.name));
+  const defaultCatIds = new Set(DEFAULT_CATEGORIES.map(d => d.id));
   state.menuCategories.forEach(c => {
     if (c.removed) return;
-    if (!c.name) return;
-    if (seen[c.name]) {
-      // 重複：古い方（_createdが古い、または同じならsortOrderが大きい方）を削除
-      const existing = seen[c.name];
-      const keepExisting = (existing._created || 0) <= (c._created || 0);
-      const toRemove = keepExisting ? c : existing;
-      const toKeep = keepExisting ? existing : c;
-      toRemove.removed = true;
-      toRemove._updated = Date.now();
-      seen[c.name] = toKeep;
-    } else {
-      seen[c.name] = c;
+    if (defaultCatNames.has(c.name) && !defaultCatIds.has(c.id)) {
+      c.removed = true;
+      c._updated = FUTURE_TS; // 同期で復活しないよう未来時刻
     }
   });
-})();
-// 同名商品の重複統合：同様の理由で、商品も同じ名前で別IDが複数登録されるケースがある。
-(function dedupeMenuItems() {
-  if (!Array.isArray(state.menuItems)) return;
-  const seen = {};
+  // 固定IDのカテゴリを存在チェック → なければ追加、あれば removed:false に戻す
+  DEFAULT_CATEGORIES.forEach((d, idx) => {
+    const existing = state.menuCategories.find(c => c.id === d.id);
+    if (existing) {
+      // 既に固定IDレコードあり：removed=true でも復活させる（ユーザーが誤って削除した可能性もあるので、初期化時のみ復活）
+      // → ただしユーザーが明示的に削除したケースもあるため、ここでは「初回マイグレーション時のみ」復活
+      // 既に存在するなら設定はそのまま尊重（ただし name は最新に）
+      if (existing.name !== d.name) {
+        existing.name = d.name;
+        existing._updated = Date.now();
+      }
+    } else {
+      state.menuCategories.push({
+        id: d.id,
+        name: d.name,
+        sortOrder: idx,
+        _created: Date.now(),
+        _updated: Date.now(),
+        removed: false,
+      });
+    }
+  });
+
+  // --- 商品：固定IDで再構築 ---
+  // 旧データの「酒類」カテゴリ参照は「ドリンク」へ
+  state.menuItems.forEach(m => {
+    if (m.category === '酒類') {
+      m.category = 'ドリンク';
+      m._updated = Date.now();
+    }
+  });
+  // ランダムIDの DEFAULT 名商品は全部 removed:true
+  const defaultItemNames = new Set(DEFAULT_MENU_ITEMS.map(d => d.name));
+  const defaultItemIds = new Set(DEFAULT_MENU_ITEMS.map(d => d.id));
   state.menuItems.forEach(m => {
     if (m.removed) return;
-    if (!m.name) return;
-    // 同じ「名前 × カテゴリ」の組み合わせで重複判定
-    const key = `${m.name}__${m.category || ''}`;
-    if (seen[key]) {
-      const existing = seen[key];
-      const keepExisting = (existing._created || 0) <= (m._created || 0);
-      const toRemove = keepExisting ? m : existing;
-      const toKeep = keepExisting ? existing : m;
-      toRemove.removed = true;
-      toRemove._updated = Date.now();
-      seen[key] = toKeep;
-    } else {
-      seen[key] = m;
+    if (defaultItemNames.has(m.name) && !defaultItemIds.has(m.id)) {
+      m.removed = true;
+      m._updated = FUTURE_TS; // 同期で復活しないよう未来時刻
     }
   });
+  // 固定IDの商品を存在チェック → なければ追加
+  DEFAULT_MENU_ITEMS.forEach((d, idx) => {
+    const existing = state.menuItems.find(m => m.id === d.id);
+    if (existing) {
+      // 既に固定IDレコードあり：名前・カテゴリは最新に更新（ただし removed フラグは尊重）
+      if (existing.name !== d.name) {
+        existing.name = d.name;
+        existing._updated = Date.now();
+      }
+      if (existing.category !== d.category) {
+        existing.category = d.category;
+        existing._updated = Date.now();
+      }
+    } else {
+      state.menuItems.push({
+        id: d.id,
+        name: d.name,
+        category: d.category,
+        sortOrder: idx,
+        _created: Date.now(),
+        _updated: Date.now(),
+        removed: false,
+      });
+    }
+  });
+
+  // --- 起動時に重複統合（ユーザー追加分も含めて、同名同カテゴリは1つに） ---
+  // カテゴリ：同名のうち、固定IDのものを残し、それ以外を removed:true
+  (function dedupeCategories() {
+    const byName = {};
+    state.menuCategories.forEach(c => {
+      if (c.removed) return;
+      if (!c.name) return;
+      if (!byName[c.name]) byName[c.name] = [];
+      byName[c.name].push(c);
+    });
+    Object.values(byName).forEach(arr => {
+      if (arr.length <= 1) return;
+      // 固定IDがあればそれを残す、なければ _created が古いものを残す
+      let keep = arr.find(c => defaultCatIds.has(c.id));
+      if (!keep) {
+        keep = arr.slice().sort((a, b) => (a._created || 0) - (b._created || 0))[0];
+      }
+      arr.forEach(c => {
+        if (c.id !== keep.id) {
+          c.removed = true;
+          c._updated = FUTURE_TS;
+        }
+      });
+    });
+  })();
+  // 商品：同名×同カテゴリのうち、固定IDのものを残す
+  (function dedupeItems() {
+    const byKey = {};
+    state.menuItems.forEach(m => {
+      if (m.removed) return;
+      if (!m.name) return;
+      const key = `${m.name}__${m.category || ''}`;
+      if (!byKey[key]) byKey[key] = [];
+      byKey[key].push(m);
+    });
+    Object.values(byKey).forEach(arr => {
+      if (arr.length <= 1) return;
+      let keep = arr.find(m => defaultItemIds.has(m.id));
+      if (!keep) {
+        keep = arr.slice().sort((a, b) => (a._created || 0) - (b._created || 0))[0];
+      }
+      arr.forEach(m => {
+        if (m.id !== keep.id) {
+          m.removed = true;
+          m._updated = FUTURE_TS;
+        }
+      });
+    });
+  })();
 })();
-// メニュー初期化：未登録ならデフォルトメニューを投入
-if (!Array.isArray(state.menuItems) || state.menuItems.length === 0) {
-  state.menuItems = DEFAULT_MENU_ITEMS.map((m, i) => ({
-    id: genId('menu'),
-    name: m.name,
-    category: m.category,
-    sortOrder: i,
-    _created: Date.now(),
-    _updated: Date.now(),
-    removed: false,
-  }));
-}
+
 // 既存データの体験キャストカウントを再計算（過去のバグで未反映だった分も復旧）
 recalcAllTrialCounts();
 // 再計算結果をローカルストレージに保存（次回起動時から正しい値で起動）
