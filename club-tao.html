@@ -1583,6 +1583,15 @@
     margin-top: 4px;
     order: 100;
   }
+  .cast-list-item .cast-move-btn {
+    min-width: 28px;
+    padding: 1px 6px !important;
+    line-height: 1.3 !important;
+  }
+  .cast-list-item .cast-move-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
   /* スマホでは折り返す */
   @media (max-width: 600px) {
     .cast-list-item, .staff-list-item {
@@ -2294,9 +2303,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.23';
+const APP_VERSION = '2026.05.24';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.24',
+    date: '2026-05-24',
+    title: 'キャストの並び替え機能',
+    items: [
+      '設定 → キャスト管理で、各キャストの左に「▲▼」ボタンを追加しました。タップで並び替えできます。',
+      '本採用キャストを体験キャストの上に持ってきたいなど、自由に順序を調整できます。',
+      'シフト表・入店モーダルの指名キャスト・予約モーダルの指名キャストも、すべてこの並び順で表示されます。',
+      '体験キャストにすると左の「▲▼」で下に動かす、本採用にしたら上に動かす、といった運用が可能です。',
+    ],
+  },
   {
     version: '2026.05.23',
     date: '2026-05-23',
@@ -4599,9 +4619,16 @@ function buildGuestCardHtml(guest, idx, isOccupied) {
       return `<option value="${c.id}" ${guest.customerId === c.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
     })).join('');
 
-  // キャスト選択肢（A/B/なし＋同伴）
+  // キャスト選択肢（A/B/なし＋同伴、sortOrder順）
   const castOptionsHtml = state.casts
     .filter(c => !c.removed)
+    .slice()
+    .sort((a, b) => {
+      const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+      const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+      if (sa !== sb) return sa - sb;
+      return (a._created || 0) - (b._created || 0);
+    })
     .map(c => {
       const checked = (guest.castIds || []).includes(c.id) ? 'checked' : '';
       const cur = (guest.castNoms && guest.castNoms[c.id]) || 'none';
@@ -6057,7 +6084,12 @@ function renderShift() {
   const resvIndex = buildShiftResvIndex(days);
 
   // テーブル構築
-  const activeCasts = state.casts.filter(c => !c.removed);
+  const activeCasts = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+    const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+    const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+    if (sa !== sb) return sa - sb;
+    return (a._created || 0) - (b._created || 0);
+  });
   const activeStaff = state.staff.filter(s => !s.removed);
   let html = '<thead><tr><th class="cast-col">名前</th>';
   days.forEach((d, i) => {
@@ -7204,8 +7236,13 @@ function buildResvGuestCardHtml(guest, idx) {
       return `<option value="${c.id}" ${selected}>${escapeHtml(label)}</option>`;
     })).join('');
 
-  // キャスト選択肢
-  const castOpts = state.casts.filter(c => !c.removed).map(c => {
+  // キャスト選択肢（sortOrder順）
+  const castOpts = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+    const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+    const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+    if (sa !== sb) return sa - sb;
+    return (a._created || 0) - (b._created || 0);
+  }).map(c => {
     const checked = (guest.castIds || []).includes(c.id) ? 'checked' : '';
     const cur = (guest.castNoms && guest.castNoms[c.id]) || 'none';
     const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
@@ -8134,13 +8171,23 @@ function addCast() {
 }
 function renderCastListUI() {
   const root = document.getElementById('castListUI');
-  const list = state.casts.filter(c => !c.removed);
+  // 表示用：sortOrder 昇順、未設定（undefined）は末尾、同じなら _created 順
+  const list = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+    const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+    const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+    if (sa !== sb) return sa - sb;
+    return (a._created || 0) - (b._created || 0);
+  });
   if (list.length === 0) {
     root.innerHTML = '<p style="color:#888; font-size:12px;">キャスト未登録</p>';
     return;
   }
-  root.innerHTML = list.map(c => `
+  root.innerHTML = list.map((c, idx) => `
     <div class="cast-list-item ${c.trial?'trial':''}">
+      <div style="display:flex; flex-direction:column; gap:1px; flex-shrink:0;">
+        <button type="button" class="btn-sub btn-sm cast-move-btn" onclick="moveCastUp('${c.id}')" ${idx===0?'disabled':''} style="padding:0 6px; font-size:10px; line-height:1.4;">▲</button>
+        <button type="button" class="btn-sub btn-sm cast-move-btn" onclick="moveCastDown('${c.id}')" ${idx===list.length-1?'disabled':''} style="padding:0 6px; font-size:10px; line-height:1.4;">▼</button>
+      </div>
       <input type="text" class="rename" value="${escapeHtml(c.name)}" onchange="renameCast('${c.id}', this.value)">
       <input type="text" class="bday-input" placeholder="🎂 例: 04-15" value="${escapeHtml(c.birthday||'')}" onchange="setCastBirthday('${c.id}', this.value)" title="誕生日（MM-DD または YYYY-MM-DD）">
       <label class="small-label">
@@ -8152,6 +8199,62 @@ function renderCastListUI() {
       <textarea class="cast-memo-input" placeholder="📝 メモ（【連絡事項】◯◯ と書くとフロアに表示）" rows="2" onchange="setCastMemo('${c.id}', this.value)">${escapeHtml(c.memo||'')}</textarea>
     </div>
   `).join('');
+}
+
+// キャストの並び替え（上へ）
+function moveCastUp(id) {
+  const list = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+    const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+    const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+    if (sa !== sb) return sa - sb;
+    return (a._created || 0) - (b._created || 0);
+  });
+  const idx = list.findIndex(c => c.id === id);
+  if (idx <= 0) return;
+  // 全員の sortOrder を正規化してから入れ替え（既存sortOrderが未設定だと比較がうまくいかないため）
+  list.forEach((c, i) => {
+    if (c.sortOrder !== i) {
+      c.sortOrder = i;
+      c._updated = Date.now();
+    }
+  });
+  const cur = list[idx];
+  const prev = list[idx - 1];
+  const tmp = cur.sortOrder;
+  cur.sortOrder = prev.sortOrder;
+  prev.sortOrder = tmp;
+  cur._updated = Date.now();
+  prev._updated = Date.now();
+  persistSave();
+  renderCastListUI();
+}
+
+// キャストの並び替え（下へ）
+function moveCastDown(id) {
+  const list = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+    const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+    const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+    if (sa !== sb) return sa - sb;
+    return (a._created || 0) - (b._created || 0);
+  });
+  const idx = list.findIndex(c => c.id === id);
+  if (idx < 0 || idx >= list.length - 1) return;
+  // 全員の sortOrder を正規化
+  list.forEach((c, i) => {
+    if (c.sortOrder !== i) {
+      c.sortOrder = i;
+      c._updated = Date.now();
+    }
+  });
+  const cur = list[idx];
+  const next = list[idx + 1];
+  const tmp = cur.sortOrder;
+  cur.sortOrder = next.sortOrder;
+  next.sortOrder = tmp;
+  cur._updated = Date.now();
+  next._updated = Date.now();
+  persistSave();
+  renderCastListUI();
 }
 function setCastMemo(id, val) {
   const c = state.casts.find(x => x.id === id);
