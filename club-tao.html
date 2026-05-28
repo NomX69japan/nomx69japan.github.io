@@ -2119,7 +2119,10 @@
           </label>
           <label class="field">
             <span class="lab">認証トークン</span>
-            <input type="text" id="srvToken" placeholder="AUTH_TOKEN">
+            <div style="display:flex; gap:4px; align-items:center;">
+              <input type="password" id="srvToken" placeholder="AUTH_TOKEN" style="flex:1;">
+              <button type="button" class="btn-sub btn-sm" onclick="(function(b){const i=document.getElementById('srvToken'); if(i){ if(i.type==='password'){i.type='text'; b.textContent='🙈';} else {i.type='password'; b.textContent='👁';} }})(this)" style="padding:4px 8px;">👁</button>
+            </div>
           </label>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="saveServerConfig()">接続して同期</button>
