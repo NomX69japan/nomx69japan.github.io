@@ -1195,6 +1195,25 @@
   .cust-toolbar input.search {
     flex: 1; min-width: 150px;
   }
+  .cust-sort-bar {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+  .cust-sort-bar .sort-label {
+    flex-shrink: 0;
+  }
+  .cust-sort-bar select {
+    flex: 1;
+    max-width: 260px;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+  }
   .cust-list {
     display: grid; gap: 8px;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -2027,6 +2046,20 @@
         <input type="text" class="search" id="custSearch" placeholder="名前で検索…" oninput="renderCustomerList()">
         <button class="btn" onclick="openCustomerModal(null)">+ 新規追加</button>
       </div>
+      <div class="cust-sort-bar">
+        <span class="sort-label">並び順:</span>
+        <select id="custSortMode" onchange="changeCustSortMode(this.value)">
+          <option value="updated_desc">更新が新しい順</option>
+          <option value="updated_asc">更新が古い順</option>
+          <option value="created_desc">登録が新しい順</option>
+          <option value="created_asc">登録が古い順</option>
+          <option value="name_asc">名前順（あ→ん）</option>
+          <option value="name_desc">名前順（ん→あ）</option>
+          <option value="last_visit_desc">最終来店が新しい順</option>
+          <option value="last_visit_asc">最終来店が古い順</option>
+          <option value="visit_count_desc">来店回数が多い順</option>
+        </select>
+      </div>
       <div class="cust-list" id="custList"></div>
     </section>
 
@@ -2303,9 +2336,38 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.24';
+const APP_VERSION = '2026.05.26';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.26',
+    date: '2026-05-26',
+    title: '⚡ 履歴を手動で追加できるように',
+    items: [
+      '営業中に忙しくて入店処理ができなかった場合に、後から手動で来店記録を追加できる機能を追加しました。',
+      '【方法その1】履歴タブ（📅 履歴）上部の「⚡ 手動で来店記録を追加」ボタンをタップ',
+      '【方法その2】履歴カレンダーで日付をタップ → 日付詳細モーダルの「⚡ この日に来店記録を追加」ボタンをタップ（その日付で初期化される）',
+      '入力項目は通常の編集モーダルと同じ：日付、テーブル、お客様、人数、入店〜退店時刻、セット数、指名キャスト（A/B/同伴）、メモ',
+      '📦 オーダー情報も同時に追加できます。タブ付きUIで商品グリッドから選択 → 数量±で調整',
+      'キャンセルで閉じると追加データは破棄されます（誤操作対策）',
+      '追加した記録は通常の来店履歴と同じように表示・編集・削除できます',
+    ],
+  },
+  {
+    version: '2026.05.25',
+    date: '2026-05-25',
+    title: '顧客タブにソート機能',
+    items: [
+      '顧客タブに並び順セレクトボックスを追加しました。次の9種類から選べます。',
+      '・更新が新しい順（デフォルト）',
+      '・更新が古い順',
+      '・登録が新しい順 / 登録が古い順',
+      '・名前順（あ→ん / ん→あ）',
+      '・最終来店が新しい順 / 古い順',
+      '・来店回数が多い順',
+      '選んだ並び順は端末ごとに記憶されるため、次回起動時も同じ並びになります。',
+    ],
+  },
   {
     version: '2026.05.24',
     date: '2026-05-24',
@@ -3665,8 +3727,12 @@ function openVisitLogEditModal(logId) {
   bg.style.zIndex = 1750;
   bg.innerHTML = `
     <div class="modal" style="max-width:480px; max-height:90vh; overflow-y:auto;">
-      <h3>✏️ 来店記録の編集</h3>
-      <div style="font-size:12px; color:#888; margin-bottom:10px;">${log.date}</div>
+      <h3>${log._isDraft ? '⚡ 手動で来店記録を追加' : '✏️ 来店記録の編集'}</h3>
+
+      <label class="field">
+        <span class="lab">日付</span>
+        <input type="date" id="vleDate" value="${escapeHtml(log.date || '')}">
+      </label>
 
       <label class="field">
         <span class="lab">テーブル</span>
@@ -3703,8 +3769,6 @@ function openVisitLogEditModal(logId) {
           <select id="vleEndMin" style="flex:1;">${buildMinOpts(eT.m)}</select>
         </div>
       </div>
-      <div style="font-size:11px; color:#888; margin:-4px 0 10px 2px;">※日付は記録日（${log.date}）のまま</div>
-
       <label class="field">
         <span class="lab">セット数</span>
         <input type="number" id="vleSetCount" value="${log.setCount || 1}" min="1" max="20">
@@ -3727,13 +3791,21 @@ function openVisitLogEditModal(logId) {
         <textarea id="vleMemo" rows="3">${escapeHtml(log.memo || '')}</textarea>
       </label>
 
+      <details class="field" style="border:1px dashed #d4af37; border-radius:6px; padding:8px 10px; background:#fffbf2;" ${(log.orders||[]).filter(o=>!o.removed).length > 0 ? 'open' : ''}>
+        <summary style="cursor:pointer; font-weight:600; color:#8b6914;">📦 オーダー（任意）</summary>
+        <div id="vleOrderEditArea" style="margin-top:8px;"></div>
+      </details>
+
       <div class="row-buttons" style="margin-top:14px; display:flex; gap:8px;">
-        <button class="btn-main" data-save style="flex:1;">保存</button>
+        <button class="btn-main" data-save style="flex:1;">${log._isDraft ? '追加' : '保存'}</button>
         <button class="btn-sub" data-cancel style="flex:1;">キャンセル</button>
       </div>
     </div>
   `;
   document.body.appendChild(bg);
+
+  // オーダー編集UIを描画
+  renderVleOrderArea(logId, bg);
 
   // A/B/なしトグル動作
   bg.querySelectorAll('.nom-toggle').forEach(toggle => {
@@ -3796,12 +3868,21 @@ function openVisitLogEditModal(logId) {
 
   bg.querySelector('[data-cancel]').addEventListener('click', () => {
     bg.remove();
-    showVisitDetail(logId);
+    if (log._isDraft) {
+      // ドラフト（手動追加）はキャンセル時に物理削除（visitLogから消す）
+      state.visitLog = state.visitLog.filter(v => v.id !== logId);
+    } else {
+      showVisitDetail(logId);
+    }
   });
   bg.addEventListener('click', (e) => {
     if (e.target === bg) {
       bg.remove();
-      showVisitDetail(logId);
+      if (log._isDraft) {
+        state.visitLog = state.visitLog.filter(v => v.id !== logId);
+      } else {
+        showVisitDetail(logId);
+      }
     }
   });
   bg.querySelector('[data-save]').addEventListener('click', () => {
@@ -3813,6 +3894,11 @@ function openVisitLogEditModal(logId) {
 function saveVisitLogEdit(logId, bg) {
   const log = state.visitLog.find(x => x.id === logId && !x.removed);
   if (!log) return;
+
+  const isDraft = !!log._isDraft; // 手動追加の新規ドラフトか
+  // 日付（手動追加・編集ともに変更可）
+  const dateVal = (bg.querySelector('#vleDate')?.value || '').trim();
+  if (dateVal) log.date = dateVal;
 
   const tableId = bg.querySelector('#vleTable').value || '';
   const customerId = bg.querySelector('#vleCustomer').value || '';
@@ -3920,12 +4006,213 @@ function saveVisitLogEdit(logId, bg) {
     }
   }
 
+  // ドラフトフラグを外す（手動追加の場合）
+  if (log._isDraft) delete log._isDraft;
+
   persistSave();
   bg.remove();
   if (typeof renderTodaySummary === 'function') renderTodaySummary();
-  showToast('来店記録を更新しました', 'normal');
-  // 詳細モーダルを再表示
+  showToast(isDraft ? '来店記録を追加しました' : '来店記録を更新しました', 'normal');
+  // 詳細モーダルを再表示（手動追加もここで詳細表示する）
   showVisitDetail(logId);
+}
+
+// 手動で来店記録を追加：ドラフトログを作って openVisitLogEditModal を開く
+function addManualVisitLog(dateStr) {
+  if (!Array.isArray(state.visitLog)) state.visitLog = [];
+  // 引数で日付指定があればそれを使う、なければ営業日（今日）
+  const targetDate = dateStr || currentBusinessDate();
+  const now = Date.now();
+  const draftId = genId('vlog');
+  // 営業日から入店/退店の概算タイムスタンプを作成（20:00〜21:00）
+  const [y, m, d] = targetDate.split('-').map(n => parseInt(n, 10));
+  const startedAt = new Date(y, m - 1, d, 20, 0, 0, 0).getTime();
+  const endedAt = new Date(y, m - 1, d, 21, 0, 0, 0).getTime();
+  state.visitLog.push({
+    id: draftId,
+    date: targetDate,
+    tableId: '',
+    tableName: '',
+    customerId: '',
+    customerName: '',
+    guests: 1,
+    castIds: [],
+    castNoms: {},
+    castFree: '',
+    dohan: false,
+    dohanCastIds: [],
+    memo: '',
+    startedAt,
+    endedAt,
+    setCount: 1,
+    extensions: [],
+    autoExtend: false,
+    durationMin: 60,
+    orders: [],
+    _created: now,
+    _updated: now,
+    _isDraft: true, // 編集モーダルでキャンセル時に破棄するためのフラグ
+  });
+  // 日付詳細モーダルが開いていたら閉じる
+  document.querySelectorAll('.modal-bg.active').forEach(el => el.remove());
+  openVisitLogEditModal(draftId);
+}
+
+// 来店ログ編集モーダル内のオーダー編集UIを描画
+function renderVleOrderArea(logId, bg) {
+  const root = bg.querySelector('#vleOrderEditArea');
+  if (!root) return;
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+  if (!Array.isArray(log.orders)) log.orders = [];
+
+  const categories = (typeof getMenuCategories === 'function') ? getMenuCategories() : ['ドリンク'];
+  const initialCat = categories[0] || '';
+
+  // 商品グリッド + 現在のオーダー一覧
+  root.innerHTML = `
+    <div class="order-cat-tabs" style="display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid var(--border); overflow-x:auto;">
+      ${categories.map((c, i) => `<button type="button" class="order-cat-tab ${i===0?'active':''}" data-vle-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}
+    </div>
+    <div id="vleOrderItemGrid" style="margin-bottom:10px;"></div>
+    <div id="vleOrderList" style="border-top:1px dashed #d4af37; padding-top:8px;"></div>
+  `;
+
+  // タブハンドラ
+  root.querySelectorAll('.order-cat-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      root.querySelectorAll('.order-cat-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderVleOrderItemGrid(logId, tab.getAttribute('data-vle-cat'), bg);
+    });
+  });
+
+  renderVleOrderItemGrid(logId, initialCat, bg);
+  renderVleOrderList(logId, bg);
+}
+
+// オーダー編集UI：カテゴリの商品グリッド
+function renderVleOrderItemGrid(logId, category, bg) {
+  const grid = bg.querySelector('#vleOrderItemGrid');
+  if (!grid) return;
+  const items = (state.menuItems || [])
+    .filter(m => !m.removed && m.category === category)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  if (items.length === 0) {
+    grid.innerHTML = '<p style="color:#888; font-size:11px; padding:8px; text-align:center;">商品なし</p>';
+    return;
+  }
+  grid.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:5px;">
+      ${items.map(item => `
+        <button type="button" class="vle-item-btn" data-vle-add-item="${item.id}" style="
+          padding:7px 4px; background:#fffbf2; border:1px solid #d4af37;
+          border-radius:5px; font-size:12px; cursor:pointer;
+          color:var(--text); font-weight:500; text-align:center;
+        ">${escapeHtml(item.name)}</button>
+      `).join('')}
+    </div>
+  `;
+  grid.querySelectorAll('[data-vle-add-item]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      addVleOrder(logId, btn.getAttribute('data-vle-add-item'), bg);
+      // フィードバック
+      btn.style.background = '#d4af37';
+      btn.style.color = '#fff';
+      setTimeout(() => { btn.style.background = '#fffbf2'; btn.style.color = ''; }, 200);
+    });
+  });
+}
+
+// オーダー追加（編集モーダル内）
+function addVleOrder(logId, itemId, bg) {
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+  const item = (state.menuItems || []).find(m => m.id === itemId);
+  if (!item) return;
+  if (!Array.isArray(log.orders)) log.orders = [];
+  // 既存の同一オーダーを探す
+  const existing = log.orders.find(o => !o.removed && o.itemId === itemId);
+  if (existing) {
+    existing.qty = (existing.qty || 1) + 1;
+    existing._updated = Date.now();
+  } else {
+    log.orders.push({
+      id: genId('order'),
+      itemId: item.id,
+      itemName: item.name,
+      category: item.category,
+      qty: 1,
+      byGuestId: '',
+      at: Date.now(),
+      _updated: Date.now(),
+    });
+  }
+  renderVleOrderList(logId, bg);
+}
+
+// オーダー一覧描画（編集モーダル内）
+function renderVleOrderList(logId, bg) {
+  const root = bg.querySelector('#vleOrderList');
+  if (!root) return;
+  const log = state.visitLog.find(x => x.id === logId);
+  if (!log) return;
+  const orders = (log.orders || []).filter(o => !o.removed);
+  if (orders.length === 0) {
+    root.innerHTML = '<p style="font-size:11px; color:#888; margin:0; padding:6px; text-align:center;">オーダーなし</p>';
+    return;
+  }
+  // カテゴリ別グルーピング
+  const byCat = {};
+  orders.forEach(o => {
+    const c = o.category || 'その他';
+    if (!byCat[c]) byCat[c] = [];
+    byCat[c].push(o);
+  });
+  const sections = Object.keys(byCat).map(cat => {
+    const rows = byCat[cat].map(o => `
+      <div class="order-row" data-vle-order-id="${o.id}">
+        <span class="order-name">${escapeHtml(o.itemName)}</span>
+        <span class="order-qty-ctrl">
+          <button type="button" class="order-qty-btn" data-vle-qty-delta="-1">−</button>
+          <span class="order-qty">${o.qty}</span>
+          <button type="button" class="order-qty-btn" data-vle-qty-delta="1">＋</button>
+          <button type="button" class="order-del-btn" data-vle-order-del title="削除">×</button>
+        </span>
+      </div>
+    `).join('');
+    return `<div class="order-cat-block"><div class="order-cat-head">${escapeHtml(cat)}</div>${rows}</div>`;
+  }).join('');
+  const totalQty = orders.reduce((s,o)=>s+(o.qty||1),0);
+  root.innerHTML = `
+    <div style="font-size:12px; color:#8b6914; font-weight:600; margin-bottom:6px;">
+      📦 ${orders.length}品 / ${totalQty}点
+    </div>
+    ${sections}
+  `;
+  // ハンドラ
+  root.querySelectorAll('.order-row').forEach(row => {
+    const oid = row.getAttribute('data-vle-order-id');
+    row.querySelectorAll('[data-vle-qty-delta]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const delta = parseInt(btn.getAttribute('data-vle-qty-delta'), 10);
+        const o = (log.orders || []).find(x => x.id === oid);
+        if (!o) return;
+        o.qty = Math.max(0, (o.qty || 0) + delta);
+        if (o.qty === 0) { o.removed = true; }
+        o._updated = Date.now();
+        renderVleOrderList(logId, bg);
+      });
+    });
+    row.querySelector('[data-vle-order-del]')?.addEventListener('click', () => {
+      const o = (log.orders || []).find(x => x.id === oid);
+      if (!o) return;
+      if (!confirm(`「${o.itemName}」を取り消しますか？`)) return;
+      o.removed = true;
+      o._updated = Date.now();
+      renderVleOrderList(logId, bg);
+    });
+  });
 }
 
 // ---------- 履歴カレンダー ----------
@@ -4036,6 +4323,9 @@ function renderTodaySummary() {
       <span class="cal-month-label">${monthLabel}</span>
       <button class="btn-sub btn-sm" onclick="changeCalMonth(1)">次月 ▶</button>
       <button class="btn-sub btn-sm" onclick="goToCalToday()" style="margin-left:auto;">今日</button>
+    </div>
+    <div style="display:flex; justify-content:flex-end; margin:6px 0 10px;">
+      <button class="btn btn-sm" onclick="addManualVisitLog()" style="background:#d4af37; color:#fff;">⚡ 手動で来店記録を追加</button>
     </div>
   `;
 
@@ -4267,13 +4557,18 @@ function showDayDetailModal(dateStr) {
     <div class="modal" style="max-width:560px; max-height:90vh; overflow-y:auto;">
       <h3>${escapeHtml(titleStr)}${isToday ? '　<span style="color:var(--accent); font-size:12px;">（本日）</span>' : ''}</h3>
       <div style="margin-top:12px;">${bodyHtml}</div>
-      <div class="row-buttons" style="margin-top:14px;">
-        <button class="btn-sub" data-close>閉じる</button>
+      <div class="row-buttons" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn-sub" data-add-manual style="flex:1; min-width:140px; background:#fff9e6; border-color:#d4af37; color:#8b6914;">⚡ この日に来店記録を追加</button>
+        <button class="btn-sub" data-close style="flex:1; min-width:80px;">閉じる</button>
       </div>
     </div>
   `;
   document.body.appendChild(bg);
   bg.querySelector('[data-close]').addEventListener('click', () => bg.remove());
+  bg.querySelector('[data-add-manual]').addEventListener('click', () => {
+    bg.remove();
+    addManualVisitLog(dateStr);
+  });
   bg.addEventListener('click', (e) => {
     if (e.target === bg) bg.remove();
   });
@@ -6486,30 +6781,87 @@ function updateTodayShiftCount() {
 }
 
 // ---------- CUSTOMERS ----------
+// 顧客タブのソートモードを localStorage に保存
+const LS_CUST_SORT = 'tao_lite_cust_sort';
+function getCustSortMode() {
+  try {
+    return localStorage.getItem(LS_CUST_SORT) || 'updated_desc';
+  } catch(e) { return 'updated_desc'; }
+}
+function changeCustSortMode(mode) {
+  try { localStorage.setItem(LS_CUST_SORT, mode); } catch(e) {}
+  renderCustomerList();
+}
+
 function renderCustomerList() {
   const q = (document.getElementById('custSearch').value || '').toLowerCase().trim();
   const list = document.getElementById('custList');
-  const filtered = state.customers
-    .filter(c => !c.removed)
-    .filter(c => !q
-      || (c.name || '').toLowerCase().includes(q)
-      || (c.nickname || '').toLowerCase().includes(q)
-      || (c.phone||'').includes(q))
-    .sort((a,b) => (b._updated||b._created||0) - (a._updated||a._created||0));
-
-  if (filtered.length === 0) {
-    list.innerHTML = '<p style="color:#888; grid-column:1/-1; text-align:center; padding:24px;">顧客がまだいません</p>';
-    return;
-  }
+  const sortMode = getCustSortMode();
+  // セレクトボックスに現在の値を反映
+  const sortSelect = document.getElementById('custSortMode');
+  if (sortSelect && sortSelect.value !== sortMode) sortSelect.value = sortMode;
 
   // 削除済みログIDの集合（来店回数のカウント等で除外するため）
   const removedLogIds = new Set(
     (state.visitLog || []).filter(v => v.removed).map(v => v.id)
   );
-  list.innerHTML = filtered.map(c => {
-    const activeVisits = (c.visits || []).filter(v => !v.logId || !removedLogIds.has(v.logId));
-    const lastVisit = activeVisits.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
-    const lastVisitStr = lastVisit ? lastVisit.date : '—';
+
+  // 顧客ごとの「最終来店日」「来店回数」を事前計算（ソートで使う）
+  const enriched = state.customers
+    .filter(c => !c.removed)
+    .filter(c => !q
+      || (c.name || '').toLowerCase().includes(q)
+      || (c.nickname || '').toLowerCase().includes(q)
+      || (c.phone||'').includes(q))
+    .map(c => {
+      const activeVisits = (c.visits || []).filter(v => !v.logId || !removedLogIds.has(v.logId));
+      const lastVisit = activeVisits.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return { c, activeVisits, lastVisitDate: lastVisit ? lastVisit.date : '' };
+    });
+
+  // ソート
+  enriched.sort((aw, bw) => {
+    const a = aw.c, b = bw.c;
+    const cmpName = () => {
+      const an = displayName(a) || a.name || '';
+      const bn = displayName(b) || b.name || '';
+      return an.localeCompare(bn, 'ja');
+    };
+    switch (sortMode) {
+      case 'updated_asc':
+        return (a._updated||a._created||0) - (b._updated||b._created||0);
+      case 'updated_desc':
+        return (b._updated||b._created||0) - (a._updated||a._created||0);
+      case 'created_asc':
+        return (a._created||0) - (b._created||0);
+      case 'created_desc':
+        return (b._created||0) - (a._created||0);
+      case 'name_asc':
+        return cmpName();
+      case 'name_desc':
+        return -cmpName();
+      case 'last_visit_desc':
+        return (bw.lastVisitDate || '').localeCompare(aw.lastVisitDate || '');
+      case 'last_visit_asc':
+        // 空文字を末尾に
+        if (!aw.lastVisitDate && !bw.lastVisitDate) return 0;
+        if (!aw.lastVisitDate) return 1;
+        if (!bw.lastVisitDate) return -1;
+        return aw.lastVisitDate.localeCompare(bw.lastVisitDate);
+      case 'visit_count_desc':
+        return bw.activeVisits.length - aw.activeVisits.length;
+      default:
+        return (b._updated||b._created||0) - (a._updated||a._created||0);
+    }
+  });
+
+  if (enriched.length === 0) {
+    list.innerHTML = '<p style="color:#888; grid-column:1/-1; text-align:center; padding:24px;">顧客がまだいません</p>';
+    return;
+  }
+
+  list.innerHTML = enriched.map(({c, activeVisits, lastVisitDate}) => {
+    const lastVisitStr = lastVisitDate || '—';
     const visitCount = activeVisits.length;
     const bottleCount = (c.bottles||[]).length;
     const dispName = withSan(displayName(c)) || '(無名)';
