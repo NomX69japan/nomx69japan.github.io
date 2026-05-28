@@ -2339,23 +2339,23 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.28';
+const APP_VERSION = '2026.05.29';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
   {
-    version: '2026.05.28',
-    date: '2026-05-28',
-    title: '🔁 自動延長を30分単位に対応',
+    version: '2026.05.29',
+    date: '2026-05-29',
+    title: '🐛 シフト変更が元に戻るバグ修正＋顧客フリガナ対応',
     items: [
-      '自動延長を「1セット目=60分固定／以降30分ごと」のルールに変更しました。',
-      '【セット数の数え方】1分でも超過したら次セット扱い。',
-      '・1時間00分滞在 → 1セット',
-      '・1時間30分滞在 → 2セット（60+30）',
-      '・2時間00分滞在 → 2セット（60+60）',
-      '・2時間15分滞在 → 3セット（60+60+30扱い）',
-      '・2時間30分滞在 → 3セット（60+60+30）',
-      '【自動延長の動き】60分経過で発火→以降は30分ごとに発火し、セット数も自動で再計算',
-      '手動で「+30分」「+60分」延長すると自動延長は自動的にOFFに戻ります（従来通り）',
+      '【重要バグ修正】シフトを◯→×に変更しても元に戻る不具合を修正しました。',
+      '原因：シフトデータにタイムスタンプが無く、サーバー同期で古いデータに上書きされていました。',
+      '対策：各シフトに更新時刻を記録し、新しい変更が必ず勝つマージ方式に変更しました。',
+      '既存のシフトデータは初回操作時に新形式へ自動アップグレードされます。',
+      '【顧客管理】顧客データにフリガナ欄を追加しました（編集モーダル内）。',
+      '【ソート】名前順ソートをフリガナ優先の五十音順に改善（カタカナ↔ひらがな自動変換）',
+      '【入店・予約モーダル】顧客選択ドロップダウンを五十音順（あ→ん）に固定',
+      '【検索】顧客クイック検索でフリガナでも検索できるようになりました',
+      '【自動延長】60分以降は30分単位で自動延長（1セット目は常に60分固定）',
     ],
   },
   {
@@ -2783,23 +2783,33 @@ function shiftKey(dateStr, castId) {
 }
 function getShift(dateStr, castId) {
   // 出勤判定（true=出勤確定、それ以外=休みor未定or未回答）
-  return state.shiftData[shiftKey(dateStr, castId)] === true;
+  return _shiftVal(state.shiftData[shiftKey(dateStr, castId)]) === 'on';
 }
 function getShiftStatus(dateStr, castId) {
   // 'on' | 'pending' | 'off' | 'unanswered'
-  const v = state.shiftData[shiftKey(dateStr, castId)];
-  if (v === true) return 'on';
+  const v = _shiftVal(state.shiftData[shiftKey(dateStr, castId)]);
+  if (v === 'on') return 'on';
   if (v === 'pending') return 'pending';
   if (v === 'off') return 'off';
   return 'unanswered';
 }
+// 内部ヘルパー：旧形式（true/'pending'/'off'）と新形式（{v,_u}）の両対応
+function _shiftVal(entry) {
+  if (entry === true) return 'on';
+  if (entry === 'pending') return 'pending';
+  if (entry === 'off') return 'off';
+  if (entry && typeof entry === 'object') return entry.v || null;
+  return null;
+}
 function setShift(dateStr, castId, val) {
-  // val: true=出勤 / 'pending'=未定 / 'off'=休み / falsy(undefined/null/false)=未回答（キー削除）
+  // val: true=出勤 / 'pending'=未定 / 'off'=休み / falsy(undefined/null/false)=未回答（削除）
+  // 同期マージのため、削除も { v:null, _u:時刻 } として記録（タイムスタンプ付き）
   const k = shiftKey(dateStr, castId);
-  if (val === true) state.shiftData[k] = true;
-  else if (val === 'pending') state.shiftData[k] = 'pending';
-  else if (val === 'off') state.shiftData[k] = 'off';
-  else delete state.shiftData[k];
+  let newVal = null;
+  if (val === true) newVal = 'on';
+  else if (val === 'pending') newVal = 'pending';
+  else if (val === 'off') newVal = 'off';
+  state.shiftData[k] = { v: newVal, _u: Date.now() };
 }
 
 // ---------- ID generators ----------
@@ -6561,7 +6571,7 @@ function renderShift() {
         let trialPastShiftDates = null;
         if (c.trial) {
           trialPastShiftDates = Object.keys(state.shiftData || {})
-            .filter(k => k.endsWith('_' + c.id) && state.shiftData[k] === true)
+            .filter(k => k.endsWith('_' + c.id) && _shiftVal(state.shiftData[k]) === 'on')
             .map(k => k.slice(0, 10))
             .filter(d => d <= todayStr) // 今日以前のみ（実績）
             .sort();
@@ -6704,7 +6714,7 @@ function recalcAllTrialCounts() {
       Object.keys(state.shiftData).forEach(k => {
         if (!k.endsWith(suffix)) return;
         // 出勤確定のみ（'pending' は未定なので除外）
-        if (state.shiftData[k] !== true) return;
+        if (_shiftVal(state.shiftData[k]) !== 'on') return;
         // キーから日付部分（YYYY-MM-DD = 先頭10文字）を抽出
         const dateStr = k.slice(0, 10);
         // 今日以前のみカウント
@@ -9174,10 +9184,21 @@ function applyServerData(payload) {
       }
     });
   }
-  if (payload.shiftData) {
-    // 全置換（削除も反映するため）
-    Object.keys(state.shiftData).forEach(k => delete state.shiftData[k]);
-    Object.assign(state.shiftData, payload.shiftData);
+  if (payload.shiftData && typeof payload.shiftData === 'object') {
+    // キー単位の _u（タイムスタンプ）比較マージ
+    // ローカルに無いキーは追加、両方にあるキーは新しい方を採用
+    // ローカルにあってリモートに無いキーはローカル保持（端末側の新規追加を保護）
+    Object.keys(payload.shiftData).forEach(k => {
+      const remote = payload.shiftData[k];
+      const local = state.shiftData[k];
+      const remoteU = (remote && typeof remote === 'object' && remote._u) ? remote._u : 0;
+      const localU = (local && typeof local === 'object' && local._u) ? local._u : 0;
+      // 旧形式（true/'pending'/'off'）はタイムスタンプ0として扱われる
+      // → タイムスタンプ付きの新しい変更が必ず勝つ
+      if (remoteU >= localU) {
+        state.shiftData[k] = remote;
+      }
+    });
   }
   if (Array.isArray(payload.casts)) {
     payload.casts.forEach(rc => {
