@@ -2813,6 +2813,26 @@ function displayName(cust) {
   return (cust.nickname && cust.nickname.trim()) ? cust.nickname.trim() : (cust.name || '');
 }
 
+// 顧客の五十音順ソート用キー：フリガナ(kana)優先 → ニックネーム → 名前
+// カタカナはひらがなに揃える（揃えないと「アイウ…ガ…」と濁点等が分散する）
+function custKanaKey(cust) {
+  if (!cust) return '';
+  let raw = (cust.kana || '').trim();
+  if (!raw) raw = (cust.nickname || '').trim();
+  if (!raw) raw = (cust.name || '').trim();
+  return raw.replace(/[\u30A1-\u30F6]/g, ch =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+function customerSortCompare(a, b) {
+  const ak = custKanaKey(a);
+  const bk = custKanaKey(b);
+  if (!ak && !bk) return 0;
+  if (!ak) return 1;
+  if (!bk) return -1;
+  return ak.localeCompare(bk, 'ja');
+}
+
 // 末尾の「様」「さま」「サマ」を取り除いて純粋な名前を返す
 function stripHonorific(name) {
   if (!name) return '';
@@ -3805,7 +3825,7 @@ function openVisitLogEditModal(logId) {
   const custOptions = ['<option value="">-- 選択しない（フリー入力） --</option>']
     .concat(state.customers
       .filter(c => !c.removed)
-      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .sort(customerSortCompare)
       .map(c => {
         const sel = (c.id === log.customerId) ? ' selected' : '';
         const dn = displayName(c);
@@ -5032,7 +5052,7 @@ let modalGuests = []; // 入店モーダル編集中の顧客カード配列
 function buildGuestCardHtml(guest, idx, isOccupied) {
   // 顧客選択肢
   const custOptions = ['<option value="">（指定なし）</option>']
-    .concat(state.customers.filter(c => !c.removed).map(c => {
+    .concat(state.customers.filter(c => !c.removed).slice().sort(customerSortCompare).map(c => {
       const dn = displayName(c);
       const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
         ? `${withSan(dn)}（${stripHonorific(c.name)}）`
@@ -6942,6 +6962,7 @@ function renderCustomerList() {
     .filter(c => !c.removed)
     .filter(c => !q
       || (c.name || '').toLowerCase().includes(q)
+      || (c.kana || '').toLowerCase().includes(q)
       || (c.nickname || '').toLowerCase().includes(q)
       || (c.phone||'').includes(q))
     .map(c => {
@@ -6953,11 +6974,7 @@ function renderCustomerList() {
   // ソート
   enriched.sort((aw, bw) => {
     const a = aw.c, b = bw.c;
-    const cmpName = () => {
-      const an = displayName(a) || a.name || '';
-      const bn = displayName(b) || b.name || '';
-      return an.localeCompare(bn, 'ja');
-    };
+    const cmpName = () => customerSortCompare(a, b);
     switch (sortMode) {
       case 'updated_asc':
         return (a._updated||a._created||0) - (b._updated||b._created||0);
@@ -7021,7 +7038,7 @@ function openCustomerModal(id) {
     document.getElementById('custModalTitle').textContent = '顧客編集';
     document.getElementById('custDeleteBtn').style.display = '';
   } else {
-    cust = { id:null, name:'', nickname:'', phone:'', birthday:'', memo:'', visits:[], bottles:[] };
+    cust = { id:null, name:'', kana:'', nickname:'', phone:'', birthday:'', memo:'', visits:[], bottles:[] };
     document.getElementById('custModalTitle').textContent = '顧客新規追加';
     document.getElementById('custDeleteBtn').style.display = 'none';
   }
@@ -7217,6 +7234,10 @@ function rebuildCustomerModalBody(cust) {
         <input type="text" id="cstName" value="${escapeHtml(stripHonorific(cust.name||''))}">
       </label>
       <label class="field">
+        <span class="lab">フリガナ（カナ・五十音順ソート用）</span>
+        <input type="text" id="cstKana" value="${escapeHtml(cust.kana||'')}" placeholder="例: ナカガワ、フジイ">
+      </label>
+      <label class="field">
         <span class="lab">ニックネーム（あれば優先表示）</span>
         <input type="text" id="cstNickname" value="${escapeHtml(stripHonorific(cust.nickname||''))}" placeholder="例: タカさん、Kちゃん">
       </label>
@@ -7276,6 +7297,7 @@ function saveCustomer() {
   if (!n) { alert('名前を入力してください'); return; }
   // 末尾の「様」「さま」「サマ」は表示時に自動付与するため、保存時は取り除く
   custEditing.name = stripHonorific(n);
+  custEditing.kana = (document.getElementById('cstKana')?.value || '').trim();
   custEditing.nickname = stripHonorific(document.getElementById('cstNickname').value.trim());
   custEditing.phone = document.getElementById('cstPhone').value.trim();
   custEditing.birthday = document.getElementById('cstBday').value.trim();
@@ -7710,7 +7732,7 @@ let modalResvGuests = []; // 予約モーダル編集中の顧客カード配列
 function buildResvGuestCardHtml(guest, idx) {
   // 顧客選択肢
   const custOpts = ['<option value="">（未登録 or 新規）</option>']
-    .concat(state.customers.filter(c => !c.removed).map(c => {
+    .concat(state.customers.filter(c => !c.removed).slice().sort(customerSortCompare).map(c => {
       const dn = displayName(c);
       const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
         ? `${withSan(dn)}（${stripHonorific(c.name)}）`
@@ -7935,7 +7957,7 @@ function openReservationModal(id) {
 
   // 顧客選択肢（ニックネーム優先表示）
   const custOptions = ['<option value="">（未登録 or 新規）</option>']
-    .concat(state.customers.filter(c => !c.removed).map(c => {
+    .concat(state.customers.filter(c => !c.removed).slice().sort(customerSortCompare).map(c => {
       const dn = displayName(c);
       const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
         ? `${withSan(dn)}（${stripHonorific(c.name)}）`
