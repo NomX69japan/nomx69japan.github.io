@@ -2339,9 +2339,39 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.26';
+const APP_VERSION = '2026.05.28';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.28',
+    date: '2026-05-28',
+    title: '🔁 自動延長を30分単位に対応',
+    items: [
+      '自動延長を「1セット目=60分固定／以降30分ごと」のルールに変更しました。',
+      '【セット数の数え方】1分でも超過したら次セット扱い。',
+      '・1時間00分滞在 → 1セット',
+      '・1時間30分滞在 → 2セット（60+30）',
+      '・2時間00分滞在 → 2セット（60+60）',
+      '・2時間15分滞在 → 3セット（60+60+30扱い）',
+      '・2時間30分滞在 → 3セット（60+60+30）',
+      '【自動延長の動き】60分経過で発火→以降は30分ごとに発火し、セット数も自動で再計算',
+      '手動で「+30分」「+60分」延長すると自動延長は自動的にOFFに戻ります（従来通り）',
+    ],
+  },
+  {
+    version: '2026.05.27',
+    date: '2026-05-27',
+    title: '🔁 自動延長ONの卓の表示を整理',
+    items: [
+      '自動延長ONなのに「終了予定」「超過」「自動延長待ち」と表示されるのが矛盾していたので修正しました。',
+      '【フロアの卓カード】「⏱ 残り○分」「⚠ 超過○分」の代わりに「⏱ 経過 H:MM」（入店からの経過時間）を表示',
+      '【卓モーダル】「終了予定：23:00」を非表示にし、代わりに「経過：2:18」と「🔁 自動延長ON」のラベルを表示',
+      '【警告色】自動延長ONの卓は黄色・赤色の警告色を出さず、常に通常色に',
+      '裏側の自動延長処理（時間切れで+60分してセット数アップ）は従来どおり動作します',
+      '【手動延長したら自動延長OFF】自動延長ON中に手動で「+30分延長」「+60分延長」を押すと、その卓の自動延長は自動的にOFFになります。30分セット運用に切り替えた場面で、その後また+60分されてズレるのを防ぐためです。OFFになった後は通常モード（残り時間・終了予定が見える状態）に戻ります。',
+      '【設定欄】認証トークン入力欄を覗き見対策で🔒パスワード表示に変更（👁ボタンで表示切替可）',
+    ],
+  },
   {
     version: '2026.05.26',
     date: '2026-05-26',
@@ -3135,25 +3165,29 @@ function buildTableCard(t, tdata) {
   let timerCls = 'timer';
   let timerTxt = '';
   if (timerInfo) {
-    if (timerInfo.stage === 'expired') {
-      const overMin = Math.ceil(-timerInfo.remainMs / 60000);
-      timerCls += ' expired';
-      // 自動延長ON時は超過していても近いうちに自動延長されるので、控えめな表記に
-      if (tdata.autoExtend) {
-        timerTxt = `🔁 自動延長待ち（${overMin}分超過）`;
-      } else {
-        timerTxt = `⚠ 超過 ${overMin}分`;
-      }
+    // 自動延長ONの卓は「経過時間」表示にして、超過・警告・残り表示は全部出さない
+    if (tdata.autoExtend) {
+      const elapsedMs = Date.now() - (tdata.startedAt || Date.now());
+      const eh = Math.floor(elapsedMs / 3600000);
+      const em = Math.floor((elapsedMs % 3600000) / 60000);
+      timerTxt = `⏱ 経過 ${eh}:${String(em).padStart(2,'0')}`;
+      timerHtml = `<div class="${timerCls}" data-timer="${t.id}">${timerTxt}</div>`;
     } else {
-      const m = Math.floor(timerInfo.remainMs / 60000);
-      const s = Math.floor((timerInfo.remainMs % 60000) / 1000);
-      const mm = String(m).padStart(2,'0');
-      const ss = String(s).padStart(2,'0');
-      if (timerInfo.stage === 'critical') timerCls += ' critical';
-      else if (timerInfo.stage === 'warn') timerCls += ' warn';
-      timerTxt = `⏱ 残り ${mm}:${ss}`;
+      if (timerInfo.stage === 'expired') {
+        const overMin = Math.ceil(-timerInfo.remainMs / 60000);
+        timerCls += ' expired';
+        timerTxt = `⚠ 超過 ${overMin}分`;
+      } else {
+        const m = Math.floor(timerInfo.remainMs / 60000);
+        const s = Math.floor((timerInfo.remainMs % 60000) / 1000);
+        const mm = String(m).padStart(2,'0');
+        const ss = String(s).padStart(2,'0');
+        if (timerInfo.stage === 'critical') timerCls += ' critical';
+        else if (timerInfo.stage === 'warn') timerCls += ' warn';
+        timerTxt = `⏱ 残り ${mm}:${ss}`;
+      }
+      timerHtml = `<div class="${timerCls}" data-timer="${t.id}">${timerTxt}</div>`;
     }
-    timerHtml = `<div class="${timerCls}" data-timer="${t.id}">${timerTxt}</div>`;
   }
 
   // 顧客名表示：guestList があれば全活動中顧客の名前を併記、なければ単独顧客名
@@ -3309,6 +3343,14 @@ function extendTable(tableId, addMin, opts) {
   const tdata = state.tables[tableId];
   if (!tdata || !tdata.occupied) return;
   opts = opts || {};
+  const isManual = !opts.auto;
+  // 自動延長ON中に手動延長された場合、自動延長を解除する
+  // （セット長が変わったので、以降の自動+60分は意図しないため）
+  let autoExtendTurnedOff = false;
+  if (isManual && tdata.autoExtend) {
+    tdata.autoExtend = false;
+    autoExtendTurnedOff = true;
+  }
   // すでに過ぎていたら現在時刻基準、まだ残っていたら現在の endsAt 基準
   const base = (tdata.endsAt && tdata.endsAt > Date.now()) ? tdata.endsAt : Date.now();
   tdata.endsAt = base + addMin * 60000;
@@ -3326,12 +3368,69 @@ function extendTable(tableId, addMin, opts) {
   tdata._updated = Date.now();
   persistSave();
   renderFloor();
-  showToast(`${getTableName(tableId)} を ${addMin}分延長しました（${tdata.setCount}セット目）`, 'normal');
+  // 卓モーダルが開いていれば再描画（自動延長表示の切替反映のため）
+  if (autoExtendTurnedOff && typeof openTableModal === 'function') {
+    const modalEl = document.getElementById('tableModalTitle');
+    if (modalEl && modalEl.closest('.modal-bg')?.classList.contains('active')) {
+      // 既に開いているモーダルを再構築
+      openTableModal(tableId);
+    }
+  }
+  if (autoExtendTurnedOff) {
+    showToast(`${getTableName(tableId)} を${addMin}分延長（${tdata.setCount}セット目）／自動延長はOFFになりました`, 'normal');
+  } else {
+    showToast(`${getTableName(tableId)} を ${addMin}分延長しました（${tdata.setCount}セット目）`, 'normal');
+  }
 }
 
 function getTableName(id) {
   const t = DEFAULT_TABLES.find(x => x.id === id);
   return t ? t.name : id;
+}
+
+// 自動延長：経過時間に基づいて endsAt とセット数を再計算（1セット目=60分固定、以降30分単位）
+// 入店からの経過時間（分）→ 次の30分節目（60, 90, 120, 150, 180...）まで endsAt を進める
+// セット数 = 60分の倍数を越えた回数 + 1。 90分なら2セット、120分なら2セット、121分なら3セット
+function autoExtendStep(tableId) {
+  const tdata = state.tables[tableId];
+  if (!tdata || !tdata.occupied || !tdata.startedAt) return;
+  const now = Date.now();
+  const elapsedMin = (now - tdata.startedAt) / 60000;
+  // 次の30分境界（既に経過した時間より先の最初の30分節目）
+  // 例: 経過60.01分 → 次境界は90分。経過90.01分 → 次境界は120分。
+  let nextBoundaryMin;
+  if (elapsedMin <= 60) {
+    nextBoundaryMin = 90; // 1セット目（60分）後の最初の節目
+  } else {
+    // 60分以降は30分刻み。次の30分節目を求める
+    nextBoundaryMin = Math.ceil((elapsedMin - 60) / 30) * 30 + 60;
+    // ぴったり境界上だった場合（境界そのもの＝過去）は次へ
+    if (nextBoundaryMin <= elapsedMin) nextBoundaryMin += 30;
+  }
+  // 新しいセット数：経過分に対応するセット数（1分でも超過したら次セット扱い）
+  // 〜60分=1セット、60分超〜120分=2セット、120分超〜180分=3セット...
+  // つまり ceil((elapsedMin) / 60)、ただし elapsedMin が0以下なら1
+  const newSetCount = elapsedMin <= 0 ? 1 : Math.max(1, Math.ceil(elapsedMin / 60));
+  const oldSetCount = tdata.setCount || 1;
+
+  tdata.endsAt = tdata.startedAt + nextBoundaryMin * 60000;
+  tdata.setCount = newSetCount;
+
+  // 延長履歴に「今回追加された分（30分単位）」を記録
+  if (!Array.isArray(tdata.extensions)) tdata.extensions = [];
+  // どれだけ延長されたかは、前回の endsAt との差ではなく、新しい30分ぶんとして記録
+  tdata.extensions.push({
+    min: 30,
+    auto: true,
+    at: now,
+  });
+
+  // 次セットでもアラートを出すためフラグリセット
+  tdata.alertedWarn = false;
+  tdata.alertedCritical = false;
+  tdata._updated = now;
+  persistSave();
+  renderFloor();
 }
 
 // 退店
@@ -4751,7 +4850,8 @@ function updateTableTimers(renderUI) {
     if (!tdata.alertedCritical && remainMs <= 0) {
       tdata.alertedCritical = true;
       if (tdata.autoExtend) {
-        extendTable(t.id, 60, { auto: true });
+        // 自動延長：経過時間に応じて endsAt を次の30分節目に進め、セット数を再計算
+        autoExtendStep(t.id);
       }
       needRender = true;
     }
@@ -4778,13 +4878,25 @@ function updateTableTimers(renderUI) {
     else if (remainMin <= ALERT_15_MIN) stage = 'warn';
 
     let txt = '';
+    // 自動延長ONの卓は経過時間表示にして警告色も出さない
+    if (tdata.autoExtend) {
+      const elapsedMs = Date.now() - (tdata.startedAt || Date.now());
+      const eh = Math.floor(elapsedMs / 3600000);
+      const em = Math.floor((elapsedMs % 3600000) / 60000);
+      txt = `⏱ 経過 ${eh}:${String(em).padStart(2,'0')}`;
+      el.textContent = txt;
+      // 警告クラスを全部外す（通常色固定）
+      const card = el.closest('.table-card');
+      if (card) {
+        card.classList.remove('warn', 'critical');
+        el.classList.remove('warn', 'critical', 'expired');
+      }
+      return;
+    }
+
     if (stage === 'expired') {
       const overMin = Math.ceil(-remainMs / 60000);
-      if (tdata.autoExtend) {
-        txt = `🔁 自動延長待ち（${overMin}分超過）`;
-      } else {
-        txt = `⚠ 超過 ${overMin}分`;
-      }
+      txt = `⚠ 超過 ${overMin}分`;
     } else {
       const m = Math.floor(remainMs / 60000);
       const s = Math.floor((remainMs % 60000) / 1000);
@@ -4808,6 +4920,17 @@ function updateTableTimers(renderUI) {
       el.classList.toggle('critical', stage === 'critical');
       el.classList.toggle('expired', stage === 'expired');
     }
+  });
+
+  // 卓モーダル内の経過時間表示（自動延長ONの卓）も1秒ごとに更新
+  document.querySelectorAll('[data-elapsed-disp]').forEach(el => {
+    const id = el.getAttribute('data-elapsed-disp');
+    const td = state.tables[id];
+    if (!td || !td.occupied || !td.startedAt) return;
+    const elapsedMs = Date.now() - td.startedAt;
+    const eh = Math.floor(elapsedMs / 3600000);
+    const em = Math.floor((elapsedMs % 3600000) / 60000);
+    el.textContent = `${eh}:${String(em).padStart(2,'0')}`;
   });
 }
 
@@ -5194,12 +5317,17 @@ function openTableModal(tableId) {
       const v = String(i).padStart(2, '0');
       return `<option value="${v}"${i===stM?' selected':''}>${v}</option>`;
     }).join('');
+    // 自動延長ON時は「終了予定」を隠して経過時間を表示
+    const statusLineHtml = tdata.autoExtend
+      ? `入店時刻：<b id="curStartedDisp">${startedStr}</b>　／　経過：<b id="curElapsedDisp" data-elapsed-disp="${tableId}">--</b><br>
+          現在 <b>${setNum}セット目</b>　<span style="font-size:11px; color:#8b6914;">🔁 自動延長ON</span>`
+      : `入店時刻：<b id="curStartedDisp">${startedStr}</b>　／　終了予定：<b id="curEndsDisp">${endsStr}</b><br>
+          現在 <b>${setNum}セット目</b>`;
     statusBlock = `
       <div class="cust-detail-section" style="margin-bottom:12px;">
         <h4>📍 現在のステータス</h4>
         <div style="font-size:13px; color:var(--text); line-height:1.8;">
-          入店時刻：<b id="curStartedDisp">${startedStr}</b>　／　終了予定：<b id="curEndsDisp">${endsStr}</b><br>
-          現在 <b>${setNum}セット目</b>
+          ${statusLineHtml}
         </div>
         <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
           <button type="button" class="btn btn-sm" data-extend-modal="30">+30分延長</button>
