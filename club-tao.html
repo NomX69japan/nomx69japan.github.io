@@ -2233,7 +2233,11 @@
 <!-- ========== Modals ========== -->
 <div class="modal-bg" id="tableModalBg">
   <div class="modal">
-    <h3 id="tableModalTitle">テーブル</h3>
+    <div class="modal-sticky-header" style="position:sticky; top:0; background:#fff; z-index:5; padding-bottom:8px; margin:-16px -16px 8px; padding:16px 16px 8px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:8px;">
+      <h3 id="tableModalTitle" style="margin:0; flex:1; font-size:16px;">テーブル</h3>
+      <button class="btn-sub btn-sm" id="tableModalTopCloseBtn" onclick="closeTableModal()" style="font-size:12px; padding:4px 10px;">閉じる</button>
+      <button class="btn btn-sm" id="tableModalTopSaveBtn" style="font-size:12px; padding:4px 10px; display:none;">💾 保存</button>
+    </div>
     <div id="tableModalBody"></div>
     <div class="row-buttons" id="tableModalFooter"></div>
   </div>
@@ -2339,23 +2343,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.29';
+const APP_VERSION = '2026.05.30';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
   {
-    version: '2026.05.29',
-    date: '2026-05-29',
-    title: '🐛 シフト変更が元に戻るバグ修正＋顧客フリガナ対応',
+    version: '2026.05.30',
+    date: '2026-05-30',
+    title: '🐛 商品マスタ重複バグ・古い通知・UI改善',
     items: [
-      '【重要バグ修正】シフトを◯→×に変更しても元に戻る不具合を修正しました。',
-      '原因：シフトデータにタイムスタンプが無く、サーバー同期で古いデータに上書きされていました。',
-      '対策：各シフトに更新時刻を記録し、新しい変更が必ず勝つマージ方式に変更しました。',
-      '既存のシフトデータは初回操作時に新形式へ自動アップグレードされます。',
-      '【顧客管理】顧客データにフリガナ欄を追加しました（編集モーダル内）。',
-      '【ソート】名前順ソートをフリガナ優先の五十音順に改善（カタカナ↔ひらがな自動変換）',
-      '【入店・予約モーダル】顧客選択ドロップダウンを五十音順（あ→ん）に固定',
-      '【検索】顧客クイック検索でフリガナでも検索できるようになりました',
-      '【自動延長】60分以降は30分単位で自動延長（1セット目は常に60分固定）',
+      '【商品マスタバグ修正】ピッチャーカテゴリで「緑茶」「烏龍茶」が追加直後に消えるバグを修正',
+      '原因：デフォルト商品（ドリンクの緑茶・烏龍茶）と同じ名前のため、カテゴリが違ってもクリーンアップ処理で削除されていました',
+      '対策：重複チェックを「カテゴリ+名前」のセットに変更。これで「ピッチャー：緑茶」と「ドリンク：緑茶」は別物として共存可能',
+      '【古い通知が朝に届くバグ対策】30分以上前の古い通知を起動時・画面復帰時に自動的に閉じるようにしました',
+      '※ ただし、Push配信自体のOSレベルの遅延は端末側の制約で完全には防げません',
+      '【UI改善】卓モーダルの上部にも「保存」「閉じる」ボタンを追加。長いスクロール後でも一番下まで戻らずに保存できます',
+      '空席卓では上部に「▶ 入店」ボタンも表示（入店処理が素早く完了）',
     ],
   },
   {
@@ -3114,6 +3116,12 @@ function initApp() {
   setTimeout(() => {
     try { showReleaseNotes(false); } catch(e) { console.warn('release notes failed', e); }
   }, 400);
+  // 起動時に古い通知（30分以上前のもの）を自動的に閉じる
+  // Android/iOS で Web Push が遅延配送されることがあり、営業時間が終わってから
+  // 「残り15分」通知などが届いて鬱陶しいため
+  setTimeout(() => {
+    try { clearStaleNotifications(); } catch(e) {}
+  }, 2000);
 }
 
 function updateFloorClock() {
@@ -5473,6 +5481,26 @@ function buildTableModalFooter(isOccupied) {
   if (!footer) return;
   // クリア
   footer.innerHTML = '';
+
+  // 上部ボタン（sticky header 内）の制御
+  const topSaveBtn = document.getElementById('tableModalTopSaveBtn');
+  if (topSaveBtn) {
+    // クローンで既存リスナーを除去
+    const newTopBtn = topSaveBtn.cloneNode(true);
+    topSaveBtn.parentNode.replaceChild(newTopBtn, topSaveBtn);
+    if (isOccupied) {
+      newTopBtn.style.display = '';
+      newTopBtn.textContent = '💾 保存';
+      newTopBtn.className = 'btn btn-sm';
+      newTopBtn.addEventListener('click', saveTable);
+    } else {
+      // 空席：上部に「入店」ボタンを表示
+      newTopBtn.style.display = '';
+      newTopBtn.textContent = '▶ 入店';
+      newTopBtn.className = 'btn-success btn-sm';
+      newTopBtn.addEventListener('click', checkInFromModal);
+    }
+  }
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'btn-sub btn-sm';
@@ -9516,6 +9544,8 @@ window.addEventListener('visibilitychange', () => {
     if (server.url && server.token) doPoll();
     // 復帰時にタイマー判定を即実行（自動延長の遅延を解消）
     try { updateTableTimers(false); } catch(e) {}
+    // 古い通知（30分以上前のもの）を自動的に閉じる
+    try { clearStaleNotifications(); } catch(e) {}
     // フロアタブ表示中なら画面も再描画
     const onFloor = document.getElementById('page-floor')?.classList.contains('active');
     if (onFloor) renderFloor();
@@ -9524,6 +9554,7 @@ window.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => {
   if (server.url && server.token) doPoll();
   try { updateTableTimers(false); } catch(e) {}
+  try { clearStaleNotifications(); } catch(e) {}
 });
 function simpleHash(str) {
   let h = 0;
@@ -9569,7 +9600,9 @@ function cleanupAndSeedOrderMaster(opts) {
 
   const defaultCatNames = new Set(DEFAULT_CATEGORIES.map(d => d.name));
   const defaultCatIds = new Set(DEFAULT_CATEGORIES.map(d => d.id));
-  const defaultItemNames = new Set(DEFAULT_MENU_ITEMS.map(d => d.name));
+  // 商品の重複判定は「カテゴリ+名前」のセットで行う
+  // （単に名前だけだと、ピッチャーカテゴリの「緑茶」がドリンクの「緑茶」と衝突して削除される）
+  const defaultItemKeys = new Set(DEFAULT_MENU_ITEMS.map(d => (d.category || '') + '||' + d.name));
   const defaultItemIds = new Set(DEFAULT_MENU_ITEMS.map(d => d.id));
 
   // --- カテゴリ：固定IDで再構築 ---
@@ -9623,9 +9656,11 @@ function cleanupAndSeedOrderMaster(opts) {
     }
   });
   // ランダムIDの DEFAULT 名商品は全部 removed:true
+  // ※ 同じ名前でもカテゴリが違えばユーザー独自の商品として保持
   state.menuItems.forEach(m => {
     if (m.removed) return;
-    if (defaultItemNames.has(m.name) && !defaultItemIds.has(m.id)) {
+    const key = (m.category || '') + '||' + m.name;
+    if (defaultItemKeys.has(key) && !defaultItemIds.has(m.id)) {
       m.removed = true;
       m._updated = FUTURE_TS;
       changed = true;
