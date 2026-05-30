@@ -1408,6 +1408,87 @@
     padding: 6px 8px;
   }
   .bav-addbtn { margin-top: 4px; align-self: flex-start; }
+
+  /* ====== ボトル管理タブ ====== */
+  .bottle-view-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+  }
+  .bottle-view-bar .sort-label { font-size: 12px; color: var(--text-sub); flex-shrink: 0; }
+  .bottle-view-bar select {
+    flex: 1;
+    font-size: 13px;
+    padding: 7px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+  }
+  .bottle-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .bottle-stat-chip {
+    font-size: 12px;
+    background: #f7f3e8;
+    border: 1px solid #ece6d3;
+    border-radius: 14px;
+    padding: 4px 12px;
+    color: var(--text-sub);
+  }
+  .bottle-stat-chip b { color: #8b6914; font-size: 14px; }
+  .bottle-keep-list { display: flex; flex-direction: column; gap: 14px; }
+  .bk-group {
+    background: #fff;
+    border: 1px solid #ece6d3;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .bk-group-head {
+    background: #faf6ec;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #8b6914;
+    border-bottom: 1px solid #ece6d3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .bk-group-head .bk-group-count {
+    font-size: 11px;
+    font-weight: normal;
+    color: #aaa;
+  }
+  .bk-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f3eee0;
+    cursor: pointer;
+  }
+  .bk-item:last-child { border-bottom: none; }
+  .bk-item:active { background: #faf6ec; }
+  .bk-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 3px;
+  }
+  .bk-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .bk-item-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+  .bk-item-meta-chip {
+    font-size: 11px;
+    color: var(--text-sub);
+    background: #f7f3e8;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .bk-empty { text-align: center; color: #aaa; font-size: 13px; padding: 40px 0; }
   .bottle-edit-actions {
     display: flex;
     gap: 6px;
@@ -1949,6 +2030,7 @@
       <button class="nav-btn" data-page="shift">📅 シフト</button>
       <button class="nav-btn" data-page="reservations">📖 予約</button>
       <button class="nav-btn" data-page="customers">👤 顧客</button>
+      <button class="nav-btn" data-page="bottles">🍾 ボトル</button>
       <button class="nav-btn" data-page="today">📅 履歴</button>
       <button class="nav-btn" data-page="settings">⚙️ 設定</button>
     </nav>
@@ -2061,6 +2143,26 @@
         </select>
       </div>
       <div class="cust-list" id="custList"></div>
+    </section>
+
+    <!-- ===== BOTTLE KEEP PAGE ===== -->
+    <section class="page" id="page-bottles">
+      <h2 class="page-title">🍾 ボトル管理</h2>
+      <div class="cust-toolbar">
+        <input type="text" class="search" id="bottleSearch" placeholder="ボトル名・顧客名・保管場所で検索…" oninput="renderBottleList()">
+      </div>
+      <div class="bottle-view-bar">
+        <span class="sort-label">表示:</span>
+        <select id="bottleViewMode" onchange="renderBottleList()">
+          <option value="customer">顧客別</option>
+          <option value="location">保管場所別</option>
+          <option value="name">ボトル種類別</option>
+          <option value="remain_asc">残量が少ない順（一覧）</option>
+          <option value="opened_desc">入店日が新しい順（一覧）</option>
+        </select>
+      </div>
+      <div id="bottleStats" class="bottle-stats"></div>
+      <div id="bottleList" class="bottle-keep-list"></div>
     </section>
 
     <!-- ===== HISTORY (CALENDAR) PAGE ===== -->
@@ -2343,9 +2445,26 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.30b';
+const APP_VERSION = '2026.05.30c';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.30c',
+    date: '2026-05-30',
+    title: '🍾 ボトル管理タブを新設',
+    items: [
+      'メニューに「🍾 ボトル」タブを追加。全顧客のボトルキープを横断して一覧・検索できます。',
+      '【検索】ボトル名・顧客名・フリガナ・タグ・保管場所のどれでも検索可能',
+      '【表示切替】5種類の見方を用意：',
+      '・顧客別（誰が何をキープしているか）',
+      '・保管場所別（旧キャッシャー・キッチンなど場所ごとに集約）',
+      '・ボトル種類別（角・モエなど銘柄ごと）',
+      '・残量が少ない順（補充・確認が必要なボトルがすぐわかる）',
+      '・入店日が新しい順',
+      '【統計】上部に総本数・キープ人数・残量わずかの本数を表示',
+      '各ボトルをタップすると、その顧客の編集画面が開いて残量調整などができます。',
+    ],
+  },
   {
     version: '2026.05.30b',
     date: '2026-05-30',
@@ -3072,6 +3191,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (target === 'shift') renderShift();
     if (target === 'reservations') renderReservations();
     if (target === 'customers') renderCustomerList();
+    if (target === 'bottles') renderBottleList();
     if (target === 'today') renderTodaySummary();
     if (target === 'settings') renderSettings();
   });
@@ -6994,6 +7114,149 @@ function getCustSortMode() {
 function changeCustSortMode(mode) {
   try { localStorage.setItem(LS_CUST_SORT, mode); } catch(e) {}
   renderCustomerList();
+}
+
+// ========== ボトル管理タブ ==========
+// 全顧客のボトルキープを横断して、顧客別/保管場所別/種類別/一覧で表示
+function getAllBottles() {
+  // 全顧客のボトルをフラットな配列に展開（顧客情報を付与）
+  const out = [];
+  (state.customers || []).forEach(c => {
+    if (c.removed) return;
+    (c.bottles || []).forEach((b, bidx) => {
+      out.push({
+        bottle: b,
+        custId: c.id,
+        custName: displayName(c) || c.name || '（名前なし）',
+        custKana: c.kana || '',
+        bottleIdx: bidx,
+        name: b.name || '',
+        tag: b.tag || '',
+        location: b.location || '',
+        openedDate: b.openedDate || '',
+        remain: (typeof b.remain === 'number') ? b.remain : 10,
+      });
+    });
+  });
+  return out;
+}
+
+function renderBottleList() {
+  const listEl = document.getElementById('bottleList');
+  const statsEl = document.getElementById('bottleStats');
+  if (!listEl) return;
+  const q = (document.getElementById('bottleSearch')?.value || '').toLowerCase().trim();
+  const mode = document.getElementById('bottleViewMode')?.value || 'customer';
+
+  let all = getAllBottles();
+
+  // 統計（フィルタ前の全体）
+  if (statsEl) {
+    const total = all.length;
+    const low = all.filter(x => x.remain <= 3).length;
+    const owners = new Set(all.map(x => x.custId)).size;
+    statsEl.innerHTML = `
+      <span class="bottle-stat-chip">総本数 <b>${total}</b> 本</span>
+      <span class="bottle-stat-chip">キープ人数 <b>${owners}</b> 名</span>
+      ${low > 0 ? `<span class="bottle-stat-chip" style="background:#fdecea; border-color:#f5c6c0;">残量わずか <b style="color:#c0392b;">${low}</b> 本</span>` : ''}
+    `;
+  }
+
+  // 検索フィルタ（ボトル名・顧客名・フリガナ・タグ・保管場所）
+  if (q) {
+    all = all.filter(x =>
+      x.name.toLowerCase().includes(q)
+      || x.custName.toLowerCase().includes(q)
+      || x.custKana.toLowerCase().includes(q)
+      || x.tag.toLowerCase().includes(q)
+      || x.location.toLowerCase().includes(q)
+    );
+  }
+
+  if (all.length === 0) {
+    listEl.innerHTML = `<div class="bk-empty">${q ? '該当するボトルがありません' : 'ボトルキープがまだありません'}</div>`;
+    return;
+  }
+
+  // 1件分のHTML（タップで顧客モーダルを開く）
+  const itemHtml = (x) => {
+    const meta = [];
+    if (mode !== 'customer') meta.push(`<span class="bk-item-meta-chip">👤 ${escapeHtml(x.custName)}</span>`);
+    if (x.tag) meta.push(`<span class="bk-item-meta-chip">🏷 ${escapeHtml(x.tag)}</span>`);
+    if (mode !== 'location' && x.location) meta.push(`<span class="bk-item-meta-chip">📍 ${escapeHtml(x.location)}</span>`);
+    if (x.openedDate) meta.push(`<span class="bk-item-meta-chip">📅 ${escapeHtml(x.openedDate)}〜</span>`);
+    return `<div class="bk-item" onclick="openCustomerModal('${x.custId}')">
+      <div class="bk-item-top">
+        <span class="bk-item-name">🍾 ${escapeHtml(x.name)}</span>
+        <span>${buildRemainBarHtml(x.remain)}</span>
+      </div>
+      ${meta.length ? `<div class="bk-item-meta">${meta.join('')}</div>` : ''}
+    </div>`;
+  };
+
+  // 一覧モード（グループ化なし）
+  if (mode === 'remain_asc' || mode === 'opened_desc') {
+    const sorted = all.slice();
+    if (mode === 'remain_asc') {
+      sorted.sort((a, b) => a.remain - b.remain || a.custName.localeCompare(b.custName, 'ja'));
+    } else {
+      // 入店日が新しい順（空欄は末尾）
+      sorted.sort((a, b) => (b.openedDate || '').localeCompare(a.openedDate || ''));
+    }
+    listEl.innerHTML = `<div class="bk-group"><div class="bk-group-head">${mode === 'remain_asc' ? '🍶 残量が少ない順' : '📅 入店日が新しい順'}<span class="bk-group-count">${sorted.length}本</span></div>${sorted.map(itemHtml).join('')}</div>`;
+    return;
+  }
+
+  // グループ化モード
+  const groups = {}; // key -> {label, items[]}
+  all.forEach(x => {
+    let key, label;
+    if (mode === 'customer') {
+      key = x.custId;
+      label = '👤 ' + x.custName;
+    } else if (mode === 'location') {
+      key = x.location || '__none__';
+      label = '📍 ' + (x.location || '（保管場所 未設定）');
+    } else { // name
+      key = x.name || '__none__';
+      label = '🍾 ' + (x.name || '（名称なし）');
+    }
+    if (!groups[key]) groups[key] = { label, items: [], sortKey: '' };
+    groups[key].items.push(x);
+  });
+
+  // グループの並び順
+  let groupArr = Object.keys(groups).map(k => groups[k]);
+  if (mode === 'customer') {
+    // 顧客名（フリガナ）の五十音順
+    groupArr.sort((a, b) => {
+      const ax = a.items[0], bx = b.items[0];
+      return customerSortCompare(
+        { kana: ax.custKana, name: ax.custName },
+        { kana: bx.custKana, name: bx.custName }
+      );
+    });
+  } else if (mode === 'location') {
+    // 本数が多い場所を上に、未設定は最後
+    groupArr.sort((a, b) => {
+      const aNone = a.label.includes('未設定');
+      const bNone = b.label.includes('未設定');
+      if (aNone !== bNone) return aNone ? 1 : -1;
+      return b.items.length - a.items.length;
+    });
+  } else {
+    // 種類別：本数が多い順
+    groupArr.sort((a, b) => b.items.length - a.items.length);
+  }
+
+  listEl.innerHTML = groupArr.map(g => {
+    // グループ内は残量が少ない順に
+    const items = g.items.slice().sort((a, b) => a.remain - b.remain);
+    return `<div class="bk-group">
+      <div class="bk-group-head">${escapeHtml(g.label)}<span class="bk-group-count">${g.items.length}本</span></div>
+      ${items.map(itemHtml).join('')}
+    </div>`;
+  }).join('');
 }
 
 function renderCustomerList() {
