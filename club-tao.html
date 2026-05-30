@@ -2481,9 +2481,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.30d';
+const APP_VERSION = '2026.05.30e';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.30e',
+    date: '2026-05-30',
+    title: '📝 顧客メモを予約メモに連絡事項として反映',
+    items: [
+      '予約モーダルで既存顧客を選ぶと、その顧客のフリーメモが予約メモに「【連絡事項】◯◯」として自動で入ります。',
+      '例：顧客メモが「チョコチップクッキー」→ 予約メモに「【連絡事項】チョコチップクッキー」',
+      '顧客メモには【連絡事項】タグを付けず普通に書いておけばOK（予約に紐付いた時だけ連絡事項になります）',
+      'これにより、連絡事項は「予約がある日だけ」フロアに表示されるようになります（顧客メモに直接書くと常時表示されてしまう問題を解消）',
+      '予約メモに既に書いた内容は消えず、連絡事項が先頭に追加されます。',
+      '同じ連絡事項が既にある場合は重複追加されません。',
+    ],
+  },
   {
     version: '2026.05.30d',
     date: '2026-05-30',
@@ -8199,6 +8212,37 @@ let editingResvId = null;
 let modalResvGuests = []; // 予約モーダル編集中の顧客カード配列
 
 // 予約モーダル：1顧客カードのHTMLを生成
+// 顧客選択時：その顧客のフリーメモを予約メモに「【連絡事項】◯◯」として反映
+// 顧客メモには【連絡事項】タグを付けず普通に書いておき、予約に紐付いた時だけ連絡事項化する運用
+function onResvCustomerChange(selectEl) {
+  const custId = selectEl ? selectEl.value : '';
+  if (!custId) return;
+  const cust = (state.customers || []).find(c => c.id === custId);
+  if (!cust) return;
+  const rawMemo = (cust.memo || '').trim();
+  if (!rawMemo) return; // メモが空なら何もしない
+
+  const memoEl = document.getElementById('resvMemo');
+  if (!memoEl) return;
+
+  // 顧客メモ内に既に【連絡事項】タグがある場合はそのまま使い、無ければ付与
+  let noticeLine;
+  if (/[\[【]\s*連絡事項\s*[\]】]/.test(rawMemo)) {
+    noticeLine = rawMemo; // 既にタグ付き → そのまま
+  } else {
+    noticeLine = '【連絡事項】' + rawMemo;
+  }
+
+  const current = memoEl.value || '';
+  // 既に同じ連絡事項が入っていれば重複追加しない
+  if (current.includes(noticeLine)) return;
+
+  // 既存メモを残しつつ、連絡事項行を先頭に追加
+  memoEl.value = current.trim()
+    ? noticeLine + '\n' + current.trim()
+    : noticeLine;
+}
+
 function buildResvGuestCardHtml(guest, idx) {
   // 顧客選択肢
   const custOpts = ['<option value="">（未登録 or 新規）</option>']
@@ -8254,7 +8298,7 @@ function buildResvGuestCardHtml(guest, idx) {
       <div class="guest-card-body">
         <div class="field-row">
           <span class="lab-inline">既存</span>
-          <select class="rg-customer-id" style="flex:1; padding:5px 6px; font-size:13px;">${custOpts}</select>
+          <select class="rg-customer-id" style="flex:1; padding:5px 6px; font-size:13px;" onchange="onResvCustomerChange(this)">${custOpts}</select>
         </div>
         <div class="field-row">
           <span class="lab-inline">新規</span>
