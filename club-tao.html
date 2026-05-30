@@ -1489,6 +1489,42 @@
     white-space: nowrap;
   }
   .bk-empty { text-align: center; color: #aaa; font-size: 13px; padding: 40px 0; }
+
+  /* 保管場所別 横スクロールタブ */
+  .bk-loc-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 10px;
+    margin-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .bk-loc-tabs::-webkit-scrollbar { height: 4px; }
+  .bk-loc-tabs::-webkit-scrollbar-thumb { background: #d4c9a8; border-radius: 2px; }
+  .bk-loc-tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 13px;
+    padding: 8px 14px;
+    border: 1px solid #e0d6bd;
+    border-radius: 18px;
+    background: #fff;
+    color: var(--text-sub);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .bk-loc-tab.active {
+    background: #8b6914;
+    color: #fff;
+    border-color: #8b6914;
+    font-weight: 600;
+  }
+  .bk-loc-tab-count {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-left: 2px;
+  }
   .bottle-edit-actions {
     display: flex;
     gap: 6px;
@@ -2445,9 +2481,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.05.30c';
+const APP_VERSION = '2026.05.30d';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.05.30d',
+    date: '2026-05-30',
+    title: '🍾 保管場所別を横タブで切替できるように',
+    items: [
+      'ボトル管理の「保管場所別」表示を横スクロールタブ方式に変更しました。',
+      '旧キャッシャー・キッチンなどの保管場所を横に並んだタブでタップ切替できます。',
+      'スクロールせずに別の保管場所のボトルへすぐ移動できるようになりました。',
+      '各タブには本数も表示（例：旧キャッシャー 21）。',
+    ],
+  },
   {
     version: '2026.05.30c',
     date: '2026-05-30',
@@ -7249,6 +7296,34 @@ function renderBottleList() {
     groupArr.sort((a, b) => b.items.length - a.items.length);
   }
 
+  // 保管場所別モード：横スクロールタブで場所を切り替え（スクロール削減）
+  if (mode === 'location') {
+    // 現在のフィルタが有効な場所か確認（検索で消えた等の場合はリセット）
+    const validLabels = groupArr.map(g => g.label);
+    if (bottleLocFilter && !validLabels.includes(bottleLocFilter)) {
+      bottleLocFilter = null;
+    }
+    // デフォルトは先頭（最も本数が多い場所）を選択
+    if (!bottleLocFilter && groupArr.length > 0) {
+      bottleLocFilter = groupArr[0].label;
+    }
+    // 横スクロールタブHTML
+    const tabsHtml = groupArr.map(g => {
+      const active = g.label === bottleLocFilter;
+      return `<button class="bk-loc-tab${active ? ' active' : ''}" onclick="setBottleLocFilter('${escapeHtml(g.label).replace(/'/g, "\\'")}')">${escapeHtml(g.label)} <span class="bk-loc-tab-count">${g.items.length}</span></button>`;
+    }).join('');
+    // 選択中のグループだけ表示
+    const activeGroup = groupArr.find(g => g.label === bottleLocFilter) || groupArr[0];
+    const items = activeGroup ? activeGroup.items.slice().sort((a, b) => a.remain - b.remain) : [];
+    listEl.innerHTML = `
+      <div class="bk-loc-tabs">${tabsHtml}</div>
+      <div class="bk-group">
+        <div class="bk-group-head">${escapeHtml(activeGroup ? activeGroup.label : '')}<span class="bk-group-count">${items.length}本</span></div>
+        ${items.map(itemHtml).join('')}
+      </div>`;
+    return;
+  }
+
   listEl.innerHTML = groupArr.map(g => {
     // グループ内は残量が少ない順に
     const items = g.items.slice().sort((a, b) => a.remain - b.remain);
@@ -7257,6 +7332,20 @@ function renderBottleList() {
       ${items.map(itemHtml).join('')}
     </div>`;
   }).join('');
+}
+
+// 保管場所タブの選択
+let bottleLocFilter = null;
+function setBottleLocFilter(label) {
+  bottleLocFilter = label;
+  renderBottleList();
+  // 選択タブが見えるようスクロール位置を調整
+  setTimeout(() => {
+    const active = document.querySelector('.bk-loc-tab.active');
+    if (active && active.scrollIntoView) {
+      active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, 30);
 }
 
 function renderCustomerList() {
