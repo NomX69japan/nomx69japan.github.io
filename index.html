@@ -72,7 +72,10 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
 
   body {
     background: var(--paper);
@@ -80,6 +83,19 @@
     font-family: 'Noto Serif JP', serif;
     font-weight: 300;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ── Accessibility: reduce motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* ── NOISE TEXTURE OVERLAY ── */
@@ -237,6 +253,7 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
+    background: linear-gradient(160deg, #d4c9b0 0%, #8b7355 100%);
   }
 
   .hero-image-area::after {
@@ -608,6 +625,41 @@
     }
   }
 
+  /* ── MANIFESTO ── */
+  .manifesto {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 8rem 4rem;
+    text-align: center;
+  }
+
+  .manifesto-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.2rem, 5vw, 4.5rem);
+    font-weight: 300;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+
+  .manifesto-line {
+    display: block;
+  }
+
+  .manifesto-text .manifesto-line:last-child {
+    color: var(--accent-dark);
+    font-style: italic;
+  }
+
+  .manifesto-sub {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 2rem;
+    letter-spacing: 0.05em;
+  }
+
   /* ── KEN BURNS effect for hero image ── */
   @keyframes kenBurns {
     0% { transform: scale(1) translate(0, 0); }
@@ -941,7 +993,7 @@
 
   .fee-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.2rem;
     margin-bottom: 2.5rem;
   }
@@ -1126,7 +1178,7 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 1100px) {
-    .fee-grid { grid-template-columns: repeat(3, 1fr); }
+    .fee-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
   @media (max-width: 900px) {
@@ -1139,6 +1191,7 @@
     .hero-name { font-size: clamp(3.5rem, 18vw, 6rem); }
     .hero-subtitle { font-size: 0.82rem; }
     section { padding: 4rem 1.5rem; }
+    .manifesto { padding: 5rem 1.5rem; }
     .pillars-header { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 2.5rem; }
     .pillars-grid { grid-template-columns: 1fr; }
     .pillar-card { border-right: none; border-bottom: 1px solid var(--line); }
@@ -1232,6 +1285,17 @@
     <span class="arrow">↓</span>
   </div>
 </div>
+
+<div class="rule"></div>
+
+<!-- MANIFESTO -->
+<section class="manifesto">
+  <p class="manifesto-text reveal">
+    <span class="manifesto-line">身体は、いちばん長く付き合う</span>
+    <span class="manifesto-line">「資産」である。</span>
+  </p>
+  <p class="manifesto-sub reveal">— だからこそ、感覚ではなく理論で育てる。</p>
+</section>
 
 <div class="rule"></div>
 
@@ -1371,6 +1435,13 @@
       <div class="fee-name">オンラインレッスン</div>
       <div class="fee-duration">40分</div>
       <div class="fee-price">¥8,000</div>
+      <div class="fee-arrow">→</div>
+    </a>
+    <a class="fee-card" href="#" target="_blank" rel="noopener">
+      <div class="fee-tag">相談</div>
+      <div class="fee-name">オンライン相談</div>
+      <div class="fee-duration">30分</div>
+      <div class="fee-price">¥5,000</div>
       <div class="fee-arrow">→</div>
     </a>
     <a class="fee-card" href="#" target="_blank" rel="noopener">
