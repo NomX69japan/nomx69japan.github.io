@@ -2528,12 +2528,57 @@ function isQuotaError(e) {
     || /quota/i.test(e.message || ''));
 }
 
-// localStorage 使用量の概算（バイト）
+// localStorage 使用量の概算（全キー合計・UTF-16換算バイト）
+// 多くのブラウザは localStorage を1文字2バイトで計算し、上限約5MB
 function estimateStorageBytes() {
+  let total = 0;
   try {
-    const raw = localStorage.getItem(LS_KEY) || '';
-    // UTF-16換算でおおよそ2バイト/文字。実際はUTF-8だが安全側に倍見積もり
-    return raw.length;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k == null) continue;
+      const v = localStorage.getItem(k) || '';
+      total += (k.length + v.length) * 2;
+    }
+  } catch(e) { return 0; }
+  return total;
+}
+
+// localStorage の内訳を取得（デバッグ・表示用）
+function getStorageBreakdown() {
+  const out = { main: 0, notifKeys: 0, notifCount: 0, other: 0, totalKeys: 0 };
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k == null) continue;
+      out.totalKeys++;
+      const size = (k.length + (localStorage.getItem(k) || '').length) * 2;
+      if (k === LS_KEY) out.main += size;
+      else if (k.startsWith('tao_notified_')) { out.notifKeys += size; out.notifCount++; }
+      else out.other += size;
+    }
+  } catch(e) {}
+  return out;
+}
+
+// 使用中でない卓の通知済みフラグキーを掃除（容量節約）
+function cleanupNotifiedKeys() {
+  try {
+    const activeKeys = new Set();
+    Object.keys(state.tables || {}).forEach(tid => {
+      const td = state.tables[tid];
+      if (td && td.occupied && td.startedAt) {
+        activeKeys.add(`tao_notified_warn_${tid}_${td.startedAt}`);
+      }
+    });
+    let removed = 0;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('tao_notified_') && !activeKeys.has(k)) {
+        localStorage.removeItem(k);
+        removed++;
+      }
+    }
+    return removed;
   } catch(e) { return 0; }
 }
 
@@ -2666,9 +2711,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.06';
+const APP_VERSION = '2026.06.06b';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.06b',
+    date: '2026-06-06',
+    title: '🔍 容量表示を正確化＋通知キー掃除',
+    items: [
+      '使用量の計算を全データ合計で正確に表示するようにしました（以前はメインデータのみの計測でした）。',
+      'データ容量の内訳（メインデータ・通知キー・全キー数）を表示するようにしました。',
+      '退店時に使い終わった通知フラグを自動削除し、不要なデータが溜まらないようにしました。',
+      '容量に余裕がある時は「✅ 余裕があります」と表示されます。',
+    ],
+  },
   {
     version: '2026.06.06',
     date: '2026-06-06',
@@ -3511,21 +3567,7 @@ function initApp() {
     delete state.tables.P2;
   }
   // 通知済みフラグの掃除：現在使用中でない卓のキーは削除
-  try {
-    const activeKeys = new Set();
-    Object.keys(state.tables || {}).forEach(tid => {
-      const td = state.tables[tid];
-      if (td && td.occupied && td.startedAt) {
-        activeKeys.add(`tao_notified_warn_${tid}_${td.startedAt}`);
-      }
-    });
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('tao_notified_warn_') && !activeKeys.has(k)) {
-        localStorage.removeItem(k);
-      }
-    }
-  } catch(e) {}
+  cleanupNotifiedKeys();
   // テーブル初期化（不足分のみ追加）
   if (!state.tables) state.tables = {};
   DEFAULT_TABLES.forEach(t => {
@@ -3926,6 +3968,10 @@ function checkOut(tableId) {
     alertedWarn: false, alertedCritical: false,
     _updated: Date.now(),
   };
+  // この卓の通知済みフラグキーを削除（容量節約：使い終わったキーを溜めない）
+  if (prev.startedAt) {
+    try { localStorage.removeItem(`tao_notified_warn_${tableId}_${prev.startedAt}`); } catch(e) {}
+  }
   persistSave();
   renderFloor();
   // Web Push 通知
@@ -9261,22 +9307,29 @@ function renderSettings() {
 function refreshStorageUsage() {
   const el = document.getElementById('storageUsageInfo');
   if (!el) return;
+  // 念のため古い通知キーを掃除してから計測
+  const purgedKeys = cleanupNotifiedKeys();
   const bytes = estimateStorageBytes();
+  const bd = getStorageBreakdown();
   const mb = (bytes / 1024 / 1024);
-  // 一般的なlocalStorage上限は5MB（端末により10MB程度）
+  // 一般的なlocalStorage上限は5MB（端末により異なる）
   const LIMIT_MB = 5;
   const pct = Math.min(100, Math.round(mb / LIMIT_MB * 100));
   const visitCount = Array.isArray(state.visitLog) ? state.visitLog.filter(v=>!v.removed).length : 0;
   const removedCount = Array.isArray(state.visitLog) ? state.visitLog.filter(v=>v.removed).length : 0;
   const custCount = Array.isArray(state.customers) ? state.customers.filter(c=>!c.removed).length : 0;
   let barColor = pct >= 90 ? '#c0392b' : (pct >= 70 ? '#d4a017' : '#5a9c5a');
+  const fmtKB = (b) => (b/1024).toFixed(0) + 'KB';
   el.innerHTML = `
     <div style="margin-bottom:6px;">使用量の目安：<b style="color:${barColor};">${mb.toFixed(2)} MB</b> / 約${LIMIT_MB}MB（${pct}%）</div>
     <div style="background:#eee; border-radius:6px; height:10px; overflow:hidden; margin-bottom:8px;">
       <div style="width:${pct}%; height:100%; background:${barColor};"></div>
     </div>
-    <div style="font-size:12px; color:#666;">来店履歴：${visitCount}件${removedCount>0?`（削除済み ${removedCount}件）`:''} ／ 顧客：${custCount}名</div>
-    ${pct >= 80 ? '<div style="margin-top:8px; padding:8px; background:#fdecea; border-radius:6px; color:#c0392b; font-size:12px;">⚠️ 容量が逼迫しています。バックアップ後、下の整理機能をお使いください。</div>' : ''}
+    <div style="font-size:12px; color:#666; line-height:1.7;">
+      来店履歴：${visitCount}件${removedCount>0?`（削除済み ${removedCount}件）`:''} ／ 顧客：${custCount}名<br>
+      <span style="color:#999;">内訳：メインデータ ${fmtKB(bd.main)} ／ 通知キー ${bd.notifCount}個（${fmtKB(bd.notifKeys)}）／ 全${bd.totalKeys}キー</span>
+    </div>
+    ${pct >= 80 ? '<div style="margin-top:8px; padding:8px; background:#fdecea; border-radius:6px; color:#c0392b; font-size:12px;">⚠️ 容量が逼迫しています。バックアップ後、下の整理機能をお使いください。</div>' : '<div style="margin-top:8px; padding:8px; background:#eef7ee; border-radius:6px; color:#5a9c5a; font-size:12px;">✅ 容量に余裕があります。</div>'}
   `;
 }
 
