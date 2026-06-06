@@ -2417,6 +2417,21 @@
       </details>
 
       <details class="settings-section">
+        <summary>🗄 データ容量の整理</summary>
+        <div class="body">
+          <div id="storageUsageInfo" style="font-size:13px; margin-bottom:10px;"></div>
+          <button class="btn-sub btn-sm" onclick="refreshStorageUsage()" style="margin-bottom:10px;">🔄 使用量を再計算</button>
+          <hr style="margin:10px 0; border:none; border-top:1px solid #eee;">
+          <p style="color:#888; font-size:11px; margin:0 0 8px;">容量がいっぱいの時は、まず上の「バックアップDL」でデータを保存してから、以下で古い記録を整理してください。</p>
+          <button class="btn-sub btn-sm" onclick="manualPurgeRemoved()" style="margin-bottom:6px;">🧹 削除済みデータを完全消去</button>
+          <p style="color:#888; font-size:11px; margin:0 0 10px;">画面に表示されない「削除済み」の記録を物理的に消して容量を空けます。</p>
+          <button class="btn-sub btn-sm" onclick="manualTrimOldLogs(180)" style="margin-bottom:6px; background:#fff4e6; border-color:#ff9800; color:#c65a00;">📅 6ヶ月以上前の来店履歴を削除</button>
+          <button class="btn-sub btn-sm" onclick="manualTrimOldLogs(365)" style="margin-bottom:6px; background:#fff4e6; border-color:#ff9800; color:#c65a00;">📅 1年以上前の来店履歴を削除</button>
+          <p style="color:#888; font-size:11px; margin:0;">古い来店履歴を削除します。顧客情報・ボトル・キャストは消えません。削除前に必ずバックアップを取ってください。</p>
+        </div>
+      </details>
+
+      <details class="settings-section">
         <summary>⚠️ データリセット</summary>
         <div class="body">
           <button class="btn-danger" onclick="resetAllData()">全データを削除</button>
@@ -2490,10 +2505,8 @@ function markLocalChange() {
   localChangeMarker.lastChangeAt = Date.now();
 }
 
-function persistSave() {
-  // 自分発の変更マーカー（同期時の通知抑制用）
-  markLocalChange();
-  const data = {
+function buildPersistData() {
+  return {
     pin: state.pin,
     casts: state.casts,
     staff: state.staff,
@@ -2507,10 +2520,111 @@ function persistSave() {
     menuCategories: state.menuCategories,
     _updatedAt: Date.now()
   };
+}
+
+function isQuotaError(e) {
+  return e && (e.name === 'QuotaExceededError'
+    || e.code === 22 || e.code === 1014
+    || /quota/i.test(e.message || ''));
+}
+
+// localStorage 使用量の概算（バイト）
+function estimateStorageBytes() {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
+    const raw = localStorage.getItem(LS_KEY) || '';
+    // UTF-16換算でおおよそ2バイト/文字。実際はUTF-8だが安全側に倍見積もり
+    return raw.length;
+  } catch(e) { return 0; }
+}
+
+// 削除済み（removed:true）データを物理削除して容量を空ける
+function purgeRemovedData() {
+  let count = 0;
+  if (Array.isArray(state.visitLog)) {
+    const before = state.visitLog.length;
+    state.visitLog = state.visitLog.filter(v => !v.removed);
+    count += before - state.visitLog.length;
+  }
+  if (Array.isArray(state.reservations)) {
+    const before = state.reservations.length;
+    state.reservations = state.reservations.filter(r => !r.removed);
+    count += before - state.reservations.length;
+  }
+  if (Array.isArray(state.events)) {
+    const before = state.events.length;
+    state.events = state.events.filter(e => !e.removed);
+    count += before - state.events.length;
+  }
+  // 顧客・キャスト・商品マスタは removed でも参照される可能性があるので残す
+  return count;
+}
+
+// 指定日数より古い来店ログを物理削除（顧客のvisitsからも対応エントリを削除）
+function trimOldVisitLogs(daysAgo) {
+  if (!Array.isArray(state.visitLog)) return 0;
+  const cutoff = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+  const removedIds = new Set();
+  const before = state.visitLog.length;
+  state.visitLog = state.visitLog.filter(v => {
+    const ts = v.endedAt || v.startedAt || (v.date ? new Date(v.date + 'T00:00:00').getTime() : 0);
+    if (ts && ts < cutoff) {
+      removedIds.add(v.id);
+      return false;
+    }
+    return true;
+  });
+  // 顧客の visits から、削除したログIDのエントリを除去
+  if (removedIds.size > 0) {
+    (state.customers || []).forEach(c => {
+      if (Array.isArray(c.visits)) {
+        c.visits = c.visits.filter(vis => !vis.logId || !removedIds.has(vis.logId));
+      }
+    });
+  }
+  return before - state.visitLog.length;
+}
+
+let _quotaWarned = false;
+function persistSave() {
+  // 自分発の変更マーカー（同期時の通知抑制用）
+  markLocalChange();
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
   } catch(e) {
-    console.error('persistSave failed', e);
+    if (isQuotaError(e)) {
+      console.warn('localStorage容量超過。自動整理を試みます…');
+      // 段階1：削除済みデータを物理削除
+      purgeRemovedData();
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+        console.warn('削除済みデータを整理して保存成功');
+      } catch(e2) {
+        // 段階2：1年以上前の来店ログを削除
+        trimOldVisitLogs(365);
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+          console.warn('古い来店ログ（1年以上前）を整理して保存成功');
+        } catch(e3) {
+          // 段階3：6ヶ月以上前の来店ログを削除
+          trimOldVisitLogs(180);
+          try {
+            localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+            console.warn('古い来店ログ（6ヶ月以上前）を整理して保存成功');
+          } catch(e4) {
+            console.error('persistSave failed: 容量を空けられませんでした', e4);
+            // ユーザーに一度だけ警告
+            if (!_quotaWarned) {
+              _quotaWarned = true;
+              setTimeout(() => {
+                alert('⚠️ 端末の保存容量がいっぱいです。\n\n設定 →「🗄 データ容量の整理」から古い来店履歴を削除してください。\n\n※サーバーにバックアップされているため、データはすぐには失われませんが、新しい記録が保存できない状態です。まず設定からバックアップDLをおすすめします。');
+              }, 500);
+            }
+          }
+        }
+      }
+    } else {
+      console.error('persistSave failed', e);
+    }
   }
   // サーバー同期があれば送信
   scheduleServerSave();
@@ -2552,9 +2666,32 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.01';
+const APP_VERSION = '2026.06.06';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.06',
+    date: '2026-06-06',
+    title: '💾 保存容量エラーの対策',
+    items: [
+      '「QuotaExceededError（保存容量オーバー）」が出る問題に対応しました。来店履歴が増えて端末の保存領域が上限に達したのが原因です。',
+      '【自動対策】保存に失敗した時、自動で「削除済みデータの消去」→「古い来店履歴の削除」を順に試して、記録が保存できるよう復旧します。',
+      '【手動整理】設定に「🗄 データ容量の整理」を追加。現在の使用量が見られ、削除済みデータの消去・古い来店履歴（6ヶ月/1年以上前）の削除ができます。',
+      '【お願い】整理する前に、必ず設定の「📥 バックアップDL」でデータを保存してください。',
+      '※ データはサーバーにもバックアップされているため、すぐには失われません。',
+    ],
+  },
+  {
+    version: '2026.06.01b',
+    date: '2026-06-01',
+    title: '🛠 動作の安定性を改善',
+    items: [
+      '【重要】動作が不安定になる原因を2つ修正しました。',
+      '①タイマーの多重起動を防止：ログイン操作が重なっても内部の時計処理が1つだけになるよう修正（時間が経つと重くなる現象の対策）。',
+      '②編集中の同期割り込みを停止：モーダル（入店・予約・顧客編集など）を開いている間はサーバーからの自動更新を一時停止。編集途中で画面がちらついたり入力が飛ぶのを防ぎます。閉じれば自動で同期再開します。',
+      'セキュリティ点検も実施：危険なコード実行なし、入力値のエスケープ処理も全機能で適切に行われていることを確認しました。',
+    ],
+  },
   {
     version: '2026.06.01',
     date: '2026-06-01',
@@ -3352,7 +3489,18 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 });
 
 // ---------- Init ----------
+let _appInitialized = false;
+let _mainTickTimer = null;
+let _clockTimer = null;
 function initApp() {
+  // 二重初期化ガード：タイマーやリスナーの多重登録を防ぐ
+  // （ログイン操作が複数回行われても初期化は一度だけ）
+  if (_appInitialized) {
+    // 再表示時は最新状態を描画するだけ
+    try { renderFloor(); } catch(e) {}
+    return;
+  }
+  _appInitialized = true;
   // 旧データのマイグレーション（P1/P2 → WASHITSU/YOSHITSU）
   if (state.tables && state.tables.P1 && !state.tables.WASHITSU) {
     state.tables.WASHITSU = state.tables.P1;
@@ -3393,12 +3541,15 @@ function initApp() {
   }
   // タイマー更新：アラート判定は常時走らせる（他タブを見ていてもPush通知が届くように）。
   // 画面のタイマー表示更新はフロアタブ表示時のみ。
-  setInterval(() => {
+  // 既存タイマーがあればクリア（多重登録防止）
+  if (_mainTickTimer) clearInterval(_mainTickTimer);
+  _mainTickTimer = setInterval(() => {
     const onFloor = document.getElementById('page-floor').classList.contains('active');
     updateTableTimers(onFloor);
   }, 1000);
   // 1分ごとに時計
-  setInterval(updateFloorClock, 60000);
+  if (_clockTimer) clearInterval(_clockTimer);
+  _clockTimer = setInterval(updateFloorClock, 60000);
   updateFloorClock();
   // アップデート告知ポップアップ（新リリースがあるときだけ表示）
   setTimeout(() => {
@@ -9103,6 +9254,50 @@ function renderSettings() {
   renderEventListUI();
   const vEl = document.getElementById('curAppVersion');
   if (vEl) vEl.textContent = APP_VERSION;
+  refreshStorageUsage();
+}
+
+// データ容量の表示
+function refreshStorageUsage() {
+  const el = document.getElementById('storageUsageInfo');
+  if (!el) return;
+  const bytes = estimateStorageBytes();
+  const mb = (bytes / 1024 / 1024);
+  // 一般的なlocalStorage上限は5MB（端末により10MB程度）
+  const LIMIT_MB = 5;
+  const pct = Math.min(100, Math.round(mb / LIMIT_MB * 100));
+  const visitCount = Array.isArray(state.visitLog) ? state.visitLog.filter(v=>!v.removed).length : 0;
+  const removedCount = Array.isArray(state.visitLog) ? state.visitLog.filter(v=>v.removed).length : 0;
+  const custCount = Array.isArray(state.customers) ? state.customers.filter(c=>!c.removed).length : 0;
+  let barColor = pct >= 90 ? '#c0392b' : (pct >= 70 ? '#d4a017' : '#5a9c5a');
+  el.innerHTML = `
+    <div style="margin-bottom:6px;">使用量の目安：<b style="color:${barColor};">${mb.toFixed(2)} MB</b> / 約${LIMIT_MB}MB（${pct}%）</div>
+    <div style="background:#eee; border-radius:6px; height:10px; overflow:hidden; margin-bottom:8px;">
+      <div style="width:${pct}%; height:100%; background:${barColor};"></div>
+    </div>
+    <div style="font-size:12px; color:#666;">来店履歴：${visitCount}件${removedCount>0?`（削除済み ${removedCount}件）`:''} ／ 顧客：${custCount}名</div>
+    ${pct >= 80 ? '<div style="margin-top:8px; padding:8px; background:#fdecea; border-radius:6px; color:#c0392b; font-size:12px;">⚠️ 容量が逼迫しています。バックアップ後、下の整理機能をお使いください。</div>' : ''}
+  `;
+}
+
+function manualPurgeRemoved() {
+  if (!confirm('画面に表示されない「削除済み」データを完全に消去します。\n（表示中のデータは消えません）\n\nバックアップは取りましたか？')) return;
+  const n = purgeRemovedData();
+  persistSave();
+  refreshStorageUsage();
+  alert(`削除済みデータ ${n} 件を消去しました。`);
+}
+
+function manualTrimOldLogs(days) {
+  const label = days >= 365 ? '1年' : '6ヶ月';
+  if (!confirm(`${label}以上前の来店履歴を削除します。\n顧客情報・ボトル・キャストは消えません。\n\nバックアップは取りましたか？この操作は元に戻せません。`)) return;
+  const n = trimOldVisitLogs(days);
+  persistSave();
+  refreshStorageUsage();
+  if (typeof renderTodaySummary === 'function' && document.getElementById('page-today')?.classList.contains('active')) {
+    renderTodaySummary();
+  }
+  alert(`${label}以上前の来店履歴 ${n} 件を削除しました。`);
 }
 // 通知設定UIにロード＆バインド
 function loadNotifPrefsUI() {
@@ -10160,16 +10355,20 @@ function applyServerData(payload) {
     cleanupChanged = cleanupAndSeedOrderMaster({ skipSeed: true });
   }
   // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
-  try { localStorage.setItem(LS_KEY, JSON.stringify({
-    pin: state.pin, casts: state.casts, staff: state.staff,
-    customers: state.customers, tables: state.tables, shiftData: state.shiftData,
-    reservations: state.reservations,
-    visitLog: state.visitLog,
-    events: state.events,
-    menuItems: state.menuItems,
-    menuCategories: state.menuCategories,
-    _updatedAt: Date.now()
-  })); } catch(e) {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+  } catch(e) {
+    if (isQuotaError(e)) {
+      // 容量超過時は削除済みデータと古いログを整理して再試行
+      purgeRemovedData();
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+      } catch(e2) {
+        trimOldVisitLogs(180);
+        try { localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData())); } catch(e3) {}
+      }
+    }
+  }
   // クリーンアップで変更があったら、サーバーにも反映（他端末も整理されるよう）
   if (cleanupChanged) {
     setTimeout(() => { try { scheduleServerSave(); } catch(e){} }, 1000);
@@ -10336,6 +10535,13 @@ function startPolling() {
 }
 async function doPoll() {
   if (!server.url || !server.token) return;
+  // モーダルで編集中はサーバー受信の適用を保留する。
+  // 編集途中にデータが書き換わると、入力が飛んだり画面がちらつく原因になるため。
+  // モーダルを閉じれば次回のpoll（最大15秒後）で同期される。
+  if (document.querySelector('.modal-bg.active')) {
+    setSyncDot(true, '編集中（同期保留）');
+    return;
+  }
   try {
     const res = await fetch(server.url + '/get', {
       method: 'GET',
