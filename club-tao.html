@@ -2711,9 +2711,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.06b';
+const APP_VERSION = '2026.06.07';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.07',
+    date: '2026-06-07',
+    title: '🔧 同期の巻き戻りバグ・通知の重要修正',
+    items: [
+      '【最重要】退店したのに復活する／予約から入店すると別の顧客に変わる、の原因を修正しました。',
+      '原因：複数端末でデータを保存する際、古いデータを持つ端末が送信すると、他端末の新しい変更（退店・顧客変更など）を上書きしていました。',
+      '対策：サーバーへ保存する前に必ず最新データを取り込んでから送信する方式に変更。古いデータで上書きしなくなります。',
+      '【予約入店】予約から入店した時に、複数のお客様（合流含む）が正しく引き継がれるようにしました。',
+      '【入店通知】通知が来なくなる問題に対応。起動時・画面復帰時にPush購読の生存を確認し、切れていたら自動で再登録します（iOSで購読が無効化される対策）。',
+      '※通知が来ない端末は、一度アプリを開き直すと購読が再登録されます。設定のテストPushでも確認できます。',
+    ],
+  },
   {
     version: '2026.06.06b',
     date: '2026-06-06',
@@ -3603,6 +3616,10 @@ function initApp() {
   setTimeout(() => {
     try { clearStaleNotifications(); } catch(e) {}
   }, 2000);
+  // 起動時にPush購読の生存を確認し、切れていたら再登録（入店通知が来ない問題の対策）
+  setTimeout(() => {
+    try { ensurePushSubscription(); } catch(e) {}
+  }, 3000);
 }
 
 function updateFloorClock() {
@@ -8676,8 +8693,10 @@ function proceedCheckInFromReservation(r, tableId) {
     guests: r.guests || 1,
     castIds: r.castIds || [],
     castNoms: r.castNoms || {},
+    dohanCastIds: r.dohanCastIds || [],
     castFree: r.castFree || '',
     memo: r.memo || '',
+    guestList: Array.isArray(r.guestList) && r.guestList.length > 0 ? r.guestList : null,
   });
 
   // 予約をdone扱い
@@ -9685,6 +9704,46 @@ async function testPushNotification() {
   }
 }
 
+// 購読の生存確認＆自動再登録（iOS等で購読が無効化される問題への対策）
+// 以前に通知を有効化していたのに購読が消えている/変わっている場合、静かに再登録する。
+// これをしないと「入店通知が来ない」状態になる（購読切れに気づけない）。
+async function ensurePushSubscription() {
+  try {
+    if (!server.url || !server.token) return;
+    if (!pushState || !pushState.subscribed) return; // 元々有効にしていない端末はスキップ
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      // 購読が消えている → VAPID鍵を取得して再購読
+      const vapidRes = await fetch(server.url.replace(/\/$/, '') + '/vapid-key');
+      const vapidJson = await vapidRes.json();
+      if (!vapidJson.publicKey) return;
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidJson.publicKey),
+      });
+    }
+    // 現在の購読をサーバーに（再）登録：endpointが変わっていても最新に更新される
+    const subJson = sub.toJSON();
+    const deviceName = navigator.userAgent.includes('Mobile') ? 'Mobile' : 'PC';
+    await fetch(server.url.replace(/\/$/, '') + '/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': server.token },
+      body: JSON.stringify({
+        deviceId: pushState.deviceId,
+        deviceName: deviceName + ' ' + (new Date()).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+        subscription: subJson,
+      }),
+    });
+    pushState.subscription = subJson;
+    savePushState();
+    console.log('Push購読を確認・再登録しました');
+  } catch(e) {
+    console.warn('ensurePushSubscription failed', e);
+  }
+}
+
 // 入退店・予約追加時にWeb Pushを発火（バックグラウンド配信）
 function dispatchPushNotification(payload) {
   if (!server.url || !server.token) return;
@@ -10532,10 +10591,122 @@ function buildSaveData() {
     _updatedAt: Date.now()
   };
 }
+// サーバーpayloadを _updated 比較でローカルstateに静かにマージ（再描画・通知なし）
+// saveToServer の前に呼び、自分の古いデータで他端末の新しい変更を上書きするのを防ぐ。
+// （退店の復活・予約/顧客の巻き戻りの根本対策）
+function mergeServerPayload(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  // テーブル：_updated が新しい方を採用
+  if (payload.tables && typeof payload.tables === 'object') {
+    Object.keys(payload.tables).forEach(tid => {
+      const incoming = payload.tables[tid];
+      const current = state.tables[tid];
+      if (!current) { state.tables[tid] = incoming; return; }
+      if ((incoming._updated || 0) >= (current._updated || 0)) {
+        state.tables[tid] = incoming;
+      }
+    });
+  }
+  // シフト：キー単位 _u 比較
+  if (payload.shiftData && typeof payload.shiftData === 'object') {
+    Object.keys(payload.shiftData).forEach(k => {
+      const remote = payload.shiftData[k];
+      const local = state.shiftData[k];
+      const ru = (remote && typeof remote === 'object' && remote._u) ? remote._u : 0;
+      const lu = (local && typeof local === 'object' && local._u) ? local._u : 0;
+      if (ru >= lu) state.shiftData[k] = remote;
+    });
+  }
+  // 顧客：_updated 比較
+  if (Array.isArray(payload.customers)) {
+    payload.customers.forEach(rc => {
+      const idx = state.customers.findIndex(c => c.id === rc.id);
+      if (idx >= 0) {
+        if ((rc._updated || 0) >= (state.customers[idx]._updated || 0)) state.customers[idx] = rc;
+      } else state.customers.push(rc);
+    });
+  }
+  // 予約：_updated 比較
+  if (Array.isArray(payload.reservations)) {
+    payload.reservations.forEach(rr => {
+      const idx = state.reservations.findIndex(r => r.id === rr.id);
+      if (idx >= 0) {
+        if ((rr._updated || 0) >= (state.reservations[idx]._updated || 0)) state.reservations[idx] = rr;
+      } else state.reservations.push(rr);
+    });
+  }
+  // 来店ログ：_updated 比較（removed も尊重）
+  if (Array.isArray(payload.visitLog)) {
+    if (!Array.isArray(state.visitLog)) state.visitLog = [];
+    payload.visitLog.forEach(rl => {
+      const idx = state.visitLog.findIndex(x => x.id === rl.id);
+      if (idx >= 0) {
+        const localTs = state.visitLog[idx]._updated || state.visitLog[idx]._created || 0;
+        const remoteTs = rl._updated || rl._created || 0;
+        if (remoteTs >= localTs) state.visitLog[idx] = rl;
+      } else state.visitLog.push(rl);
+    });
+  }
+  // イベント
+  if (Array.isArray(payload.events)) {
+    if (!Array.isArray(state.events)) state.events = [];
+    payload.events.forEach(re => {
+      const idx = state.events.findIndex(e => e.id === re.id);
+      if (idx >= 0) {
+        if ((re._updated || 0) >= (state.events[idx]._updated || 0)) state.events[idx] = re;
+      } else state.events.push(re);
+    });
+  }
+  // メニュー商品マスタ（ローカル削除を尊重）
+  if (Array.isArray(payload.menuItems)) {
+    if (!Array.isArray(state.menuItems)) state.menuItems = [];
+    payload.menuItems.forEach(rm => {
+      const idx = state.menuItems.findIndex(m => m.id === rm.id);
+      if (idx >= 0) {
+        const local = state.menuItems[idx];
+        if (local.removed && !rm.removed) rm = { ...rm, removed: true, _updated: Math.max(local._updated||0, rm._updated||0) };
+        if ((rm._updated || 0) >= (local._updated || 0)) state.menuItems[idx] = rm;
+      } else state.menuItems.push(rm);
+    });
+  }
+  // メニューカテゴリマスタ
+  if (Array.isArray(payload.menuCategories)) {
+    if (!Array.isArray(state.menuCategories)) state.menuCategories = [];
+    payload.menuCategories.forEach(rc => {
+      const idx = state.menuCategories.findIndex(c => c.id === rc.id);
+      if (idx >= 0) {
+        const local = state.menuCategories[idx];
+        if (local.removed && !rc.removed) rc = { ...rc, removed: true, _updated: Math.max(local._updated||0, rc._updated||0) };
+        if ((rc._updated || 0) >= (local._updated || 0)) state.menuCategories[idx] = rc;
+      } else state.menuCategories.push(rc);
+    });
+  }
+}
+
 async function saveToServer() {
   if (!server.url || !server.token) return;
-  const payload = buildSaveData();
   try {
+    // ★ read-modify-write：送信前に最新サーバーデータを取り込む
+    // これをしないと、古いデータを持つ端末の送信で他端末の変更（退店・顧客変更等）が消える
+    try {
+      const getRes = await fetch(server.url + '/get', {
+        method: 'GET',
+        headers: { 'X-Auth-Token': server.token }
+      });
+      if (getRes.ok) {
+        const sd = await getRes.json();
+        if (sd && sd.payload) {
+          mergeServerPayload(sd.payload);
+          // マージ結果をローカルにも反映保存
+          try { localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData())); } catch(e) {}
+        }
+      }
+    } catch(getErr) {
+      // GET失敗時はマージをスキップ（オフライン等）。PUTも失敗する可能性が高い。
+      console.warn('saveToServer: pre-merge GET failed', getErr);
+    }
+    // マージ後の最新stateを送信
+    const payload = buildSaveData();
     const res = await fetch(server.url + '/set', {
       method: 'POST',
       headers: {
@@ -10623,6 +10794,8 @@ window.addEventListener('visibilitychange', () => {
     try { updateTableTimers(false); } catch(e) {}
     // 古い通知（30分以上前のもの）を自動的に閉じる
     try { clearStaleNotifications(); } catch(e) {}
+    // Push購読の生存を確認（営業中の購読切れに対応）
+    try { ensurePushSubscription(); } catch(e) {}
     // フロアタブ表示中なら画面も再描画
     const onFloor = document.getElementById('page-floor')?.classList.contains('active');
     if (onFloor) renderFloor();
