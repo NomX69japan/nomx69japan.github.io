@@ -290,6 +290,24 @@
     pointer-events: none;
   }
 
+  .hero-tategaki {
+    position: absolute;
+    top: 50%;
+    left: 2.2rem;
+    transform: translateY(-50%);
+    writing-mode: vertical-rl;
+    font-family: 'Noto Serif JP', serif;
+    font-weight: 300;
+    font-size: 0.95rem;
+    letter-spacing: 0.45em;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 12px rgba(0,0,0,0.35);
+    z-index: 2;
+    opacity: 0;
+    animation: fadeIn 1.8s 1.6s forwards;
+    pointer-events: none;
+  }
+
   /* ── RULE LINES ── */
   .rule {
     width: 100%;
@@ -569,17 +587,66 @@
   footer {
     background: var(--ink);
     border-top: 1px solid rgba(245,240,232,0.08);
-    padding: 2rem 4rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    padding: 3.5rem 4rem 2rem;
   }
 
-  footer p {
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.3rem;
+    color: var(--paper);
+    margin-bottom: 0.6rem;
+  }
+
+  .footer-tagline {
+    font-size: 0.82rem;
+    color: rgba(245,240,232,0.45);
+    letter-spacing: 0.03em;
+  }
+
+  .footer-nav {
+    display: flex;
+    gap: 1.8rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-nav a {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    color: rgba(245,240,232,0.5);
+    text-decoration: none;
+    text-transform: uppercase;
+    transition: color 0.3s;
+  }
+
+  .footer-nav a:hover { color: var(--accent); }
+
+  .footer-bottom {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(245,240,232,0.07);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .footer-bottom p {
     font-family: 'Space Mono', monospace;
     font-size: 0.58rem;
     letter-spacing: 0.2em;
-    color: rgba(245,240,232,0.2);
+    color: rgba(245,240,232,0.25);
   }
 
   /* ── SCROLL REVEAL (enhanced) ── */
@@ -1286,10 +1353,13 @@
     .contact-section { padding: 4rem 1.5rem; }
     .contact-inner { grid-template-columns: 1fr; gap: 2.5rem; }
     .contact-heading { font-size: clamp(2rem, 8vw, 3rem); }
-    footer { padding: 1.5rem; flex-direction: column; gap: 0.8rem; text-align: center; }
+    footer { padding: 2.5rem 1.5rem 1.5rem; }
+    .footer-inner { flex-direction: column; }
+    .footer-bottom { flex-direction: column; text-align: left; }
     .scroll-indicator { display: none; }
     .hero-left::before { display: none; }
     .section-indicator { display: none; }
+    .hero-tategaki { left: 1.2rem; font-size: 0.8rem; letter-spacing: 0.35em; }
   }
 
   @media (max-width: 480px) {
@@ -1357,6 +1427,7 @@
         id="hero-img"
         data-photoset="hero"
       >
+      <p class="hero-tategaki">十年後の身体は、今日つくられる</p>
       <div class="hero-year-marker">NomX</div>
     </div>
   </div>
@@ -1625,8 +1696,23 @@
 </div>
 
 <footer>
-  <p>© 2026 <strong>NomX</strong> — 野村達也 Body Design Studio. All rights reserved.</p>
-  <p>Kyoto, Japan</p>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <p class="footer-logo">Nom<span style="color:var(--accent);">X</span></p>
+      <p class="footer-tagline">10年後も、今より動ける身体であるために。</p>
+    </div>
+    <div class="footer-nav">
+      <a href="#philosophy">Philosophy</a>
+      <a href="#about">About</a>
+      <a href="#fee">Fee</a>
+      <a href="#contact">Contact</a>
+      <a href="nomx-lp.html">AI業務改善</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 <strong>NomX</strong> 野村達也 Body Design Studio</p>
+    <p>Kyoto, Japan</p>
+  </div>
 </footer>
 
 <script>
