@@ -222,6 +222,27 @@
   }
   .hero-trust .check { color: var(--green); font-weight: 900; }
 
+  .hero-trust-row {
+    margin-top: 2.2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+  .trust-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--ink);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  }
+  .trust-tag .check { color: var(--green); font-weight: 900; }
+
   /* ── SECTION COMMON ── */
   section { padding: 5rem 0; position: relative; }
   .sec-label {
@@ -510,6 +531,56 @@
   .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.9s cubic-bezier(0.22,1,0.36,1), transform 0.9s cubic-bezier(0.22,1,0.36,1); }
   .reveal.visible { opacity: 1; transform: none; }
 
+  /* ── FAQ ── */
+  .faq { background: var(--cream); }
+  .faq-list {
+    max-width: 760px;
+    display: grid;
+    gap: 0.8rem;
+  }
+  .faq-item {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+  .faq-item[open] {
+    border-color: var(--orange);
+    box-shadow: 0 6px 20px rgba(240,138,60,0.08);
+  }
+  .faq-item summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 1.2rem 3rem 1.2rem 1.4rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--navy);
+    position: relative;
+    user-select: none;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after {
+    content: '+';
+    position: absolute;
+    right: 1.3rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: var(--orange);
+    transition: transform 0.3s;
+  }
+  .faq-item[open] summary::after {
+    transform: translateY(-50%) rotate(45deg);
+  }
+  .faq-item p {
+    padding: 0 1.4rem 1.3rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+
   /* ── LP CROSS LINK ── */
   .lp-cross {
     background: var(--green-soft);
@@ -628,7 +699,11 @@
       <a href="#consult" class="btn-primary">今の困りごとを相談する <span class="arr">→</span></a>
       <a href="#examples" class="btn-secondary">NomXの改善事例を見る</a>
     </div>
-    <p class="hero-trust"><span class="check">✓</span> 大きなシステムは不要。今ある道具と現場に合わせて、小さく始められます。</p>
+    <div class="hero-trust-row">
+      <span class="trust-tag"><span class="check">✓</span> 相談は何度でも無料</span>
+      <span class="trust-tag"><span class="check">✓</span> オンラインで全国対応</span>
+      <span class="trust-tag"><span class="check">✓</span> 小さく始めて育てる方式</span>
+    </div>
   </div>
 </section>
 
@@ -745,6 +820,36 @@
 </section>
 
 <!-- CONSULT / FORM -->
+<!-- FAQ -->
+<section class="faq" id="faq">
+  <div class="wrap">
+    <p class="sec-label reveal">FAQ</p>
+    <h2 class="sec-title reveal">よくあるご質問</h2>
+    <div class="faq-list">
+      <details class="faq-item reveal">
+        <summary>パソコンやAIに詳しくなくても大丈夫ですか？</summary>
+        <p>まったく問題ありません。専門用語は使わず、現場のことばでお話しします。「何がわからないかもわからない」状態からのご相談がほとんどです。</p>
+      </details>
+      <details class="faq-item reveal">
+        <summary>相談したら、必ず依頼しないといけませんか？</summary>
+        <p>いいえ。相談だけで終わっても大丈夫です。話して頭の中が整理されるだけでも意味があると考えています。無理な営業は一切しません。</p>
+      </details>
+      <details class="faq-item reveal">
+        <summary>費用はどれくらいかかりますか？</summary>
+        <p>内容によって異なるため、課題を伺ったうえでお見積もりします。「小さく作って、使いながら育てる」方針なので、最初から大きな費用はかかりません。</p>
+      </details>
+      <details class="faq-item reveal">
+        <summary>遠方でも対応してもらえますか？</summary>
+        <p>オンラインでの相談・制作は全国対応しています。現場確認が必要な場合は、地域や内容に応じてご相談させてください。</p>
+      </details>
+      <details class="faq-item reveal">
+        <summary>どんな業種でも相談できますか？</summary>
+        <p>飲食、美容、治療院、フィットネス、小売など、小規模店舗・個人事業主の方ならどんな業種でも歓迎です。現場に流れがある仕事なら、改善の余地は必ずあります。</p>
+      </details>
+    </div>
+  </div>
+</section>
+
 <section class="consult" id="consult">
   <div class="wrap">
     <p class="sec-label reveal">Consultation</p>
