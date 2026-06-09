@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>NomX｜小さなお店の「ちょっと困った」を、AIとアプリで形にします</title>
+<meta name="description" content="予約管理・顧客管理・SNS発信・日々の記録。現場の声を聞きながら、無理なく使える仕組みを一緒に作ります。必要なら実際の現場に入って業務の流れまで確認。小規模店舗・個人事業主向けの現場密着型AI業務改善パートナー、NomX。まずは無料相談から。">
+<meta name="keywords" content="業務改善,AI,WEBアプリ制作,小規模店舗,個人事業主,予約管理,顧客管理,DX,無料相談,NomX">
+<meta name="robots" content="index, follow">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="NomX｜小さなお店の「ちょっと困った」をAIとアプリで形に">
+<meta property="og:description" content="現場の声を聞きながら、無理なく使える仕組みを一緒に作ります。まずは無料相談から。">
+<meta property="og:locale" content="ja_JP">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --navy: #1c3d5a;
+    --navy-deep: #16314a;
+    --orange: #f08a3c;
+    --orange-soft: #fbeadb;
+    --green: #5b9279;
+    --green-soft: #e6f0eb;
+    --cream: #fbf8f3;
+    --paper: #ffffff;
+    --ink: #2b2b2b;
+    --muted: #6b6b6b;
+    --line: #ece7df;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4.5rem;
+  }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--ink);
+    background: var(--cream);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  h1, h2, h3 { font-family: 'BIZ UDPGothic', 'Noto Sans JP', sans-serif; font-weight: 700; line-height: 1.4; letter-spacing: 0.01em; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ── STICKY HEADER ── */
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0.8rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-family: 'BIZ UDPGothic', 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    letter-spacing: -0.01em;
+    color: var(--navy);
+    text-decoration: none;
+  }
+  .logo span { color: var(--orange); }
+  .header-cta {
+    background: var(--orange);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 100px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+  }
+  .header-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(240,138,60,0.3); }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 7rem 0 4rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -10%; right: -8%;
+    width: 480px; height: 480px;
+    background: var(--orange-soft);
+    border-radius: 47% 53% 60% 40% / 45% 50% 50% 55%;
+    z-index: 0;
+    animation: blob 14s ease-in-out infinite;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -15%; left: -10%;
+    width: 380px; height: 380px;
+    background: var(--green-soft);
+    border-radius: 53% 47% 40% 60% / 55% 45% 55% 45%;
+    z-index: 0;
+    animation: blob 18s ease-in-out infinite reverse;
+  }
+  @keyframes blob {
+    0%, 100% { transform: translate(0,0) rotate(0deg); }
+    50% { transform: translate(15px,-20px) rotate(8deg); }
+  }
+  .hero-inner { position: relative; z-index: 2; max-width: 760px; }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--navy);
+    border: none;
+    border-radius: 100px;
+    padding: 0.5rem 1.2rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 1.8rem;
+    box-shadow: 0 4px 14px rgba(28,61,90,0.18);
+    letter-spacing: 0.02em;
+  }
+  .hero-badge::before {
+    content: '';
+    width: 7px; height: 7px;
+    background: var(--orange);
+    border-radius: 50%;
+    animation: ping 2s infinite;
+  }
+  @keyframes ping {
+    0% { box-shadow: 0 0 0 0 rgba(240,138,60,0.6); }
+    70% { box-shadow: 0 0 0 8px rgba(240,138,60,0); }
+    100% { box-shadow: 0 0 0 0 rgba(240,138,60,0); }
+  }
+  .hero h1 {
+    font-size: clamp(1.8rem, 5.5vw, 3.2rem);
+    color: var(--navy);
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.005em;
+    font-weight: 700;
+  }
+  .hero h1 .hl {
+    position: relative;
+    display: inline-block;
+    color: var(--orange);
+  }
+  .hero h1 .hl::after {
+    content: '';
+    position: absolute;
+    bottom: 0.05em; left: -2px; right: -2px;
+    height: 0.35em;
+    background: rgba(240,138,60,0.18);
+    z-index: -1;
+    border-radius: 4px;
+  }
+  .hero-sub {
+    font-size: clamp(0.95rem, 2.5vw, 1.12rem);
+    color: var(--muted);
+    margin-bottom: 2.4rem;
+    max-width: 620px;
+  }
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+  .btn-primary {
+    background: var(--orange);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1.02rem;
+    padding: 1rem 2.2rem;
+    border-radius: 100px;
+    box-shadow: 0 8px 24px rgba(240,138,60,0.28);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(240,138,60,0.4); }
+  .btn-primary .arr { transition: transform 0.2s; }
+  .btn-primary:hover .arr { transform: translateX(4px); }
+  .btn-secondary {
+    color: var(--navy);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--navy); }
+  .hero-trust {
+    margin-top: 2.2rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .hero-trust .check { color: var(--green); font-weight: 900; }
+
+  /* ── SECTION COMMON ── */
+  section { padding: 5rem 0; position: relative; }
+  .sec-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--orange);
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+  }
+  .sec-title {
+    font-size: clamp(1.5rem, 4vw, 2.3rem);
+    color: var(--navy);
+    margin-bottom: 1rem;
+  }
+  .sec-intro { color: var(--muted); font-size: 1rem; max-width: 640px; margin-bottom: 3rem; }
+
+  /* ── PROBLEM ── */
+  .problem { background: var(--paper); }
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+  }
+  .problem-card {
+    background: var(--cream);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 1.8rem 1.5rem;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .problem-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(28,61,90,0.08); }
+  .problem-icon {
+    font-size: 1.6rem;
+    margin-bottom: 0.8rem;
+    display: block;
+  }
+  .problem-card p { font-size: 0.95rem; font-weight: 500; color: var(--ink); }
+
+  /* ── SOLUTION ── */
+  .solution { background: var(--navy); color: #fff; overflow: hidden; }
+  .solution::before {
+    content: '';
+    position: absolute;
+    top: -20%; right: -5%;
+    width: 360px; height: 360px;
+    background: rgba(240,138,60,0.12);
+    border-radius: 50%;
+    filter: blur(20px);
+  }
+  .solution .sec-label { color: var(--orange); }
+  .solution .sec-title { color: #fff; }
+  .solution-lead {
+    font-size: clamp(1.1rem, 3vw, 1.5rem);
+    font-weight: 700;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 2;
+  }
+  .solution-lead .accent { color: var(--orange); }
+  .solution-body {
+    color: rgba(255,255,255,0.8);
+    font-size: 1rem;
+    max-width: 680px;
+    position: relative;
+    z-index: 2;
+  }
+  .solution-points {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin-top: 2.5rem;
+    position: relative;
+    z-index: 2;
+  }
+  .sol-chip {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 100px;
+    padding: 0.6rem 1.3rem;
+    font-size: 0.88rem;
+    font-weight: 500;
+  }
+
+  /* ── FLOW ── */
+  .flow-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    counter-reset: step;
+  }
+  .flow-step {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 1.8rem 1.5rem;
+    position: relative;
+    counter-increment: step;
+    transition: transform 0.3s, border-color 0.3s;
+  }
+  .flow-step:hover { transform: translateY(-4px); border-color: var(--orange); }
+  .flow-step::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: 'BIZ UDPGothic', 'Noto Sans JP', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--orange-soft);
+    display: block;
+    line-height: 1;
+    margin-bottom: 0.6rem;
+  }
+  .flow-step h3 { font-size: 1.05rem; color: var(--navy); margin-bottom: 0.4rem; }
+  .flow-step p { font-size: 0.86rem; color: var(--muted); }
+
+  /* ── EXAMPLES ── */
+  .examples { background: var(--green-soft); }
+  .ex-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.4rem;
+  }
+  .ex-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 2rem 1.6rem;
+    box-shadow: 0 8px 24px rgba(28,61,90,0.06);
+    transition: transform 0.3s, box-shadow 0.3s;
+    border-top: 4px solid var(--green);
+  }
+  .ex-card:nth-child(2) { border-top-color: var(--orange); }
+  .ex-card:nth-child(3) { border-top-color: var(--navy); }
+  .ex-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(28,61,90,0.12); }
+  .ex-card h3 { font-size: 1.15rem; color: var(--navy); margin-bottom: 1rem; }
+  .ex-card ul { list-style: none; }
+  .ex-card li {
+    font-size: 0.9rem;
+    color: var(--ink);
+    padding: 0.4rem 0 0.4rem 1.5rem;
+    position: relative;
+  }
+  .ex-card li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--green);
+    font-weight: 900;
+  }
+  .ex-card:nth-child(2) li::before { color: var(--orange); }
+  .ex-card:nth-child(3) li::before { color: var(--navy); }
+  .ex-note {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--line);
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--green);
+    font-weight: 500;
+  }
+
+  /* ── WHY ── */
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem 3rem;
+  }
+  .why-item { display: flex; gap: 1rem; align-items: flex-start; }
+  .why-num {
+    flex-shrink: 0;
+    width: 38px; height: 38px;
+    background: var(--orange);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'BIZ UDPGothic', 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .why-item h3 { font-size: 1.05rem; color: var(--navy); margin-bottom: 0.3rem; }
+  .why-item p { font-size: 0.9rem; color: var(--muted); }
+
+  /* ── CONSULT / FORM ── */
+  .consult { background: var(--paper); }
+  .consult-check {
+    background: var(--orange-soft);
+    border-radius: 16px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .consult-check h3 { font-size: 1.05rem; color: var(--navy); margin-bottom: 1rem; }
+  .consult-check ul { list-style: none; display: grid; grid-template-columns: repeat(2,1fr); gap: 0.6rem; }
+  .consult-check li { font-size: 0.92rem; padding-left: 1.6rem; position: relative; }
+  .consult-check li::before {
+    content: '?';
+    position: absolute; left: 0;
+    width: 20px; height: 20px;
+    background: var(--orange);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    top: 4px;
+  }
+  form { display: grid; gap: 1.2rem; max-width: 640px; }
+  .field label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 0.4rem;
+  }
+  .field label .req { color: var(--orange); font-size: 0.75rem; margin-left: 0.3rem; }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: var(--cream);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--orange);
+    background: #fff;
+  }
+  .field textarea { resize: vertical; min-height: 110px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+  .submit-btn {
+    background: var(--orange);
+    color: #fff;
+    border: none;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 1.1rem;
+    border-radius: 100px;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(240,138,60,0.28);
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-top: 0.5rem;
+  }
+  .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(240,138,60,0.4); }
+  .form-note { font-size: 0.78rem; color: var(--muted); text-align: center; }
+
+  /* ── FINAL CTA ── */
+  .final-cta {
+    background: var(--navy);
+    color: #fff;
+    text-align: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .final-cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(240,138,60,0.15), transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(91,146,121,0.15), transparent 50%);
+  }
+  .final-cta h2 {
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    margin-bottom: 1rem;
+    position: relative;
+    z-index: 2;
+  }
+  .final-cta p { color: rgba(255,255,255,0.8); margin-bottom: 2.2rem; position: relative; z-index: 2; }
+  .final-cta .btn-primary { position: relative; z-index: 2; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--navy-deep);
+    color: rgba(255,255,255,0.6);
+    padding: 2.5rem 0;
+    text-align: center;
+    font-size: 0.82rem;
+  }
+  footer .logo { font-size: 1.2rem; margin-bottom: 0.6rem; display: inline-block; }
+  footer .logo span { color: var(--orange); }
+
+  /* ── REVEAL ── */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.9s cubic-bezier(0.22,1,0.36,1), transform 0.9s cubic-bezier(0.22,1,0.36,1); }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── LP CROSS LINK ── */
+  .lp-cross {
+    background: var(--green-soft);
+    padding: 3.5rem 0;
+  }
+  .lp-cross-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .lp-cross-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--green);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+  .lp-cross-title {
+    font-family: 'BIZ UDPGothic', 'Noto Sans JP', sans-serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--navy);
+    margin-bottom: 0.4rem;
+  }
+  .lp-cross-desc {
+    font-size: 0.88rem;
+    color: var(--muted);
+    max-width: 480px;
+  }
+  .lp-cross-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--navy);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.9rem 1.6rem;
+    border-radius: 100px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .lp-cross-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(28,61,90,0.25);
+  }
+  @media (max-width: 600px) {
+    .lp-cross-inner { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* ── MOBILE STICKY CTA ── */
+  .mobile-cta {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 0.8rem 1rem;
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line);
+    z-index: 99;
+  }
+  .mobile-cta a {
+    display: block;
+    background: var(--orange);
+    color: #fff;
+    text-decoration: none;
+    text-align: center;
+    font-weight: 700;
+    padding: 0.9rem;
+    border-radius: 100px;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 880px) {
+    .problem-grid, .flow-steps, .ex-grid { grid-template-columns: 1fr 1fr; }
+    .why-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .header-cta { display: none; }
+    section { padding: 3.5rem 0; }
+    .hero { padding: 6rem 0 3rem; }
+    .problem-grid, .flow-steps, .ex-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .consult-check ul { grid-template-columns: 1fr; }
+    .mobile-cta { display: block; }
+    body { padding-bottom: 4.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <a href="#top" class="logo">Nom<span>X</span></a>
+    <a href="#consult" class="header-cta">無料で相談する</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="wrap hero-inner">
+    <span class="hero-badge">現場密着型 AI業務改善パートナー</span>
+    <h1>小さなお店の<span class="hl">現場改善</span>を、<br>AIとアプリで形にします。</h1>
+    <p class="hero-sub">
+      予約管理、顧客管理、SNS発信、日々の記録。<br>
+      現場の声を聞きながら、無理なく使える仕組みを一緒に作ります。
+      必要なら、実際の現場に入って業務の流れまで確認します。
+    </p>
+    <div class="hero-ctas">
+      <a href="#consult" class="btn-primary">今の困りごとを相談する <span class="arr">→</span></a>
+      <a href="#examples" class="btn-secondary">NomXの改善事例を見る</a>
+    </div>
+    <p class="hero-trust"><span class="check">✓</span> 大きなシステムは不要。今ある道具と現場に合わせて、小さく始められます。</p>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="problem" id="problem">
+  <div class="wrap">
+    <p class="sec-label reveal">Problem</p>
+    <h2 class="sec-title reveal">こんな小さな手間、毎日積み重なっていませんか？</h2>
+    <p class="sec-intro reveal">ひとつひとつは小さくても、毎日続くと大きな負担に。まずは、その「あるある」から。</p>
+    <div class="problem-grid">
+      <div class="problem-card reveal"><span class="problem-icon">📅</span><p>予約管理がバラバラで、ダブルブッキングが怖い</p></div>
+      <div class="problem-card reveal"><span class="problem-icon">📝</span><p>顧客メモが紙やノート頼みで、探すのに時間がかかる</p></div>
+      <div class="problem-card reveal"><span class="problem-icon">📱</span><p>LINEやSNSの発信が、なかなか続かない</p></div>
+      <div class="problem-card reveal"><span class="problem-icon">✍️</span><p>同じ内容を何度も手で転記している</p></div>
+      <div class="problem-card reveal"><span class="problem-icon">🧩</span><p>既製のシステムが、現場のやり方に合わない</p></div>
+      <div class="problem-card reveal"><span class="problem-icon">🤔</span><p>AIを使いたいけど、何から始めればいいかわからない</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION -->
+<section class="solution" id="solution">
+  <div class="wrap">
+    <p class="sec-label reveal">NomX Solution</p>
+    <h2 class="sec-title reveal">NomXは、現場の中から仕組みを作ります。</h2>
+    <p class="solution-lead reveal">
+      相談だけで終わらせません。必要なら<span class="accent">実際に現場へ入り</span>、<br>
+      仕事の流れや小さな手間を、内側から確かめます。
+    </p>
+    <p class="solution-body reveal">
+      外から聞いた話だけで作るのではなく、現場参加や業務体験を通じて見えてくる
+      「見落とされがちな困りごと」を拾い上げる。そのうえで、AI・WEBアプリ・SNS運用・記録の仕組みを
+      小さく作り、使いながら一緒に育てていきます。
+    </p>
+    <div class="solution-points">
+      <span class="sol-chip reveal">現場に入る</span>
+      <span class="sol-chip reveal">小さく作る</span>
+      <span class="sol-chip reveal">使いながら改善</span>
+      <span class="sol-chip reveal">現場の言葉で話す</span>
+    </div>
+  </div>
+</section>
+
+<!-- FLOW -->
+<section class="flow" id="flow">
+  <div class="wrap">
+    <p class="sec-label reveal">Flow</p>
+    <h2 class="sec-title reveal">相談から制作までの流れ</h2>
+    <p class="sec-intro reveal">いきなり大きく作りません。話を聞いて、現場を見て、小さく始めます。</p>
+    <div class="flow-steps">
+      <div class="flow-step reveal"><h3>無料相談</h3><p>まずはお気軽に。困っていることをそのまま聞かせてください。</p></div>
+      <div class="flow-step reveal"><h3>課題ヒアリング</h3><p>どこに時間がかかっているか、一緒に整理します。</p></div>
+      <div class="flow-step reveal"><h3>現場確認・業務体験</h3><p>必要に応じて現場に入り、実際の流れを確認します。</p></div>
+      <div class="flow-step reveal"><h3>改善案と見積もり</h3><p>無理のない範囲で、できることをご提案します。</p></div>
+      <div class="flow-step reveal"><h3>小さく制作</h3><p>まずは小さく形にして、現場で試します。</p></div>
+      <div class="flow-step reveal"><h3>運用しながら改善</h3><p>使いながら、現場に合うよう少しずつ育てます。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- EXAMPLES -->
+<section class="examples" id="examples">
+  <div class="wrap">
+    <p class="sec-label reveal">Examples</p>
+    <h2 class="sec-title reveal">たとえば、こんな仕組みを作れます。</h2>
+    <p class="sec-intro reveal">どれも「現場で本当に使えること」を一番に考えて作っています。</p>
+    <div class="ex-grid">
+      <div class="ex-card reveal">
+        <h3>飲食店向けWEBアプリ</h3>
+        <ul>
+          <li>フロア・席の管理</li>
+          <li>スタッフの管理</li>
+          <li>顧客の来店履歴</li>
+          <li>ボトル・在庫の管理</li>
+        </ul>
+        <p class="ex-note">リアルタイムのフロア管理、顧客履歴、ボトル管理など、実際の店舗運用に合わせて現在も改善を重ねています。</p>
+      </div>
+      <div class="ex-card reveal">
+        <h3>店舗・トレーナー向け顧客管理</h3>
+        <ul>
+          <li>顧客情報の一元管理</li>
+          <li>セッション・施術の記録</li>
+          <li>予約管理</li>
+          <li>メニュー作成の補助</li>
+        </ul>
+      </div>
+      <div class="ex-card reveal">
+        <h3>SNS・ショート動画運用</h3>
+        <ul>
+          <li>日々の記録を投稿に変換</li>
+          <li>タイトル・概要・タグ整理</li>
+          <li>継続できる発信の導線づくり</li>
+          <li>無理なく続く運用設計</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section class="why" id="why">
+  <div class="wrap">
+    <p class="sec-label reveal">Why NomX</p>
+    <h2 class="sec-title reveal">NomXが大切にしていること</h2>
+    <p class="sec-intro reveal">便利な道具を売るのではなく、現場に寄り添う相談相手でありたいと考えています。</p>
+    <div class="why-grid">
+      <div class="why-item reveal"><div class="why-num">01</div><div><h3>小さく始める</h3><p>大きな投資はいりません。できるところから少しずつ。</p></div></div>
+      <div class="why-item reveal"><div class="why-num">02</div><div><h3>現場の言葉を大切にする</h3><p>専門用語ではなく、現場のことばで一緒に考えます。</p></div></div>
+      <div class="why-item reveal"><div class="why-num">03</div><div><h3>使いながら育てる</h3><p>作って終わりではなく、運用しながら改善し続けます。</p></div></div>
+      <div class="why-item reveal"><div class="why-num">04</div><div><h3>難しいAIを、日々の仕事に</h3><p>むずかしい技術を、毎日の業務に自然となじむ形に。</p></div></div>
+      <div class="why-item reveal"><div class="why-num">05</div><div><h3>自分自身で実験している</h3><p>50代からでも新しい仕事は作れる。それを自分で確かめながら進めています。</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONSULT / FORM -->
+<section class="consult" id="consult">
+  <div class="wrap">
+    <p class="sec-label reveal">Consultation</p>
+    <h2 class="sec-title reveal">まずは、今困っていることを聞かせてください。</h2>
+    <p class="sec-intro reveal">売り込みはしません。話すだけでも、頭の中が整理されるはずです。</p>
+
+    <div class="consult-check reveal">
+      <h3>無料相談で、こんなことを一緒に確認します</h3>
+      <ul>
+        <li>どんな作業に時間がかかっているか</li>
+        <li>どんな管理がバラバラになっているか</li>
+        <li>何をAI化・アプリ化すると楽になるか</li>
+        <li>現場確認が必要かどうか</li>
+      </ul>
+    </div>
+
+    <form class="reveal" onsubmit="handleSubmit(event)">
+      <input type="hidden" name="_subject" value="【NomX】新しい無料相談の申し込み">
+      <div class="form-row">
+        <div class="field">
+          <label>お名前 <span class="req">必須</span></label>
+          <input type="text" name="お名前" required placeholder="山田 太郎">
+        </div>
+        <div class="field">
+          <label>店舗名・屋号</label>
+          <input type="text" name="店舗名・屋号" placeholder="○○商店">
+        </div>
+      </div>
+      <div class="field">
+        <label>メールアドレス <span class="req">必須</span></label>
+        <input type="email" name="email" required placeholder="example@email.com">
+      </div>
+      <div class="field">
+        <label>業種</label>
+        <select name="業種">
+          <option value="">選択してください</option>
+          <option>飲食店</option>
+          <option>美容・サロン</option>
+          <option>整体・治療院</option>
+          <option>トレーナー・フィットネス</option>
+          <option>小売・物販</option>
+          <option>その他サービス業</option>
+          <option>その他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>相談したい内容 <span class="req">必須</span></label>
+        <textarea name="相談内容" required placeholder="例：予約管理を紙でやっていて、ダブルブッキングが多く困っています。"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>希望連絡方法</label>
+          <select name="希望連絡方法">
+            <option value="">選択してください</option>
+            <option>メール</option>
+            <option>電話</option>
+            <option>LINE</option>
+            <option>オンライン（Zoom等）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>オンライン相談 希望日時</label>
+          <input type="text" name="希望日時" placeholder="例：平日の午前中など">
+        </div>
+      </div>
+      <button type="submit" class="submit-btn">この内容で相談する（無料）</button>
+      <p class="form-note">※ いただいた内容は相談以外の目的には使用しません。</p>
+    </form>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="wrap">
+    <h2>日常の困りごとから、<br>未来の仕事を作りましょう。</h2>
+    <p>まずは話を聞かせてください。それがすべての始まりです。</p>
+    <a href="#consult" class="btn-primary">今の困りごとを相談する <span class="arr">→</span></a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<!-- CROSS LINK to HP -->
+<div class="lp-cross">
+  <div class="wrap lp-cross-inner">
+    <div>
+      <span class="lp-cross-label">Another Service</span>
+      <p class="lp-cross-title">パーソナルトレーニングも行っています</p>
+      <p class="lp-cross-desc">NomXは、京都でボディデザイン・パーソナルトレーニングのスタジオも運営しています。</p>
+    </div>
+    <a href="index.html" class="lp-cross-btn">トレーニング事業を見る →</a>
+  </div>
+</div>
+
+<footer>
+  <a href="#top" class="logo">Nom<span>X</span></a>
+  <p>現場に入って業務を理解する、AI業務改善パートナー</p>
+  <p style="margin-top:0.8rem;">© 2026 NomX — ノム社長</p>
+</footer>
+
+<!-- MOBILE STICKY CTA -->
+<div class="mobile-cta">
+  <a href="#consult">今の困りごとを相談する →</a>
+</div>
+
+<script>
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), Math.min(i * 50, 300));
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Form submit — 本番接続用
+  // ▼▼▼ ここに送信先を設定してください ▼▼▼
+  // 方法A: Formspree → const FORM_ENDPOINT = "https://formspree.io/f/xxxxxxx";
+  // 方法B: GoogleフォームのformResponse URL
+  const FORM_ENDPOINT = "https://formspree.io/f/xrevqgyw"; // Formspree接続済み
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+
+    if (!FORM_ENDPOINT) {
+      alert('お問い合わせありがとうございます。\n（送信先が未設定です。FORM_ENDPOINT を設定すると本番送信されます）');
+      return;
+    }
+
+    const data = new FormData(form);
+    const btn = form.querySelector('.submit-btn');
+    const original = btn.textContent;
+    btn.textContent = '送信中...';
+    btn.disabled = true;
+
+    fetch(FORM_ENDPOINT, {
+      method: 'POST',
+      body: data,
+      headers: { 'Accept': 'application/json' }
+    })
+    .then(res => {
+      if (res.ok) {
+        form.innerHTML = '<div style="text-align:center;padding:2rem 0;"><p style="font-size:1.2rem;font-weight:700;color:var(--navy);margin-bottom:0.5rem;">送信が完了しました。</p><p style="color:var(--muted);">内容を確認のうえ、折り返しご連絡いたします。ありがとうございます。</p></div>';
+      } else {
+        throw new Error('送信に失敗しました');
+      }
+    })
+    .catch(() => {
+      alert('送信に失敗しました。お手数ですが時間をおいて再度お試しください。');
+      btn.textContent = original;
+      btn.disabled = false;
+    });
+  }
+</script>
+</body>
+</html>
