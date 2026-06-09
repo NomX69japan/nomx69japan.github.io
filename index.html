@@ -660,6 +660,69 @@
     letter-spacing: 0.05em;
   }
 
+  /* ── CROSS LINK ── */
+  .cross-link {
+    background: var(--ink);
+    border-top: 1px solid rgba(200,169,110,0.2);
+    padding: 4rem 4rem;
+  }
+  .cross-link-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .cross-link-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.8rem;
+  }
+  .cross-link-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.8rem;
+    font-weight: 300;
+    color: var(--paper);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+  }
+  .cross-link-desc {
+    font-size: 0.85rem;
+    color: rgba(245,240,232,0.55);
+    line-height: 1.7;
+  }
+  .cross-link-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    text-decoration: none;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    padding: 1rem 1.8rem;
+    border-radius: 2px;
+    transition: background 0.3s, color 0.3s, transform 0.3s;
+  }
+  .cross-link-btn:hover {
+    background: var(--accent);
+    color: var(--ink);
+    transform: translateY(-2px);
+  }
+  @media (max-width: 700px) {
+    .cross-link { padding: 3rem 1.5rem; }
+    .cross-link-inner { flex-direction: column; align-items: flex-start; }
+    .cross-link-title { font-size: 1.4rem; }
+  }
+
   /* ── KEN BURNS effect for hero image ── */
   @keyframes kenBurns {
     0% { transform: scale(1) translate(0, 0); }
@@ -1529,6 +1592,18 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- CROSS LINK to LP -->
+<div class="cross-link">
+  <div class="cross-link-inner">
+    <div class="cross-link-text">
+      <span class="cross-link-label">Another Project</span>
+      <p class="cross-link-title">小さなお店の現場改善を、AIとアプリで。</p>
+      <p class="cross-link-desc">NomXは、AIとWEBアプリで小規模店舗の業務改善も手がけています。</p>
+    </div>
+    <a href="nomx-lp.html" class="cross-link-btn">AI業務改善事業を見る →</a>
   </div>
 </div>
 
