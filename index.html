@@ -86,6 +86,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-feature-settings: "palt" 1, "kern" 1;
+    letter-spacing: 0.02em;
+  }
+
+  ::selection {
+    background: rgba(200, 169, 110, 0.3);
+    color: var(--ink);
   }
 
   /* ── Accessibility: reduce motion ── */
@@ -462,6 +469,14 @@
     text-transform: uppercase;
   }
 
+  .stat-unit {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: var(--muted);
+    margin-left: 0.15rem;
+  }
+
   /* ── CONTACT ── */
   .contact-section {
     background: var(--ink);
@@ -725,11 +740,13 @@
 
   /* ── KEN BURNS effect for hero image ── */
   @keyframes kenBurns {
-    0% { transform: scale(1) translate(0, 0); }
-    100% { transform: scale(1.08) translate(-1%, -1%); }
+    0% { transform: scale(1.02) translate(0, 0); }
+    33% { transform: scale(1.05) translate(-0.8%, -0.5%); }
+    66% { transform: scale(1.04) translate(0.5%, -0.8%); }
+    100% { transform: scale(1.02) translate(0, 0); }
   }
   .hero-image-area img {
-    animation: fadeIn 1.5s 1s forwards, kenBurns 18s ease-out 2s infinite alternate !important;
+    animation: fadeIn 1.5s 1s forwards, kenBurns 28s ease-in-out 2s infinite !important;
   }
 
   /* ── SECTION INDICATOR (right side, desktop) ── */
@@ -1322,7 +1339,7 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-left">
-    <p class="hero-eyebrow">Body Design Studio — Kyoto</p>
+    <p class="hero-eyebrow">Body Design Studio, Kyoto</p>
     <h1 class="hero-name">Nom<em>X</em></h1>
     <p class="hero-name-jp reveal-fast">野村 達也 / Tatsuya Nomura</p>
     <p class="hero-subtitle">
@@ -1357,7 +1374,7 @@
     <span class="manifesto-line">身体は、いちばん長く付き合う</span>
     <span class="manifesto-line">「資産」である。</span>
   </p>
-  <p class="manifesto-sub reveal">— だからこそ、感覚ではなく理論で育てる。</p>
+  <p class="manifesto-sub reveal">だからこそ、感覚ではなく理論で育てたい。</p>
 </section>
 
 <div class="rule"></div>
@@ -1449,16 +1466,16 @@
       </p>
       <div class="about-stats reveal">
         <div>
-          <div class="stat-value">10+</div>
-          <div class="stat-label">Years</div>
+          <div class="stat-value">10<span class="stat-unit">年+</span></div>
+          <div class="stat-label">指導歴</div>
         </div>
         <div>
-          <div class="stat-value">∞</div>
-          <div class="stat-label">Perspective</div>
+          <div class="stat-value">90<span class="stat-unit">分</span></div>
+          <div class="stat-label">1セッション</div>
         </div>
         <div>
-          <div class="stat-value">京都</div>
-          <div class="stat-label">Base</div>
+          <div class="stat-value">京都<span class="stat-unit">・四条</span></div>
+          <div class="stat-label">拠点</div>
         </div>
       </div>
     </div>
@@ -1688,13 +1705,15 @@
         if (e.isIntersecting) {
           const yearsEl = e.target.querySelector('.stat-value');
           if (yearsEl && yearsEl.textContent.includes('10')) {
+            const unit = yearsEl.querySelector('.stat-unit');
+            const unitHTML = unit ? unit.outerHTML : '';
             let n = 0;
             const target = 10;
             const tick = setInterval(() => {
               n++;
-              yearsEl.textContent = n + '+';
+              yearsEl.innerHTML = n + unitHTML;
               if (n >= target) clearInterval(tick);
-            }, 80);
+            }, 70);
           }
           statsIO.unobserve(e.target);
         }
