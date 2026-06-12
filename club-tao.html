@@ -2518,6 +2518,7 @@ function buildPersistData() {
     events: state.events,
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
+    closedSessions: state.closedSessions || {},
     _updatedAt: Date.now()
   };
 }
@@ -2691,6 +2692,7 @@ function persistLoad() {
     if (Array.isArray(data.events)) state.events = data.events;
     if (Array.isArray(data.menuItems)) state.menuItems = data.menuItems;
     if (Array.isArray(data.menuCategories)) state.menuCategories = data.menuCategories;
+    if (data.closedSessions && typeof data.closedSessions === 'object') state.closedSessions = data.closedSessions;
   } catch(e) {
     console.error('persistLoad failed', e);
   }
@@ -2711,9 +2713,23 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.07';
+const APP_VERSION = '2026.06.08';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.08',
+    date: '2026-06-08',
+    title: '🔒 退店が他端末で復活し続けるバグの根本修正',
+    items: [
+      '【最重要】iPadで退店しても他端末で「入店中」のまま朝まで残る問題を根本修正しました。',
+      '原因：自動延長ONの卓を持つ古い端末が、30分ごとの自動延長で「入店中」データに新しい更新時刻を付け続け、退店データに同期で勝ち続けていました。',
+      '対策：「退店済みセッション台帳」を導入。退店した卓のセッション（卓＋入店時刻）を記録・全端末で共有し、台帳に載っているセッションの「入店中」データは同期で完全に拒否します。',
+      '古い端末側でも、台帳を受信した瞬間に該当卓が自動で空席になります（1秒以内）。',
+      '退店取消（履歴から復活）した場合は台帳からも解除され、全端末に正しく伝わります。',
+      '台帳は7日で自動掃除されるため、容量への影響はほぼありません。',
+      '3パターンの同期シナリオでテスト済み（受信拒否・自動クリア・取消伝搬すべて確認）。',
+    ],
+  },
   {
     version: '2026.06.07',
     date: '2026-06-07',
@@ -3143,8 +3159,62 @@ const state = {
   events: [],   // 店舗イベント（誕生日・記念日・キャンペーンなど。{id, title, startDate, endDate}）
   menuItems: [], // オーダー商品マスタ {id, name, category, sortOrder, removed}
   menuCategories: [], // カテゴリマスタ {id, name, sortOrder, removed}
+  closedSessions: {}, // 退店済みセッション台帳 { "tableId_startedAt": 退店時刻 }。同期の巻き戻り防止
   weekOffset: 0,
 };
+
+// 退店済みセッション関連ヘルパー
+// closedSessions の値：正のタイムスタンプ=退店済み ／ 負のタイムスタンプ=退店取消済み
+// （単純削除だと他端末から同期で戻ってくるため、取消も「負値」として記録・伝搬する）
+function sessionKey(tableId, startedAt) { return tableId + '_' + startedAt; }
+function isSessionClosed(tableId, startedAt) {
+  if (!tableId || !startedAt) return false;
+  const v = state.closedSessions && state.closedSessions[sessionKey(tableId, startedAt)];
+  return typeof v === 'number' && v > 0;
+}
+function markSessionClosed(tableId, startedAt) {
+  if (!tableId || !startedAt) return;
+  if (!state.closedSessions) state.closedSessions = {};
+  state.closedSessions[sessionKey(tableId, startedAt)] = Date.now();
+}
+function unmarkSessionClosed(tableId, startedAt) {
+  if (!tableId || !startedAt) return;
+  if (!state.closedSessions) state.closedSessions = {};
+  // 負値=取消マーカー（絶対値が新しい方がマージで勝つ）
+  state.closedSessions[sessionKey(tableId, startedAt)] = -Date.now();
+}
+// 7日以上前の記録は掃除（台帳の肥大化防止）
+function pruneClosedSessions() {
+  if (!state.closedSessions) { state.closedSessions = {}; return; }
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  Object.keys(state.closedSessions).forEach(k => {
+    if (Math.abs(state.closedSessions[k] || 0) < cutoff) delete state.closedSessions[k];
+  });
+}
+// closedSessions のマージ：絶対値（時刻）が新しい方を採用
+function mergeClosedSessions(remote) {
+  if (!remote || typeof remote !== 'object') return;
+  if (!state.closedSessions) state.closedSessions = {};
+  Object.keys(remote).forEach(k => {
+    const rv = remote[k];
+    const lv = state.closedSessions[k];
+    if (typeof rv !== 'number') return;
+    if (typeof lv !== 'number' || Math.abs(rv) > Math.abs(lv)) {
+      state.closedSessions[k] = rv;
+    }
+  });
+}
+// 空席テーブルの標準形
+function emptyTableData() {
+  return {
+    occupied: false, guests: 0, castIds: [], castNoms: {}, castFree: '',
+    customerId: '', customerName: '', memo: '',
+    startedAt: null, endsAt: null, setCount: 0,
+    autoExtend: false,
+    alertedWarn: false, alertedCritical: false,
+    _updated: Date.now(),
+  };
+}
 
 // デフォルト商品マスタ（state.menuItemsが空の時にだけ投入される）
 // 固定IDを使うことで、複数端末で初回投入したときも同じIDになり、サーバー同期で
@@ -3976,6 +4046,10 @@ function checkOut(tableId) {
   // 来店ログに記録（入店していた場合のみ）
   if (prev.occupied && prev.startedAt) {
     recordVisitLog(tableId, prev);
+    // 退店済みセッション台帳に記録：他端末の古い「入店中」データが
+    // 同期で復活するのを防ぐ（自動延長による _updated 更新にも勝つ）
+    markSessionClosed(tableId, prev.startedAt);
+    pruneClosedSessions();
   }
   state.tables[tableId] = {
     occupied: false, guests: 0, castIds: [], castNoms: {}, castFree: '',
@@ -4278,6 +4352,9 @@ function undoCheckout(logId) {
   // 来店ログを論理削除（サーバー同期で復活しないように）
   log.removed = true;
   log._updated = now;
+  // 退店済みセッション台帳に「取消」を記録：これを伝搬しないと、復活させた卓が
+  // 同期マージで再び強制退店されてしまう
+  unmarkSessionClosed(tableId, log.startedAt);
   // 顧客のvisitsからもlogId参照を削除
   if (log.customerId) {
     const cust = state.customers.find(c => c.id === log.customerId);
@@ -5530,6 +5607,13 @@ function updateTableTimers(renderUI) {
   DEFAULT_TABLES.forEach(t => {
     const tdata = state.tables[t.id];
     if (!tdata || !tdata.occupied || !tdata.endsAt) return;
+    // ★退店済みセッション台帳に載っている卓は即クリア
+    // （同期で台帳だけ先に届いた場合の保険。自動延長・通知も発火させない）
+    if (tdata.startedAt && isSessionClosed(t.id, tdata.startedAt)) {
+      state.tables[t.id] = emptyTableData();
+      needRender = true;
+      return;
+    }
     const remainMs = tdata.endsAt - Date.now();
     const remainMin = Math.ceil(remainMs / 60000);
 
@@ -5580,6 +5664,10 @@ function updateTableTimers(renderUI) {
   });
   if (needRender) {
     persistSave();
+    // 退店済みクリア等で卓の状態が変わった場合、フロア表示中なら再描画
+    try {
+      if (document.getElementById('page-floor')?.classList.contains('active')) renderFloor();
+    } catch(e) {}
   }
 
   // 画面のタイマー表示更新（フロアタブ表示中のみ）
@@ -10093,6 +10181,7 @@ function exportBackup() {
     events: state.events,
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
+    closedSessions: state.closedSessions || {},
     _exportedAt: Date.now()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -10123,6 +10212,7 @@ function importBackup(e) {
       if (Array.isArray(data.events)) state.events = data.events;
       if (Array.isArray(data.menuItems)) state.menuItems = data.menuItems;
       if (Array.isArray(data.menuCategories)) state.menuCategories = data.menuCategories;
+    if (data.closedSessions && typeof data.closedSessions === 'object') state.closedSessions = data.closedSessions;
       persistSave();
       alert('復元しました');
       location.reload();
@@ -10298,10 +10388,17 @@ function applyServerData(payload) {
 
   // IDベースマージ
   if (payload.pin) state.pin = payload.pin;
+  // 退店済みセッション台帳を先にマージ（後続のテーブルマージで使うため）
+  mergeClosedSessions(payload.closedSessions);
   // テーブル：オブジェクト単位でマージ（_updated タイムスタンプで判定）
   if (payload.tables && typeof payload.tables === 'object') {
     Object.keys(payload.tables).forEach(tid => {
-      const incoming = payload.tables[tid];
+      let incoming = payload.tables[tid];
+      // ★退店済みセッションの「入店中」データは拒否（空席に置換）
+      // 古い端末の自動延長が _updated を更新し続けても、退店が巻き戻らない
+      if (incoming && incoming.occupied && incoming.startedAt && isSessionClosed(tid, incoming.startedAt)) {
+        incoming = emptyTableData();
+      }
       const current = state.tables[tid];
       if (!current) {
         state.tables[tid] = incoming;
@@ -10588,6 +10685,7 @@ function buildSaveData() {
     events: state.events,
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
+    closedSessions: state.closedSessions || {},
     _updatedAt: Date.now()
   };
 }
@@ -10596,10 +10694,15 @@ function buildSaveData() {
 // （退店の復活・予約/顧客の巻き戻りの根本対策）
 function mergeServerPayload(payload) {
   if (!payload || typeof payload !== 'object') return;
-  // テーブル：_updated が新しい方を採用
+  // 退店済みセッション台帳を先にマージ（テーブルマージで使う）
+  mergeClosedSessions(payload.closedSessions);
+  // テーブル：_updated が新しい方を採用（退店済みセッションの入店中は拒否）
   if (payload.tables && typeof payload.tables === 'object') {
     Object.keys(payload.tables).forEach(tid => {
-      const incoming = payload.tables[tid];
+      let incoming = payload.tables[tid];
+      if (incoming && incoming.occupied && incoming.startedAt && isSessionClosed(tid, incoming.startedAt)) {
+        incoming = emptyTableData();
+      }
       const current = state.tables[tid];
       if (!current) { state.tables[tid] = incoming; return; }
       if ((incoming._updated || 0) >= (current._updated || 0)) {
@@ -11044,6 +11147,7 @@ try {
     events: state.events,
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
+    closedSessions: state.closedSessions || {},
     _updatedAt: Date.now()
   }));
 } catch(e) {}
