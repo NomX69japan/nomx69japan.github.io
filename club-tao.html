@@ -2641,6 +2641,31 @@ function trimOldVisitLogs(daysAgo) {
   return before - state.visitLog.length;
 }
 
+// 件数ベースの圧縮：直近 keepCount 件だけローカルに残す（古い分はサーバーに残る）
+// 日数ベースで削れない（まだ新しいログばかり）端末でも、確実にローカル保存サイズを下げる最終手段
+function trimVisitLogsByCount(keepCount) {
+  if (!Array.isArray(state.visitLog)) return 0;
+  const activeCount = state.visitLog.filter(v => !v.removed).length;
+  if (activeCount <= keepCount) return 0;
+  const sorted = state.visitLog.slice().sort((a, b) => {
+    const ta = a.endedAt || a.startedAt || 0;
+    const tb = b.endedAt || b.startedAt || 0;
+    return tb - ta; // 新しい順
+  });
+  const keepIds = new Set(sorted.slice(0, keepCount).map(v => v.id));
+  const removedIds = new Set();
+  const before = state.visitLog.length;
+  state.visitLog = state.visitLog.filter(v => {
+    if (keepIds.has(v.id)) return true;
+    removedIds.add(v.id);
+    return false;
+  });
+  (state.customers || []).forEach(c => {
+    if (Array.isArray(c.visits)) c.visits = c.visits.filter(vis => !vis.logId || !removedIds.has(vis.logId));
+  });
+  return before - state.visitLog.length;
+}
+
 let _quotaWarned = false;
 function persistSave() {
   // 自分発の変更マーカー（同期時の通知抑制用）
@@ -2668,13 +2693,26 @@ function persistSave() {
             localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
             console.warn('古い来店ログ（6ヶ月以上前）を整理して保存成功');
           } catch(e4) {
-            console.error('persistSave failed: 容量を空けられませんでした', e4);
-            // ユーザーに一度だけ警告
-            if (!_quotaWarned) {
-              _quotaWarned = true;
-              setTimeout(() => {
-                alert('⚠️ 端末の保存容量がいっぱいです。\n\n設定 →「🗄 データ容量の整理」から古い来店履歴を削除してください。\n\n※サーバーにバックアップされているため、データはすぐには失われませんが、新しい記録が保存できない状態です。まず設定からバックアップDLをおすすめします。');
-              }, 500);
+            // 段階4：直近300件だけローカルに残す（古い分はサーバーに残る）
+            trimVisitLogsByCount(300);
+            try {
+              localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+              console.warn('来店ログを直近300件に圧縮して保存成功');
+            } catch(e5) {
+              // 段階5：直近100件まで圧縮（ストレージ極小端末向け）
+              trimVisitLogsByCount(100);
+              try {
+                localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
+                console.warn('来店ログを直近100件に圧縮して保存成功');
+              } catch(e6) {
+                console.error('persistSave failed: 容量を空けられませんでした', e6);
+                if (!_quotaWarned) {
+                  _quotaWarned = true;
+                  setTimeout(() => {
+                    alert('⚠️ この端末の保存容量が不足しています。\n\nこの端末（おそらくプライベートモードか容量制限）では履歴をすべて保存できませんが、アプリの動作とサーバー同期は正常です。\n\n・メインのiPad等では問題ありません\n・この端末でも操作・閲覧は可能です（再読み込み時にサーバーから取得）\n・Safariをお使いの場合、プライベートモードを解除すると改善することがあります');
+                  }, 500);
+                }
+              }
             }
           }
         }
@@ -2724,9 +2762,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.09d';
+const APP_VERSION = '2026.06.13';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.13',
+    date: '2026-06-13',
+    title: '💾 容量不足の端末でも保存できるよう強化',
+    items: [
+      '保存容量が少ない端末（Safariのプライベートモード等）で「容量超過」が出ても、来店ログを直近300件→100件と段階的に圧縮して保存できるようにしました。',
+      '圧縮で外れた古い履歴もサーバーには残るため、データは失われません。',
+      '万一保存しきれない場合も、アプリの動作とサーバー同期は正常に続きます（案内メッセージを分かりやすくしました）。',
+      '※このメッセージが出た端末は、Safariのプライベートモード解除やChromeの利用で改善することがあります。メインのiPad等は影響ありません。',
+    ],
+  },
   {
     version: '2026.06.09d',
     date: '2026-06-09',
@@ -10735,7 +10784,15 @@ function applyServerData(payload) {
         localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
       } catch(e2) {
         trimOldVisitLogs(180);
-        try { localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData())); } catch(e3) {}
+        try { localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData())); }
+        catch(e3) {
+          trimVisitLogsByCount(300);
+          try { localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData())); }
+          catch(e4) {
+            trimVisitLogsByCount(100);
+            try { localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData())); } catch(e5) {}
+          }
+        }
       }
     }
   }
