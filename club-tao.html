@@ -2713,9 +2713,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.08';
+const APP_VERSION = '2026.06.09';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.09',
+    date: '2026-06-09',
+    title: '🧹 残ってしまった「入店中」卓の自動掃除',
+    items: [
+      '【自己修復】退店記録（来店ログ）が存在するのに「入店中」のまま残っている卓を、起動時・同期時に自動で空席に戻すようにしました。',
+      '旧バージョン時代に発生した巻き戻りの残骸（朝まで残る使用中卓）は、アプリを開くだけで自動的に掃除されます。',
+      '修復結果はサーバーにも反映されるため、1台で開けば全端末がきれいになります。',
+      '【保険機能】終了予定を3時間以上超過した卓を退店する時、「記録を残さずに空席へ戻す」を選べるようにしました（来店ログの二重記録を防止）。',
+      '昨夜の来店記録はiPadで退店した時のものが正しく残っています。今朝の残骸を消しても記録は失われません。',
+    ],
+  },
   {
     version: '2026.06.08',
     date: '2026-06-08',
@@ -3204,6 +3216,30 @@ function mergeClosedSessions(remote) {
     }
   });
 }
+
+// ゾンビ卓の自己修復：
+// 「入店中」の卓と同じセッション（卓＋入店時刻）の退店記録（来店ログ）が存在するなら、
+// その卓は別端末で退店済み。台帳に登録して空席化する。
+// 旧バージョン時代に発生した巻き戻り（台帳に載っていないゾンビセッション）もこれで解消される。
+function selfHealZombieTables() {
+  let healed = 0;
+  try {
+    Object.keys(state.tables || {}).forEach(tid => {
+      const td = state.tables[tid];
+      if (!td || !td.occupied || !td.startedAt) return;
+      // 同一セッションの退店記録があるか（退店取消されたログ removed:true は除外）
+      const hasCheckoutLog = (state.visitLog || []).some(v =>
+        !v.removed && v.tableId === tid && v.startedAt === td.startedAt && v.endedAt
+      );
+      if (hasCheckoutLog) {
+        markSessionClosed(tid, td.startedAt);
+        state.tables[tid] = emptyTableData();
+        healed++;
+      }
+    });
+  } catch(e) { console.warn('selfHealZombieTables failed', e); }
+  return healed;
+}
 // 空席テーブルの標準形
 function emptyTableData() {
   return {
@@ -3651,6 +3687,12 @@ function initApp() {
   }
   // 通知済みフラグの掃除：現在使用中でない卓のキーは削除
   cleanupNotifiedKeys();
+  // ゾンビ卓の自己修復：退店記録が存在する「入店中」卓を空席化
+  // （旧バージョンで発生した同期巻き戻りの残骸を起動時に掃除）
+  const healedAtBoot = selfHealZombieTables();
+  if (healedAtBoot > 0) {
+    console.log(`起動時自己修復: ${healedAtBoot}卓を空席に戻しました`);
+  }
   // テーブル初期化（不足分のみ追加）
   if (!state.tables) state.tables = {};
   DEFAULT_TABLES.forEach(t => {
@@ -7363,6 +7405,29 @@ function saveTableInternal(closeAfter) {
 function clearTable() {
   if (!editingTableId) return;
   const tname = getTableName(editingTableId);
+  const td = state.tables[editingTableId];
+  // 超過3時間以上の卓は、別端末で退店済みのゾンビの可能性が高い。
+  // 「記録せず空席に戻す」選択肢を出す（来店ログの二重記録を防ぐ）
+  const overMs = (td && td.occupied && td.endsAt) ? (Date.now() - td.endsAt) : 0;
+  if (overMs > 3 * 60 * 60 * 1000) {
+    const choice = confirm(
+      `${tname} は終了予定を${Math.floor(overMs/3600000)}時間以上超過しています。\n` +
+      `別の端末で退店済みの可能性があります。\n\n` +
+      `OK＝来店記録を残さずに空席へ戻す（推奨）\n` +
+      `キャンセル＝通常の退店処理（来店記録を作成）`
+    );
+    if (choice) {
+      // 記録なしクリア：台帳に登録して空席化（他端末にも伝搬し、復活しない）
+      if (td.startedAt) markSessionClosed(editingTableId, td.startedAt);
+      state.tables[editingTableId] = emptyTableData();
+      persistSave();
+      renderFloor();
+      closeTableModal();
+      showToast(`${tname} を空席に戻しました（記録なし）`, 'info');
+      return;
+    }
+    // キャンセル → 下の通常退店フローへ
+  }
   if (!confirm(`${tname} を退店扱いにしますか？`)) return;
   checkOut(editingTableId);
   closeTableModal();
@@ -10563,6 +10628,9 @@ function applyServerData(payload) {
   if (typeof cleanupAndSeedOrderMaster === 'function') {
     cleanupChanged = cleanupAndSeedOrderMaster({ skipSeed: true });
   }
+  // 同期受信後にもゾンビ卓を自己修復（来店ログが先に届いた場合に対応）
+  const healedAfterSync = selfHealZombieTables();
+  if (healedAfterSync > 0) cleanupChanged = true;
   // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
