@@ -2432,6 +2432,17 @@
       </details>
 
       <details class="settings-section">
+        <summary>🔧 同期診断（トラブル時に確認）</summary>
+        <div class="body">
+          <button class="btn btn-sm" onclick="renderSyncDiagnosis()" style="margin-bottom:8px;">🔍 診断を実行</button>
+          <div id="syncDiagnosisOut" style="font-size:12px; line-height:1.7; background:#f9f6ee; border:1px solid #ece6d3; border-radius:8px; padding:10px; white-space:pre-wrap; word-break:break-all; display:none;"></div>
+          <hr style="margin:12px 0; border:none; border-top:1px solid #eee;">
+          <button class="btn-danger btn-sm" onclick="forceResetAllTables()">🪑 全卓を強制的に空席へ戻す</button>
+          <p style="color:#888; font-size:11px; margin-top:6px;">入店中の全卓を空席にし、巻き戻り防止の台帳に登録します。来店記録は作られません（必要なら履歴タブから手動追加）。他端末にも反映されます。</p>
+        </div>
+      </details>
+
+      <details class="settings-section">
         <summary>⚠️ データリセット</summary>
         <div class="body">
           <button class="btn-danger" onclick="resetAllData()">全データを削除</button>
@@ -2713,9 +2724,43 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.09';
+const APP_VERSION = '2026.06.09d';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.09d',
+    date: '2026-06-09',
+    title: '🔒 退店の巻き戻りを送受信の両方でブロック',
+    items: [
+      '退店して空席になった卓が、他端末の古い「入店中」データで復活する経路を、データ受信・送信の両方で塞ぎました。',
+      '退店済みの卓は、来店記録（履歴）を根拠に判定するため、古いバージョンの端末が混ざっていても守られます。',
+      'これで卓ごとの退店処理が確実に全端末へ反映されます。',
+    ],
+  },
+  {
+    version: '2026.06.09c',
+    date: '2026-06-09',
+    title: '🔒 退店判定を来店ログベースに強化（巻き戻り根絶）',
+    items: [
+      '【最重要】退店したのに他端末で復活する問題を、より確実な方法で修正しました。',
+      '原因：退店を記録する「台帳」が、古いバージョンの端末の保存によって消されることがありました。',
+      '対策：退店したかどうかを「来店記録（履歴）の有無」でも判定するようにしました。来店記録は消えにくいため、台帳が消えても退店が守られます。',
+      '退店した端末自身が、保存処理の途中でサーバーの古い「入店中」データに巻き戻される問題も直接ブロックしました。',
+      'これで、1台でも古いバージョンが混ざっていても退店が守られます。',
+    ],
+  },
+  {
+    version: '2026.06.09b',
+    date: '2026-06-09',
+    title: '🧹 残った卓の確実な掃除（12時間ルール）',
+    items: [
+      '12時間以上前に入店したままの卓があると、起動時に「空席に戻しますか？」の確認が出るようになりました。',
+      'OKを押すと全卓まとめて空席になり、他端末にも反映されます（巻き戻りもしません）。',
+      '退店記録（来店ログ）の有無に関係なく掃除できるため、退店し忘れ・同期トラブルどちらの残骸にも有効です。',
+      '※この掃除では来店記録は作られません。昨夜の売上記録が必要な場合は、履歴タブの「⚡ 手動で来店記録を追加」で正しい時刻・セット数で登録してください。',
+      '自己修復（退店記録がある卓の自動空席化）の結果がサーバーに保存されない問題も修正しました。',
+    ],
+  },
   {
     version: '2026.06.09',
     date: '2026-06-09',
@@ -3182,7 +3227,16 @@ function sessionKey(tableId, startedAt) { return tableId + '_' + startedAt; }
 function isSessionClosed(tableId, startedAt) {
   if (!tableId || !startedAt) return false;
   const v = state.closedSessions && state.closedSessions[sessionKey(tableId, startedAt)];
-  return typeof v === 'number' && v > 0;
+  // 台帳に取消記録（負値）があれば、明示的に「退店していない」
+  if (typeof v === 'number' && v < 0) return false;
+  // 台帳に退店記録（正値）があれば退店済み
+  if (typeof v === 'number' && v > 0) return true;
+  // ★台帳に無くても、同一セッション（卓＋入店時刻）の来店ログ（退店記録）が存在すれば退店済み。
+  // 来店ログはIDベースで堅牢に同期されるため、旧端末のPUTで台帳が消えても退店を守れる。
+  const hasCheckoutLog = (state.visitLog || []).some(log =>
+    !log.removed && log.tableId === tableId && log.startedAt === startedAt && log.endedAt
+  );
+  return hasCheckoutLog;
 }
 function markSessionClosed(tableId, startedAt) {
   if (!tableId || !startedAt) return;
@@ -3692,7 +3746,40 @@ function initApp() {
   const healedAtBoot = selfHealZombieTables();
   if (healedAtBoot > 0) {
     console.log(`起動時自己修復: ${healedAtBoot}卓を空席に戻しました`);
+    persistSave(); // 修復結果を保存＆サーバー反映（他端末にも伝搬）
   }
+  // 12時間以上前に入店した卓の検出（退店ログの有無に関係なく掃除できる最終手段）
+  // 営業は深夜までだが12時間を超えることはないため、これは確実に残骸
+  setTimeout(() => {
+    try {
+      const STALE_MS = 12 * 60 * 60 * 1000;
+      const now0 = Date.now();
+      const stale = Object.keys(state.tables || {}).filter(tid => {
+        const td = state.tables[tid];
+        return td && td.occupied && td.startedAt && (now0 - td.startedAt) > STALE_MS;
+      });
+      if (stale.length > 0) {
+        const names = stale.map(getTableName).join('・');
+        const ok = confirm(
+          `⚠ 12時間以上前に入店した卓が残っています：\n${names}\n\n` +
+          `空席に戻しますか？\n\n` +
+          `※来店記録は作られません。昨夜の記録が必要な場合は、\n` +
+          `履歴タブの「⚡ 手動で来店記録を追加」で正しい時刻で登録できます。`
+        );
+        if (ok) {
+          stale.forEach(tid => {
+            const td = state.tables[tid];
+            if (td && td.startedAt) markSessionClosed(tid, td.startedAt);
+            state.tables[tid] = emptyTableData();
+          });
+          pruneClosedSessions();
+          persistSave();
+          renderFloor();
+          showToast(`✅ ${stale.length}卓を空席に戻しました`, 'info');
+        }
+      }
+    } catch(e) { console.warn('stale table check failed', e); }
+  }, 1500);
   // テーブル初期化（不足分のみ追加）
   if (!state.tables) state.tables = {};
   DEFAULT_TABLES.forEach(t => {
@@ -10469,6 +10556,12 @@ function applyServerData(payload) {
         state.tables[tid] = incoming;
         return;
       }
+      // ★保護：ローカルが空席で、サーバーが退店済みセッションの「入店中」を送ってきたら拒否。
+      // 退店直後に他端末の古い入店中データで巻き戻されるのを防ぐ。
+      if (!current.occupied && incoming.occupied && incoming.startedAt
+          && isSessionClosed(tid, incoming.startedAt)) {
+        return; // ローカルの空席を維持
+      }
       // _updated が新しい方を採用、無ければ incoming を採用
       const incomingTs = incoming._updated || 0;
       const currentTs = current._updated || 0;
@@ -10768,11 +10861,18 @@ function mergeServerPayload(payload) {
   if (payload.tables && typeof payload.tables === 'object') {
     Object.keys(payload.tables).forEach(tid => {
       let incoming = payload.tables[tid];
+      // 退店済みセッション（台帳 or 来店ログで判定）の「入店中」は拒否して空席に
       if (incoming && incoming.occupied && incoming.startedAt && isSessionClosed(tid, incoming.startedAt)) {
         incoming = emptyTableData();
       }
       const current = state.tables[tid];
       if (!current) { state.tables[tid] = incoming; return; }
+      // ★保護：ローカルが空席で、サーバーが「同じ入店中卓」を送ってきた場合、
+      // そのセッションが退店済みなら受け入れない（退店直後の巻き戻り防止）
+      if (!current.occupied && incoming.occupied && incoming.startedAt
+          && isSessionClosed(tid, incoming.startedAt)) {
+        return; // ローカルの空席を維持
+      }
       if ((incoming._updated || 0) >= (current._updated || 0)) {
         state.tables[tid] = incoming;
       }
