@@ -2667,6 +2667,7 @@ function trimVisitLogsByCount(keepCount) {
 }
 
 let _quotaWarned = false;
+let _lastServerWriter = null; // 最後にサーバーへ書き込んだ端末情報（設定画面で表示）
 function persistSave() {
   // 自分発の変更マーカー（同期時の通知抑制用）
   markLocalChange();
@@ -2762,9 +2763,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.13';
+const APP_VERSION = '2026.06.13b';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.13b',
+    date: '2026-06-13',
+    title: '🔎 同期の診断機能を追加（巻き戻りの原因特定用）',
+    items: [
+      '設定 →「🗄 データ容量の整理」の下に「同期の診断情報」を追加しました。',
+      'この端末のバージョンと、最後にサーバーを更新した端末・そのバージョン・時刻が分かります。',
+      '別バージョンの端末が混ざっていると⚠マークが出ます。これで「古いバージョンのまま開いている端末」を特定できます。',
+      '退店が巻き戻る現象は、古いバージョンの端末が営業後にアプリを開くと起きます。全端末を最新版に統一すれば解消します。',
+    ],
+  },
   {
     version: '2026.06.13',
     date: '2026-06-13',
@@ -9638,6 +9650,12 @@ function refreshStorageUsage() {
       <span style="color:#999;">内訳：メインデータ ${fmtKB(bd.main)} ／ 通知キー ${bd.notifCount}個（${fmtKB(bd.notifKeys)}）／ 全${bd.totalKeys}キー</span>
     </div>
     ${pct >= 80 ? '<div style="margin-top:8px; padding:8px; background:#fdecea; border-radius:6px; color:#c0392b; font-size:12px;">⚠️ 容量が逼迫しています。バックアップ後、下の整理機能をお使いください。</div>' : '<div style="margin-top:8px; padding:8px; background:#eef7ee; border-radius:6px; color:#5a9c5a; font-size:12px;">✅ 容量に余裕があります。</div>'}
+    <hr style="margin:12px 0; border:none; border-top:1px solid #eee;">
+    <div style="font-size:12px; color:#666; line-height:1.8;">
+      <b style="color:#8b6914;">🖥 同期の診断情報</b><br>
+      この端末：<b>${escapeHtml(getDeviceLabel())}</b>（バージョン ${APP_VERSION}）<br>
+      ${_lastServerWriter ? `最後にサーバー更新した端末：<b>${escapeHtml(_lastServerWriter.device)}</b><br>　└ バージョン ${escapeHtml(String(_lastServerWriter.version))}　${escapeHtml(_lastServerWriter.version) !== APP_VERSION ? '<span style="color:#c0392b;">⚠ 別バージョン</span>' : '<span style="color:#5a9c5a;">✅ 一致</span>'}<br>　└ ${new Date(_lastServerWriter.at).toLocaleString('ja-JP')}` : '<span style="color:#999;">まだ同期データを受信していません</span>'}
+    </div>
   `;
 }
 
@@ -10587,6 +10605,20 @@ function applyServerData(payload) {
   // 初回同期（lastHashが空のとき）も通知しない
   const isFirstSync = !server.lastHash;
 
+  // 最後にサーバーへ書き込んだ端末を記録（バージョン特定・巻き戻り犯人の追跡用）
+  if (payload._lastWriter) {
+    _lastServerWriter = {
+      device: payload._lastWriter,
+      version: payload._lastWriterVersion || '不明',
+      at: payload._lastWriterAt || payload._updatedAt || Date.now(),
+    };
+    // 自分より古いバージョンの端末が書き込んでいたら警告ログ
+    if (payload._lastWriterVersion && payload._lastWriterVersion < APP_VERSION
+        && payload._lastWriter !== getDeviceLabel()) {
+      console.warn(`⚠ 古いバージョンの端末が書き込み中: ${payload._lastWriter} (v${payload._lastWriterVersion})`);
+    }
+  }
+
   // IDベースマージ
   if (payload.pin) state.pin = payload.pin;
   // 退店済みセッション台帳を先にマージ（後続のテーブルマージで使うため）
@@ -10904,8 +10936,32 @@ function buildSaveData() {
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
     closedSessions: state.closedSessions || {},
-    _updatedAt: Date.now()
+    _updatedAt: Date.now(),
+    _lastWriter: getDeviceLabel(),       // 最後に書き込んだ端末の表示名
+    _lastWriterVersion: APP_VERSION,     // その端末のバージョン
+    _lastWriterAt: Date.now(),
   };
+}
+
+// この端末の識別名（バージョン特定・犯人追跡用）。一度決めたら localStorage に保持
+function getDeviceLabel() {
+  const LS_DEV = 'tao_lite_device_label';
+  try {
+    let label = localStorage.getItem(LS_DEV);
+    if (!label) {
+      const ua = navigator.userAgent;
+      let os = 'PC';
+      if (/iPad/.test(ua)) os = 'iPad';
+      else if (/iPhone/.test(ua)) os = 'iPhone';
+      else if (/Android/.test(ua)) os = 'Android';
+      else if (/Macintosh/.test(ua)) os = 'Mac';
+      else if (/Windows/.test(ua)) os = 'Windows';
+      const rand = Math.random().toString(36).slice(2, 5);
+      label = os + '-' + rand;
+      localStorage.setItem(LS_DEV, label);
+    }
+    return label;
+  } catch(e) { return 'unknown'; }
 }
 // サーバーpayloadを _updated 比較でローカルstateに静かにマージ（再描画・通知なし）
 // saveToServer の前に呼び、自分の古いデータで他端末の新しい変更を上書きするのを防ぐ。
