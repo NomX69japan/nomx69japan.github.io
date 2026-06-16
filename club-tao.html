@@ -2425,6 +2425,8 @@
           <p style="color:#888; font-size:11px; margin:0 0 8px;">容量がいっぱいの時は、まず上の「バックアップDL」でデータを保存してから、以下で古い記録を整理してください。</p>
           <button class="btn-sub btn-sm" onclick="manualPurgeRemoved()" style="margin-bottom:6px;">🧹 削除済みデータを完全消去</button>
           <p style="color:#888; font-size:11px; margin:0 0 10px;">画面に表示されない「削除済み」の記録を物理的に消して容量を空けます。</p>
+          <button class="btn-sub btn-sm" onclick="manualDedupeCustomers()" style="margin-bottom:6px; background:#eef4ff; border-color:#5b8def; color:#2a5cb8;">👥 重複した顧客を統合</button>
+          <p style="color:#888; font-size:11px; margin:0 0 10px;">同じ名前で来店履歴もボトルも無い「空の重複顧客」を1つにまとめます（過去の重複登録の掃除用）。</p>
           <button class="btn-sub btn-sm" onclick="manualTrimOldLogs(180)" style="margin-bottom:6px; background:#fff4e6; border-color:#ff9800; color:#c65a00;">📅 6ヶ月以上前の来店履歴を削除</button>
           <button class="btn-sub btn-sm" onclick="manualTrimOldLogs(365)" style="margin-bottom:6px; background:#fff4e6; border-color:#ff9800; color:#c65a00;">📅 1年以上前の来店履歴を削除</button>
           <p style="color:#888; font-size:11px; margin:0;">古い来店履歴を削除します。顧客情報・ボトル・キャストは消えません。削除前に必ずバックアップを取ってください。</p>
@@ -2763,9 +2765,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.13b';
+const APP_VERSION = '2026.06.14';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.14',
+    date: '2026-06-14',
+    title: '🐛 新規客の重複登録バグ修正＋予約の顧客検索',
+    items: [
+      '【重要バグ修正】新規登録したお客様の来店中にオーダー追加すると、保存のたびに顧客リストへ重複登録されていた不具合を修正しました。',
+      '【重複の掃除】設定 →「データ容量の整理」に「👥 重複した顧客を統合」を追加。過去にできた空の重複顧客をまとめられます。',
+      '【予約の顧客検索】予約登録の既存顧客選択を、入店時と同じ検索方式にしました。名前・フリガナ・電話で素早く探せます。',
+      '【フリー指名（ママ欄）】「ママ・代表」のように複数人を入力できます（「・」やカンマで区切り）。入力欄の案内も分かりやすくしました。',
+    ],
+  },
   {
     version: '2026.06.13b',
     date: '2026-06-13',
@@ -6031,8 +6044,10 @@ let modalGuests = []; // 入店モーダル編集中の顧客カード配列
 // 1人分の顧客カードを生成（HTML文字列）
 // ===== 入店モーダル：顧客検索ピッカー =====
 let custPickerGuestId = null;
+let _custPickerMode = 'checkin'; // 'checkin' | 'resv'
 function openGuestCustomerPicker(guestId) {
   syncGuestCardFromDom(); // 入力中の他フィールドを保存
+  _custPickerMode = 'checkin';
   custPickerGuestId = guestId;
   const searchEl = document.getElementById('custPickerSearch');
   if (searchEl) searchEl.value = '';
@@ -6043,6 +6058,7 @@ function openGuestCustomerPicker(guestId) {
 function closeCustPicker() {
   document.getElementById('custPickerBg').classList.remove('active');
   custPickerGuestId = null;
+  _custPickerMode = 'checkin';
 }
 function renderCustPickerList() {
   const el = document.getElementById('custPickerList');
@@ -6077,6 +6093,16 @@ function renderCustPickerList() {
     : '');
 }
 function pickGuestCustomer(custId) {
+  // 予約モードの場合は予約カードを更新
+  if (_custPickerMode === 'resv') {
+    const g = modalResvGuests.find(x => x.id === custPickerGuestId);
+    if (g) { g.customerId = custId; g.customerName = ''; }
+    closeCustPicker();
+    // 顧客メモを連絡事項に反映（従来の onResvCustomerChange 相当）
+    try { applyResvCustomerMemo(custId); } catch(e) {}
+    renderResvGuestCardList();
+    return;
+  }
   const g = modalGuests.find(x => x.id === custPickerGuestId);
   if (g) {
     g.customerId = custId;
@@ -6085,6 +6111,23 @@ function pickGuestCustomer(custId) {
   }
   closeCustPicker();
   renderGuestCardList();
+}
+// 予約モーダルから顧客検索ピッカーを開く
+function openResvCustomerPicker(guestId) {
+  syncResvGuestCardFromDom();
+  _custPickerMode = 'resv';
+  custPickerGuestId = guestId;
+  const searchEl = document.getElementById('custPickerSearch');
+  if (searchEl) searchEl.value = '';
+  renderCustPickerList();
+  document.getElementById('custPickerBg').classList.add('active');
+  setTimeout(() => { try { document.getElementById('custPickerSearch')?.focus(); } catch(e){} }, 100);
+}
+function clearResvCustomer(guestId) {
+  syncResvGuestCardFromDom();
+  const g = modalResvGuests.find(x => x.id === guestId);
+  if (g) g.customerId = '';
+  renderResvGuestCardList();
 }
 function clearGuestCustomer(guestId) {
   syncGuestCardFromDom();
@@ -6176,7 +6219,7 @@ function buildGuestCardHtml(guest, idx, isOccupied) {
           <div class="cast-pick-list">
             ${castOptionsHtml || '<span style="color:var(--text-muted);font-size:12px;">設定からキャストを追加してください</span>'}
           </div>
-          <input type="text" class="gc-cast-free" data-guest-id="${guest.id}" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px; width:100%;">
+          <input type="text" class="gc-cast-free" data-guest-id="${guest.id}" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない人（複数可：ママ・代表 など）" style="margin-top:6px; width:100%;">
         </div>
       </div>
     </div>
@@ -7500,21 +7543,43 @@ function saveTableInternal(closeAfter) {
   const wasOccupied = !!prev.occupied;
 
   // 「新規登録」が選ばれていてまだ顧客IDがない場合は登録
+  // 各 guestList カードを個別に処理（複数の新規客に対応＋重複作成を防止）
   let customerId = data.customerId;
   let customerName = data.customerName;
+  const nowTs = Date.now();
+  if (Array.isArray(data.guestList)) {
+    data.guestList.forEach(g => {
+      if (g.registerNew && g.customerName && g.customerName.trim() && !g.customerId) {
+        const newCust = {
+          id: genId('cust'),
+          name: g.customerName.trim(),
+          phone: '', birthday: '', memo: '',
+          visits: [], bottles: [],
+          _created: nowTs, _updated: nowTs, removed: false,
+        };
+        state.customers.push(newCust);
+        // ★カードに customerId を書き戻し、registerNew を解除（次回保存での重複作成を防ぐ）
+        g.customerId = newCust.id;
+        g.registerNew = false;
+        // 同じIDの modalGuests エントリも更新（DOM再描画用）
+        const mg = modalGuests.find(x => x.id === g.id);
+        if (mg) { mg.customerId = newCust.id; mg.registerNew = false; mg.customerName = ''; }
+        // 先頭顧客なら従来フィールドにも反映
+        if (g.id === (data.guestList[0] && data.guestList[0].id)) {
+          customerId = newCust.id;
+          customerName = '';
+        }
+      }
+    });
+  }
+  // 後方互換：先頭顧客がまだ未処理の新規なら作成（guestListが無い古い経路向け）
   if (data.createNewCustomer && customerName && !customerId) {
-    const now = Date.now();
     const newCust = {
       id: genId('cust'),
       name: customerName,
-      phone: '',
-      birthday: '',
-      memo: '',
-      visits: [],
-      bottles: [],
-      _created: now,
-      _updated: now,
-      removed: false
+      phone: '', birthday: '', memo: '',
+      visits: [], bottles: [],
+      _created: nowTs, _updated: nowTs, removed: false,
     };
     state.customers.push(newCust);
     customerId = newCust.id;
@@ -9073,8 +9138,7 @@ let modalResvGuests = []; // 予約モーダル編集中の顧客カード配列
 // 予約モーダル：1顧客カードのHTMLを生成
 // 顧客選択時：その顧客のフリーメモを予約メモに「【連絡事項】◯◯」として反映
 // 顧客メモには【連絡事項】タグを付けず普通に書いておき、予約に紐付いた時だけ連絡事項化する運用
-function onResvCustomerChange(selectEl) {
-  const custId = selectEl ? selectEl.value : '';
+function applyResvCustomerMemo(custId) {
   if (!custId) return;
   const cust = (state.customers || []).find(c => c.id === custId);
   if (!cust) return;
@@ -9103,17 +9167,6 @@ function onResvCustomerChange(selectEl) {
 }
 
 function buildResvGuestCardHtml(guest, idx) {
-  // 顧客選択肢
-  const custOpts = ['<option value="">（未登録 or 新規）</option>']
-    .concat(state.customers.filter(c => !c.removed).slice().sort(customerSortCompare).map(c => {
-      const dn = displayName(c);
-      const label = (c.nickname && c.nickname.trim() && c.name && c.nickname.trim() !== c.name)
-        ? `${withSan(dn)}（${stripHonorific(c.name)}）`
-        : withSan(dn);
-      const selected = guest.customerId === c.id ? 'selected' : '';
-      return `<option value="${c.id}" ${selected}>${escapeHtml(label)}</option>`;
-    })).join('');
-
   // キャスト選択肢（sortOrder順）
   const castOpts = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
     const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
@@ -9157,7 +9210,14 @@ function buildResvGuestCardHtml(guest, idx) {
       <div class="guest-card-body">
         <div class="field-row">
           <span class="lab-inline">既存</span>
-          <select class="rg-customer-id" style="flex:1; padding:5px 6px; font-size:13px;" onchange="onResvCustomerChange(this)">${custOpts}</select>
+          <input type="hidden" class="rg-customer-id" data-rg-id="${guest.id}" value="${guest.customerId || ''}">
+          <button type="button" class="gc-cust-picker-btn" onclick="openResvCustomerPicker('${guest.id}')" style="flex:1;">
+            ${(() => {
+              const sc = guest.customerId ? state.customers.find(c => c.id === guest.customerId) : null;
+              return sc ? escapeHtml(withSan(displayName(sc))) : '<span class="gc-cust-placeholder">🔍 タップして顧客を検索</span>';
+            })()}
+          </button>
+          ${guest.customerId ? `<button type="button" class="btn-sub btn-sm" onclick="clearResvCustomer('${guest.id}')" style="padding:4px 10px;">×</button>` : ''}
         </div>
         <div class="field-row">
           <span class="lab-inline">新規</span>
@@ -9171,7 +9231,7 @@ function buildResvGuestCardHtml(guest, idx) {
         <div class="guest-card-casts">
           <div style="font-size:11px; color:var(--text-sub); margin-bottom:4px;">指名キャスト</div>
           ${castOpts || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
-          <input type="text" class="rg-cast-free" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない名前（フリー入力）" style="margin-top:6px; width:100%; padding:5px 6px; font-size:12px;">
+          <input type="text" class="rg-cast-free" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない人（複数可：ママ・代表 など）" style="margin-top:6px; width:100%; padding:5px 6px; font-size:12px;">
         </div>
       </div>
     </div>
@@ -9665,6 +9725,48 @@ function manualPurgeRemoved() {
   persistSave();
   refreshStorageUsage();
   alert(`削除済みデータ ${n} 件を消去しました。`);
+}
+
+// 重複顧客の統合：同名で「来店履歴もボトルも無い空の顧客」を1つにまとめる
+// 過去のオーダー追加重複登録バグで作られた空の重複を掃除する
+function manualDedupeCustomers() {
+  if (!confirm('同じ名前で、来店履歴もボトルも無い「空の重複顧客」を統合します。\n（履歴やボトルがある顧客は残します）\n\nバックアップは取りましたか？')) return;
+  const byName = {};
+  let removed = 0;
+  (state.customers || []).forEach(c => {
+    if (c.removed) return;
+    const key = (c.name || '').trim();
+    if (!key) return;
+    if (!byName[key]) byName[key] = [];
+    byName[key].push(c);
+  });
+  const hasContent = (c) =>
+    (Array.isArray(c.visits) && c.visits.length > 0) ||
+    (Array.isArray(c.bottles) && c.bottles.length > 0) ||
+    (c.phone && c.phone.trim()) || (c.memo && c.memo.trim()) ||
+    (c.kana && c.kana.trim()) || (c.nickname && c.nickname.trim());
+  Object.keys(byName).forEach(name => {
+    const group = byName[name];
+    if (group.length < 2) return;
+    const withContent = group.filter(hasContent);
+    const keep = (withContent.length > 0 ? withContent : group)
+      .slice().sort((a, b) => (a._created || 0) - (b._created || 0))[0];
+    group.forEach(c => {
+      if (c.id === keep.id) return;
+      if (hasContent(c)) return; // 中身があるものは安全のため残す
+      c.removed = true;
+      c._updated = Date.now();
+      removed++;
+    });
+  });
+  if (removed > 0) {
+    persistSave();
+    if (document.getElementById('page-customers')?.classList.contains('active')) renderCustomerList();
+  }
+  refreshStorageUsage();
+  alert(removed > 0
+    ? `空の重複顧客 ${removed} 件を統合しました。`
+    : '統合対象の重複顧客は見つかりませんでした。');
 }
 
 function manualTrimOldLogs(days) {
