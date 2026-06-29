@@ -1017,7 +1017,7 @@ function goStep(n) {
   curStep = n;
   if(n === 3){
     initWeekStart();
-    renderWeek();
+    renderWeek(); // async・await不要（goStepはasyncではないため発火のみ）
   }
   if(n === 4) {
     const m = menus[selMenu];
@@ -1087,8 +1087,31 @@ function initWeekStart(){
     weekStart = new Date(now); weekStart.setDate(now.getDate() - dayOffset);
   }
 }
-function prevW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() - 7); renderWeek(); }
-function nextW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() + 7); renderWeek(); }
+async function prevW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() - 7); await renderWeek(); }
+async function nextW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() + 7); await renderWeek(); }
+
+async function syncEventsFromGAS() {
+  if (!weekStart) return;
+  const start = new Date(weekStart);
+  const end   = new Date(weekStart);
+  end.setDate(end.getDate() + 7);
+  const url = GAS_URL + '?action=events&start=' + encodeURIComponent(start.toISOString()) + '&end=' + encodeURIComponent(end.toISOString());
+  try {
+    const resp = await fetch(url, { redirect: 'follow' });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const gasItems = data.map(ev => {
+      const s = new Date(ev.start), f = new Date(ev.end);
+      const jst = d => new Date(d.getTime() + 9*60*60*1000).toISOString();
+      return {
+        id: ev.start + ev.source, source: ev.source,
+        date: jst(s).slice(0,10), startTime: jst(s).slice(11,16), endTime: jst(f).slice(11,16),
+        colorId: ev.colorId ? parseInt(ev.colorId) : null, type: 'personal'
+      };
+    });
+    gcalEvents = [...gcalEvents.filter(e => e.source === 'app' || e.imported), ...gasItems];
+  } catch(err) { console.warn('GAS sync:', err); }
+}
 
 function fmtDate(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -1110,7 +1133,8 @@ function availableStartsForDay(dateStr){
   return out;
 }
 
-function renderWeek(){
+async function renderWeek(){
+  await syncEventsFromGAS();
   const head = document.getElementById('week-store-head');
   const cls  = selStore ? STORES[selStore].cls : '';
   head.innerHTML = '対象店舗： ' + (selStore ? storeChip(selStore) + storeName(selStore) + '店' : '未選択');
