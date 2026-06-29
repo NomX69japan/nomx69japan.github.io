@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NomX 予約</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --brand:#1a1a2e;
+  --brand2:#2d2d4e;
+  --accent:#E87722;
+  --accent2:#cf6815;
+  --brand-x:#E87722;
+  --bg:#f4f3ef;
+  --bg2:#ffffff;
+  --text:#1a1a2e;
+  --text2:#6b6b7b;
+  --text3:#a0a0b0;
+  --border:#e2e2ea;
+  --border2:#c8c8d8;
+  --radius:12px;
+  --radius-sm:8px;
+  --shadow:0 2px 12px rgba(26,26,46,0.08);
+  --shadow-lg:0 8px 32px rgba(26,26,46,0.14);
+  /* 店舗カラー（実カレンダー準拠：四条烏丸=緑 / 御池=アンバー） */
+  --oike:#d97706;
+  --oike-bg:#fef6e7;
+  --oike-border:#f6d08a;
+  --shijo:#16a34a;
+  --shijo-bg:#e8f7ee;
+  --shijo-border:#a7e0bd;
+}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+
+/* Layout */
+.app-shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+@media(max-width:768px){.app-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}}
+
+/* Sidebar */
+.sidebar{background:var(--brand);color:white;display:flex;flex-direction:column;padding:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+@media(max-width:768px){.sidebar{display:none}}
+.sidebar-logo{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.sidebar-logo .dm{font-family:'DM Serif Display',serif;font-size:24px;letter-spacing:0.02em}
+.logo-x{color:var(--brand-x)}
+.sidebar-logo .sub{font-size:11px;opacity:0.5;margin-top:2px;letter-spacing:0.08em}
+.sidebar-mode{padding:16px 16px 12px;display:flex;gap:6px}
+.mode-btn{flex:1;padding:6px;font-size:11px;border:1px solid rgba(255,255,255,0.2);border-radius:var(--radius-sm);background:none;color:rgba(255,255,255,0.6);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s}
+.mode-btn.active{background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.4)}
+.sidebar-nav{flex:1;padding:8px 12px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;color:rgba(255,255,255,0.6);transition:all 0.15s;margin-bottom:2px;font-size:13px}
+.nav-item:hover{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.9)}
+.nav-item.active{background:rgba(255,255,255,0.15);color:white}
+.nav-icon{font-size:15px;width:20px;text-align:center}
+.sidebar-footer{padding:16px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;opacity:0.4}
+
+/* Mobile bottom nav */
+.mobile-nav{display:none;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 16px}
+@media(max-width:768px){.mobile-nav{display:flex}}
+.mob-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px;background:none;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text2);font-size:10px}
+.mob-btn.active{color:var(--brand)}
+.mob-icon{font-size:20px}
+.mobile-header{display:none;background:var(--brand);color:white;padding:16px 20px;align-items:center;justify-content:space-between}
+@media(max-width:768px){.mobile-header{display:flex}}
+.mh-name{font-size:18px;font-weight:700;font-family:'DM Serif Display',serif}
+.mh-sub{font-size:10px;opacity:0.5;letter-spacing:0.08em}
+
+/* Main content */
+.main{background:var(--bg);overflow-y:auto}
+.page{display:none;padding:32px}
+.page.active{display:block}
+@media(max-width:768px){.page{padding:16px}}
+
+/* Page header */
+.page-header{margin-bottom:24px}
+.page-title{font-size:22px;font-weight:700;color:var(--text)}
+.page-subtitle{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card-sm{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+
+/* Buttons */
+.btn{padding:10px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.15s;border:1px solid var(--border2)}
+.btn-brand{background:var(--brand);color:white;border-color:var(--brand)}
+.btn-brand:hover{background:var(--brand2)}
+.btn-brand:disabled{opacity:0.35;cursor:default}
+.btn-accent{background:var(--accent);color:var(--brand);border-color:var(--accent)}
+.btn-accent:hover{background:var(--accent2)}
+.btn-ghost{background:none;color:var(--text2)}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
+.btn-danger{background:none;color:#e53e3e;border-color:#feb2b2}
+.btn-danger:hover{background:#fff5f5}
+.btn-full{width:100%}
+.btn-sm{padding:5px 12px;font-size:12px}
+
+/* Form elements */
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;color:var(--text2);margin-bottom:5px;display:block;font-weight:500}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;font-family:'Noto Sans JP',sans-serif;background:var(--bg2);color:var(--text);transition:border-color 0.15s}
+.form-input:focus{outline:none;border-color:var(--brand)}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b7b' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+/* Toggle */
+.toggle-wrap{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.toggle-wrap:last-child{border-bottom:none;padding-bottom:0}
+.toggle-info .toggle-title{font-size:13px;font-weight:500}
+.toggle-info .toggle-desc{font-size:11px;color:var(--text3);margin-top:2px}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.tslider{position:absolute;inset:0;background:var(--border2);border-radius:11px;cursor:pointer;transition:background 0.2s}
+.tslider:before{content:'';position:absolute;height:16px;width:16px;left:3px;top:3px;background:white;border-radius:50%;transition:transform 0.2s}
+.toggle input:checked+.tslider{background:var(--accent)}
+.toggle input:checked+.tslider:before{transform:translateX(18px)}
+
+/* Badges */
+.badge{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500}
+.badge-ok{background:#d4f5e7;color:#166534}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-cancel{background:#fee2e2;color:#991b1b}
+.badge-gcal{background:#e8f0fe;color:#1a56db}
+.badge-line{background:#d4f5e7;color:#166534}
+/* 店舗チップ */
+.store-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:700}
+.store-chip::before{content:'';width:8px;height:8px;border-radius:50%}
+.store-oike{background:var(--oike-bg);color:var(--oike)}
+.store-oike::before{background:var(--oike)}
+.store-shijo{background:var(--shijo-bg);color:var(--shijo)}
+.store-shijo::before{background:var(--shijo)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:480px){.stats-grid{grid-template-columns:1fr 1fr}}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.stat-label{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:0.04em}
+.stat-value{font-size:26px;font-weight:700;color:var(--text);margin-top:4px}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* Calendar */
+.cal-wrap{margin-bottom:16px}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-month{font-size:15px;font-weight:700}
+.cal-nav{background:none;border:1px solid var(--border2);border-radius:var(--radius-sm);width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--text2);transition:all 0.15s}
+.cal-nav:hover{background:var(--bg);border-color:var(--brand);color:var(--brand)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cd-lbl{text-align:center;font-size:11px;color:var(--text3);padding:4px 0;font-weight:500}
+.cd{text-align:center;font-size:12px;padding:7px 0;border-radius:var(--radius-sm);cursor:pointer;transition:all 0.12s;position:relative;color:var(--text)}
+.cd:hover:not(.cd-empty):not(.cd-past){background:var(--bg)}
+.cd.cd-today{color:var(--accent2);font-weight:700}
+.cd.cd-sel{background:var(--brand);color:white}
+.cd.cd-past{color:var(--text3);cursor:default}
+.cd.cd-has::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--accent);margin:2px auto 0}
+.cd.cd-sel.cd-has::after{background:#7ee8a2}
+.cd.cd-gcal{background:#e8f0fe}
+.cd.cd-gcal::before{content:'G';position:absolute;top:1px;right:2px;font-size:8px;color:#1a56db;font-weight:700}
+
+/* Slots */
+.slot-group-title{font-size:11px;font-weight:700;color:var(--text2);margin:4px 0 8px;letter-spacing:0.04em}
+.slots-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+@media(max-width:480px){.slots-grid{grid-template-columns:1fr 1fr}}
+.slot{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;background:var(--bg2);transition:all 0.12s}
+.slot:hover:not(.slot-busy):not(.slot-gcal-busy){border-color:var(--brand)}
+.slot.slot-sel{background:var(--brand);border-color:var(--brand);color:white}
+.slot.slot-busy{background:var(--bg);color:var(--text3);cursor:default}
+.slot.slot-gcal-busy{background:#e8f0fe;border-color:#bcd0f5;cursor:default}
+.slot-time{font-size:14px;font-weight:700}
+.slot-label{font-size:11px;color:var(--text2);margin-top:2px}
+.slot.slot-sel .slot-label{color:rgba(255,255,255,0.7)}
+.slot.slot-busy .slot-label,.slot.slot-gcal-busy .slot-label{color:var(--text3)}
+.slot.slot-gcal-busy .slot-time{color:#1a56db}
+.slot.slot-gcal-busy .slot-label{color:#1a56db}
+
+/* Step dots */
+.step-dots{display:flex;gap:6px;justify-content:center;margin-bottom:20px}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--border2);transition:all 0.2s}
+.sdot.on{background:var(--brand);width:24px;border-radius:4px}
+
+/* Store options */
+.store-opt{padding:18px 18px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;background:var(--bg2);display:flex;align-items:center;gap:14px;margin-bottom:12px;transition:all 0.15s}
+.store-opt:hover{box-shadow:var(--shadow)}
+.store-opt .store-mark{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.store-opt.store-opt-oike{border-left:4px solid var(--oike)}
+.store-opt.store-opt-oike .store-mark{background:var(--oike)}
+.store-opt.store-opt-oike.sel{border-color:var(--oike);box-shadow:0 0 0 3px rgba(217,119,6,0.14)}
+.store-opt.store-opt-shijo{border-left:4px solid var(--shijo)}
+.store-opt.store-opt-shijo .store-mark{background:var(--shijo)}
+.store-opt.store-opt-shijo.sel{border-color:var(--shijo);box-shadow:0 0 0 3px rgba(22,163,74,0.14)}
+.store-opt-name{font-size:15px;font-weight:700}
+.store-opt-desc{font-size:12px;color:var(--text2);margin-top:2px}
+
+/* Menu options */
+.menu-opt{padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;background:var(--bg2);display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;transition:all 0.15s}
+.menu-opt:hover{border-color:var(--brand2);box-shadow:var(--shadow)}
+.menu-opt.sel{border-color:var(--brand);box-shadow:0 0 0 3px rgba(26,26,46,0.06)}
+.menu-opt-name{font-size:14px;font-weight:700}
+.menu-opt-desc{font-size:12px;color:var(--text2);margin-top:3px}
+.menu-opt-dur{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* Summary */
+.sum-table{width:100%;font-size:13px}
+.sum-table tr td{padding:8px 0}
+.sum-table tr:not(:last-child) td{border-bottom:1px solid var(--border)}
+.sum-key{color:var(--text2);width:120px}
+.sum-val{font-weight:500;text-align:right}
+
+/* Admin table */
+.admin-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.admin-row:last-child{border-bottom:none}
+.admin-name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.admin-meta{font-size:11px;color:var(--text2);margin-top:3px}
+.admin-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+
+/* GCal sync indicator */
+.gcal-sync-bar{background:#e8f0fe;border:1px solid #bcd0f5;border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.gcal-sync-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.gcal-sync-text{font-size:12px;color:#1a56db;font-weight:500}
+
+/* Gcal event preview */
+.gcal-event{border-left:3px solid #1a73e8;background:#e8f0fe;border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 12px;margin-bottom:6px}
+.gcal-event.src-nomura{border-left-color:#1a73e8}
+.gcal-event.src-macumba{border-left-color:#d97706;background:#fff7ed}
+.gcal-event-title{font-size:12px;font-weight:700;color:#1a56db}
+.gcal-event.src-macumba .gcal-event-title{color:#b45309}
+.gcal-event-time{font-size:11px;color:#1a56db;opacity:0.8;margin-top:1px}
+.gcal-event.src-macumba .gcal-event-time{color:#b45309}
+.src-tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;margin-left:6px}
+.src-tag.nomura{background:#dbeafe;color:#1d4ed8}
+.src-tag.macumba{background:#ffedd5;color:#c2410c}
+
+/* Settings */
+.settings-block{margin-bottom:20px}
+.settings-title{font-size:13px;font-weight:700;color:var(--text2);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:10px}
+.menu-edit-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.menu-edit-row .form-input{flex:2}
+.menu-edit-row .dur-input{flex:none;width:72px}
+.del-btn{background:none;border:none;color:#e53e3e;cursor:pointer;font-size:18px;padding:0 4px;line-height:1}
+
+/* Integration cards */
+.integration-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.integration-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.integration-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.ig-gcal{background:#e8f0fe}
+.ig-line{background:#d4f5e7}
+.integration-name{font-size:14px;font-weight:700}
+.integration-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.integration-status{margin-left:auto;display:flex;align-items:center;gap:8px}
+.status-dot{width:8px;height:8px;border-radius:50%}
+.status-dot.on{background:var(--accent)}
+.status-dot.off{background:var(--text3)}
+
+/* Today timeline */
+.timeline{position:relative;padding-left:20px}
+.tl-item{position:relative;padding:0 0 16px 16px;border-left:2px solid var(--border)}
+.tl-item:last-child{border-left-color:transparent}
+.tl-dot{position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--accent);border:2px solid var(--bg2)}
+.tl-dot.gcal{background:#1a73e8}
+.tl-dot.macumba{background:#d97706}
+.tl-time{font-size:11px;font-weight:700;color:var(--text3)}
+.tl-name{font-size:13px;font-weight:700;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tl-menu{font-size:11px;color:var(--text2)}
+
+/* Toast */
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--brand);color:white;padding:12px 18px;border-radius:var(--radius);font-size:13px;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(8px);transition:all 0.3s;max-width:300px}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* Loading */
+.gcal-loading{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);padding:10px 0}
+.spinner{width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--brand);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Section divider */
+.divider{height:1px;background:var(--border);margin:20px 0}
+
+/* Tagline */
+.tagline{font-size:12px;color:var(--text2);line-height:1.7;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:12px 14px;margin-bottom:20px}
+
+/* View tabs (月/週) */
+.view-tabs{display:flex;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;margin-bottom:16px}
+.view-tab{flex:1;padding:8px;font-size:13px;font-weight:500;border:none;border-radius:6px;background:none;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.15s}
+.view-tab.active{background:var(--bg2);color:var(--text);box-shadow:var(--shadow)}
+
+/* Week view — ○×グリッド */
+.week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
+.week-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px}
+.week-grid{display:grid;border-collapse:separate;min-width:480px}
+/* 1列目=時間軸、2〜8列目=7日分 */
+.week-grid-inner{display:grid;grid-template-columns:52px repeat(7,minmax(56px,1fr));gap:0}
+/* ヘッダ行 */
+.wg-corner{position:sticky;left:0;z-index:3;background:var(--bg);border-bottom:2px solid var(--border2);border-right:1px solid var(--border)}
+.wg-day-head{text-align:center;font-size:11px;font-weight:700;padding:6px 2px;border-bottom:2px solid var(--border2);border-right:1px solid var(--border);line-height:1.3;background:var(--bg2)}
+.wg-day-head.is-today{background:var(--accent);color:white;border-bottom-color:var(--accent2)}
+.wg-day-head .wdh-date{display:block;font-size:12px}
+.wg-day-head .wdh-wd{display:block;font-size:10px;opacity:0.75}
+/* 時間ラベル列 */
+.wg-time{position:sticky;left:0;z-index:2;background:var(--bg);font-size:10px;color:var(--text2);text-align:right;padding:0 6px 0 0;line-height:1;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:32px}
+/* セル */
+.wg-cell{display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:32px;font-size:13px;font-weight:700;cursor:default;transition:filter 0.1s}
+.wg-cell.wg-ok{cursor:pointer}
+.wg-cell.wg-ok.wc-shijo{background:var(--shijo-bg);color:var(--shijo)}
+.wg-cell.wg-ok.wc-oike{background:var(--oike-bg);color:var(--oike)}
+.wg-cell.wg-ok:hover{filter:brightness(0.93)}
+.wg-cell.wg-ok.sel{background:var(--brand);color:white}
+.wg-cell.wg-ng{background:#f4f4f6;color:#bbbbc8}
+/* 選択中ハイライト */
+.wg-cell.sel{background:var(--brand) !important;color:white !important}
+
+/* Responsive helpers */
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .slots-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="dm" id="sb-name">Nom<span class="logo-x">X</span></div>
+      <div class="sub" id="sb-sub">ボディデザインスタジオ / 京都</div>
+    </div>
+    <div class="sidebar-mode">
+      <button class="mode-btn" id="mb-client" onclick="setMode('client')">顧客画面</button>
+      <button class="mode-btn active" id="mb-admin" onclick="setMode('admin')">管理者</button>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('book')" id="ni-book">
+        <span class="nav-icon">📅</span>予約する
+      </div>
+      <div class="nav-item" onclick="showPage('mybook')" id="ni-mybook">
+        <span class="nav-icon">📋</span>予約確認
+      </div>
+      <div class="nav-item admin-only" onclick="showPage('admin')" id="ni-admin">
+        <span class="nav-icon">🗂️</span>管理画面
+      </div>
+      <div class="nav-item admin-only" onclick="showPage('gcal')" id="ni-gcal">
+        <span class="nav-icon">📆</span>カレンダー同期
+      </div>
+      <div class="nav-item admin-only" onclick="showPage('settings')" id="ni-settings">
+        <span class="nav-icon">⚙️</span>設定
+      </div>
+    </nav>
+    <div class="sidebar-footer">NomX 予約 v1.0 (試作)</div>
+  </aside>
+
+  <!-- Mobile header -->
+  <div class="mobile-header">
+    <div>
+      <div class="mh-name" id="mh-name">Nom<span class="logo-x">X</span></div>
+      <div class="mh-sub" id="mh-sub">ボディデザインスタジオ / 京都</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="mode-btn" id="mb-client-m" onclick="setMode('client')" style="font-size:11px;padding:5px 10px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:none;color:rgba(255,255,255,0.6);cursor:pointer">顧客</button>
+      <button class="mode-btn active" id="mb-admin-m" onclick="setMode('admin')" style="font-size:11px;padding:5px 10px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:rgba(255,255,255,0.2);color:white;cursor:pointer">管理</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- 予約ページ -->
+    <div id="page-book" class="page active">
+      <div class="page-header">
+        <div class="page-title">セッション予約</div>
+        <div class="page-subtitle">会員様向け予約 — 店舗 → メニュー → 日時 → 確認の順に進めてください</div>
+      </div>
+
+      <div class="step-dots">
+        <div class="sdot on" id="sd1"></div>
+        <div class="sdot" id="sd2"></div>
+        <div class="sdot" id="sd3"></div>
+        <div class="sdot" id="sd4"></div>
+      </div>
+
+      <!-- Step 1: Store -->
+      <div id="step1">
+        <div class="tagline">
+          感覚や根性じゃなく、理屈で鍛える。<br>
+          10年後も、今より動ける身体であるために。
+        </div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px">店舗を選ぶ</div>
+        <div id="store-opts-container"></div>
+        <button class="btn btn-brand btn-full" id="btn-step1" disabled onclick="goStep(2)">メニューを選ぶ →</button>
+      </div>
+
+      <!-- Step 2: Menu -->
+      <div id="step2" style="display:none">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px">メニューを選ぶ</div>
+        <div id="menu-opts-container"></div>
+        <button class="btn btn-brand btn-full" id="btn-step2" disabled onclick="goStep(3)">日時を選ぶ →</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="goStep(1)">← 店舗を選び直す</button>
+      </div>
+
+      <!-- Step 3: Date/Time -->
+      <div id="step3" style="display:none">
+        <div class="gcal-sync-bar">
+          <div class="gcal-sync-dot"></div>
+          <div class="gcal-sync-text">Googleカレンダー（ノムラ＋macumba）と同期 — 本当に空いてる枠だけ表示</div>
+        </div>
+
+        <!-- 月表示 / 週表示 トグル -->
+        <div class="view-tabs">
+          <button class="view-tab active" id="vt-month" onclick="setDateView('month')">月表示</button>
+          <button class="view-tab" id="vt-week" onclick="setDateView('week')">週表示</button>
+        </div>
+
+        <!-- 週表示 -->
+        <div id="week-view" style="display:none">
+          <div class="week-store-head" id="week-store-head"></div>
+          <div class="cal-header">
+            <button class="cal-nav" onclick="prevW()">‹</button>
+            <div class="cal-month" id="week-lbl"></div>
+            <button class="cal-nav" onclick="nextW()">›</button>
+          </div>
+          <div class="week-scroll-wrap">
+            <div class="week-grid" id="week-grid"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:10px">
+            ○をタップするとその日時で確認に進みます。<br>
+            セッション間隔: 同じ店舗 <span id="week-interval-display">30分</span> / 店舗をまたぐとき <span id="week-move-buffer-display">60分</span>確保
+          </div>
+        </div>
+
+        <!-- 月表示 -->
+        <div id="month-view">
+        <div class="cal-wrap">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="prevM()">‹</button>
+            <div class="cal-month" id="cal-lbl"></div>
+            <button class="cal-nav" onclick="nextM()">›</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+        <div id="slot-section" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:700">時間帯を選ぶ</div>
+            <div style="font-size:11px;color:var(--text2)">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:4px"></span>空き
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#9aa;margin-left:10px;margin-right:4px"></span>予約不可（理由表示）
+            </div>
+          </div>
+          <div id="slots-container" style="max-height:340px;overflow-y:auto"></div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:12px">
+            セッション間隔: 同じ店舗 <span id="interval-display">30分</span> / 店舗をまたぐとき <span id="move-buffer-display">60分</span>確保
+          </div>
+        </div>
+        </div><!-- /month-view -->
+        <button class="btn btn-brand btn-full" id="btn-step3" disabled onclick="goStep(4)">内容を確認する →</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="goStep(2)">← 戻る</button>
+      </div>
+
+      <!-- Step 4: Confirm -->
+      <div id="step4" style="display:none">
+        <div class="card">
+          <table class="sum-table">
+            <tr><td class="sum-key">店舗</td><td class="sum-val" id="sm-store"></td></tr>
+            <tr><td class="sum-key">メニュー</td><td class="sum-val" id="sm-menu"></td></tr>
+            <tr><td class="sum-key">日時</td><td class="sum-val" id="sm-date"></td></tr>
+            <tr><td class="sum-key">所要時間</td><td class="sum-val" id="sm-dur"></td></tr>
+            <tr><td class="sum-key">Gカレンダー</td><td class="sum-val"><span class="badge badge-gcal" id="sm-gcal">自動追加</span></td></tr>
+            <tr><td class="sum-key">LINE通知</td><td class="sum-val"><span class="badge badge-line" id="sm-line">送信する</span></td></tr>
+          </table>
+        </div>
+        <button class="btn btn-brand btn-full" onclick="confirmBooking()" style="margin-bottom:8px">予約を確定する</button>
+        <button class="btn btn-ghost btn-full" onclick="goStep(3)">← 日時を変更する</button>
+      </div>
+    </div>
+
+    <!-- 予約確認ページ -->
+    <div id="page-mybook" class="page">
+      <div class="page-header">
+        <div class="page-title">予約確認</div>
+        <div class="page-subtitle">あなたの予約一覧</div>
+      </div>
+      <div id="mybook-container"></div>
+    </div>
+
+    <!-- 管理画面 -->
+    <div id="page-admin" class="page">
+      <div class="page-header">
+        <div class="page-title">管理画面</div>
+        <div class="page-subtitle">予約管理</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">今月の予約</div><div class="stat-value" id="st-count">0</div><div class="stat-sub">件</div></div>
+        <div class="stat-card"><div class="stat-label">キャンセル率</div><div class="stat-value" id="st-cancel">0%</div><div class="stat-sub"></div></div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:15px;font-weight:700">予約一覧</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-ghost" onclick="filterBookings('all')" id="fa-all" style="border:1px solid var(--brand);color:var(--brand)">すべて</button>
+          <button class="btn btn-sm btn-ghost" onclick="filterBookings('confirmed')" id="fa-confirmed">確定</button>
+          <button class="btn btn-sm btn-ghost" onclick="filterBookings('pending')" id="fa-pending">保留</button>
+          <button class="btn btn-sm btn-ghost" onclick="filterBookings('cancelled')" id="fa-cancelled">ｷｬﾝｾﾙ</button>
+        </div>
+      </div>
+
+      <!-- 店舗で絞り込み -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+        <span style="font-size:11px;color:var(--text2);font-weight:500">店舗:</span>
+        <button class="btn btn-sm btn-ghost" onclick="filterStore('all')" id="fs-all" style="border:1px solid var(--brand);color:var(--brand)">すべて</button>
+        <button class="btn btn-sm btn-ghost" onclick="filterStore('oike')" id="fs-oike" style="border:1px solid var(--oike-border)"><span class="store-chip store-oike">御池</span></button>
+        <button class="btn btn-sm btn-ghost" onclick="filterStore('shijo')" id="fs-shijo" style="border:1px solid var(--shijo-border)"><span class="store-chip store-shijo">四条烏丸</span></button>
+      </div>
+
+      <div class="card" style="padding:16px">
+        <div id="admin-bookings-container"></div>
+      </div>
+
+      <div style="font-size:15px;font-weight:700;margin:24px 0 12px">本日のスケジュール</div>
+      <div class="card" style="padding:16px">
+        <div class="timeline" id="today-timeline"></div>
+      </div>
+    </div>
+
+    <!-- Googleカレンダー同期ページ -->
+    <div id="page-gcal" class="page">
+      <div class="page-header">
+        <div class="page-title">Googleカレンダー同期</div>
+        <div class="page-subtitle">「ノムラ」＋「macumba」2つの予定を合算して、動けない時間をブロックします</div>
+      </div>
+
+      <div class="gcal-sync-bar" style="margin-bottom:20px">
+        <div class="gcal-sync-dot"></div>
+        <div class="gcal-sync-text">最終同期: <span id="last-sync-time">数秒前</span></div>
+        <button class="btn btn-sm btn-ghost" id="gcal-sync-btn" onclick="simulateSync()" style="margin-left:auto;display:none">今すぐ同期</button>
+      </div>
+
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">ブロック中の予定（ノムラ＋macumba）</div>
+      <div id="gcal-events-list"></div>
+
+      <div class="divider"></div>
+
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">同期設定</div>
+      <div class="card">
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <div class="toggle-title">2カレンダーの予定をブロック</div>
+            <div class="toggle-desc">ノムラ・macumbaどちらかに予定があれば予約不可にする</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked id="tog-gcal-block"><span class="tslider"></span></label>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <div class="toggle-title">予約確定時にGカレンダーに追加</div>
+            <div class="toggle-desc">予約が確定したら自動でイベント作成（ノムラ側）</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked id="tog-gcal-add"><span class="tslider"></span></label>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <div class="toggle-title">キャンセル時にGカレンダーから削除</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked id="tog-gcal-del"><span class="tslider"></span></label>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle-info">
+            <div class="toggle-title">手動予約をアプリに取り込む</div>
+            <div class="toggle-desc">Gカレンダーに手動追加した「PT:」で始まるイベントを予約として反映</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked id="tog-gcal-import"><span class="tslider"></span></label>
+        </div>
+        <div class="form-group" style="margin-top:12px;margin-bottom:0">
+          <label class="form-label">手動予約のキーワード（このワードで始まるイベントを取り込む）</label>
+          <input class="form-input" id="gcal-keyword" value="PT:">
+        </div>
+      </div>
+
+      <div style="font-size:15px;font-weight:700;margin:20px 0 12px">Gカレンダーから取り込まれた予約</div>
+      <div id="gcal-imported-list"></div>
+
+      <div class="divider"></div>
+      <div style="font-size:13px;color:var(--text2);padding:10px 0">
+        <strong>接続方法：</strong>Google Cloud ConsoleでCalendar APIを有効化し、API Key と OAuthクライアントIDを取得。
+        「設定」画面で「ノムラ用」「macumba用」のカレンダーIDを入力して「Googleでログイン」してください。
+      </div>
+    </div>
+
+    <!-- 設定ページ -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <div class="page-title">設定</div>
+        <div class="page-subtitle">アプリの各種設定を変更できます</div>
+      </div>
+
+      <!-- スタジオ情報 -->
+      <div class="settings-block">
+        <div class="settings-title">スタジオ情報</div>
+        <div class="card">
+          <div class="form-group"><label class="form-label">名前</label><input class="form-input" id="cfg-name" value="NomX"></div>
+          <div class="form-group"><label class="form-label">肩書き</label><input class="form-input" id="cfg-sub" value="ボディデザインスタジオ / 京都"></div>
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">LINE公式アカウント名</label><input class="form-input" id="cfg-line-name" value="NomX"></div>
+        </div>
+      </div>
+
+      <!-- セッション設定 -->
+      <div class="settings-block">
+        <div class="settings-title">セッション設定</div>
+        <div class="card">
+          <div class="form-group">
+            <label class="form-label">セッション間の空き時間（最短・同じ店舗どうし）</label>
+            <select class="form-input form-select" id="cfg-interval">
+              <option value="15">最短 15分</option>
+              <option value="30" selected>標準 30分</option>
+              <option value="45">余裕 45分</option>
+              <option value="60">ゆとり 60分</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">店舗間移動バッファ（御池⇄四条烏丸をまたぐとき）</label>
+            <select class="form-input form-select" id="cfg-move-buffer">
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60" selected>標準 60分</option>
+              <option value="90">余裕 90分</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">営業時間</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input class="form-input" type="time" id="cfg-open" value="09:00" style="width:auto">
+              <span style="color:var(--text2)">〜</span>
+              <input class="form-input" type="time" id="cfg-close" value="21:00" style="width:auto">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- メニュー編集 -->
+      <div class="settings-block">
+        <div class="settings-title">メニュー編集（※時間は仮。社長確認待ち）</div>
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr 64px 28px;gap:6px;margin-bottom:8px">
+            <div class="form-label">名前</div>
+            <div class="form-label">時間(分)</div>
+            <div></div>
+          </div>
+          <div id="menu-edit-rows"></div>
+          <button class="btn btn-ghost btn-sm" onclick="addMenuRow()" style="margin-top:8px;border:1px dashed var(--border2)">＋ メニューを追加</button>
+        </div>
+      </div>
+
+      <!-- キャンセルポリシー -->
+      <div class="settings-block">
+        <div class="settings-title">キャンセルポリシー</div>
+        <div class="card">
+          <div class="toggle-wrap">
+            <div class="toggle-info"><div class="toggle-title">前日キャンセルを許可</div></div>
+            <label class="toggle"><input type="checkbox" checked><span class="tslider"></span></label>
+          </div>
+          <div class="toggle-wrap">
+            <div class="toggle-info"><div class="toggle-title">当日キャンセルを許可</div></div>
+            <label class="toggle"><input type="checkbox"><span class="tslider"></span></label>
+          </div>
+          <div class="form-group" style="margin-top:12px;margin-bottom:0">
+            <label class="form-label">無料キャンセル期限（何時間前まで）</label>
+            <input class="form-input" type="number" value="24" min="1" max="72" style="width:80px">
+          </div>
+        </div>
+      </div>
+
+      <!-- LINE連携 -->
+      <div class="settings-block">
+        <div class="settings-title">LINE連携</div>
+        <div class="integration-card">
+          <div class="integration-header">
+            <div class="integration-icon ig-line">💬</div>
+            <div>
+              <div class="integration-name">LINE公式アカウント</div>
+              <div class="integration-desc">予約通知・リマインダーをLINEで自動送信</div>
+            </div>
+            <div class="integration-status">
+              <div class="status-dot on" id="line-dot"></div>
+              <span style="font-size:12px;font-weight:500" id="line-status-text">接続済み</span>
+              <button class="btn btn-sm btn-ghost" onclick="toggleLine()" id="line-toggle-btn">解除</button>
+            </div>
+          </div>
+          <div class="toggle-wrap"><div class="toggle-info"><div class="toggle-title">予約確定通知</div></div><label class="toggle"><input type="checkbox" checked id="tog-line-confirm"><span class="tslider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-info"><div class="toggle-title">前日リマインド</div></div><label class="toggle"><input type="checkbox" checked id="tog-line-remind"><span class="tslider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-info"><div class="toggle-title">キャンセル通知</div></div><label class="toggle"><input type="checkbox" checked id="tog-line-cancel"><span class="tslider"></span></label></div>
+          <div class="toggle-wrap"><div class="toggle-info"><div class="toggle-title">管理者にも同時通知</div></div><label class="toggle"><input type="checkbox" id="tog-line-admin"><span class="tslider"></span></label></div>
+        </div>
+      </div>
+
+      <!-- Googleカレンダー連携 -->
+      <div class="settings-block">
+        <div class="settings-title">Googleカレンダー連携（2カレンダー合算）</div>
+        <div class="integration-card">
+          <div class="integration-header">
+            <div class="integration-icon ig-gcal">📆</div>
+            <div>
+              <div class="integration-name">Googleカレンダー</div>
+              <div class="integration-desc">「ノムラ」＋「macumba」を合算して空き判定 / 予約反映</div>
+            </div>
+            <div class="integration-status">
+              <div class="status-dot on" id="gcal-dot"></div>
+              <span style="font-size:12px;font-weight:500" id="gcal-status-text">接続済み</span>
+              <button class="btn btn-sm btn-ghost" onclick="toggleGcal()" id="gcal-toggle-btn">解除</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ノムラ用カレンダーID（メイン予定）</label>
+            <input class="form-input" value="primary" id="cfg-gcal-id-nomura" placeholder="例: primary または yourname@gmail.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">macumba用カレンダーID（夜バイト等）</label>
+            <input class="form-input" value="" id="cfg-gcal-id-macumba" placeholder="例: macumba@group.calendar.google.com">
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.6">
+            ※ 複数カレンダーをまとめたい場合はカンマ区切りで複数IDを入力できます。<br>
+            ※ 「ノム宅」カレンダーは予約判定に使いません（除外）。
+          </div>
+          <div id="gcal-login-area" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px">🔑 Google API 認証情報</div>
+            <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:12px;color:#92400e">
+              <strong>設定手順：</strong><br>
+              1. <a href="https://console.cloud.google.com/" target="_blank" style="color:#1a56db">Google Cloud Console</a> を開く<br>
+              2. 新規プロジェクト作成 → 「Google Calendar API」を有効化<br>
+              3. 「認証情報」→「APIキー」を作成 → 下のAPI Keyに貼る<br>
+              4. 「OAuth 2.0クライアントID」を作成（種類: ウェブアプリ）<br>
+              &nbsp;&nbsp;&nbsp;承認済みJSオリジン: <code style="background:#fef3c7;padding:1px 4px;border-radius:3px">file://</code> または公開先URL<br>
+              5. クライアントIDを下に貼る → 「Googleでログイン」ボタンを押す
+            </div>
+            <div class="form-group">
+              <label class="form-label">API Key</label>
+              <input class="form-input" id="cfg-gcal-api-key" placeholder="AIzaSy..." type="password"
+                value="" oninput="localStorage.setItem('gcal_api_key',this.value)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">OAuth 2.0 クライアントID</label>
+              <input class="form-input" id="cfg-gcal-client-id" placeholder="xxxxxx.apps.googleusercontent.com"
+                value="" oninput="localStorage.setItem('gcal_client_id',this.value)">
+            </div>
+            <button class="btn btn-brand btn-full" onclick="gcalLogin()">
+              <span style="margin-right:6px">G</span>Googleでログインして連携する
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- データ管理 -->
+      <div class="settings-block">
+        <div class="settings-title">データのエクスポート / インポート</div>
+        <div class="card">
+          <div style="font-size:13px;color:var(--text2);margin-bottom:14px">テストデータや設定を JSON ファイルとして書き出し、別の端末や本番環境に読み込めます。</div>
+
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">エクスポート</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+            <button class="btn btn-ghost btn-full" onclick="exportData('all')">📦 すべてエクスポート</button>
+            <button class="btn btn-ghost btn-full" onclick="exportData('bookings')">📋 予約データのみ</button>
+            <button class="btn btn-ghost btn-full" onclick="exportData('menus')">💪 メニューのみ</button>
+            <button class="btn btn-ghost btn-full" onclick="exportData('settings')">⚙️ 設定のみ</button>
+          </div>
+
+          <div style="height:1px;background:var(--border);margin-bottom:16px"></div>
+
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">インポート</div>
+          <div id="import-drop-zone"
+            style="border:2px dashed var(--border2);border-radius:var(--radius);padding:28px 16px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:10px"
+            onclick="document.getElementById('import-file-input').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--brand)';this.style.background='#f0f4ff'"
+            ondragleave="this.style.borderColor='';this.style.background=''"
+            ondrop="handleImportDrop(event)">
+            <div style="font-size:24px;margin-bottom:6px">📂</div>
+            <div style="font-size:13px;font-weight:500;color:var(--text)">クリックまたはドラッグ＆ドロップ</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">エクスポートした .json ファイルを選択</div>
+          </div>
+          <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event)">
+
+          <div id="import-preview" style="display:none">
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px">
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">読み込み内容</div>
+              <div id="import-preview-content" style="font-size:12px;color:var(--text)"></div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-brand" style="flex:1" onclick="applyImport()">✓ インポートして適用</button>
+              <button class="btn btn-ghost" onclick="cancelImport()">キャンセル</button>
+            </div>
+          </div>
+
+          <div style="height:1px;background:var(--border);margin:16px 0"></div>
+
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">データのリセット</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <button class="btn btn-ghost btn-full" onclick="resetData('sample')">🔄 サンプルデータに戻す</button>
+            <button class="btn btn-danger btn-full" onclick="resetData('empty')">🗑 すべて空にする</button>
+          </div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.5">
+            「サンプルデータに戻す」は初期のテストデータに上書きします。<br>
+            「すべて空にする」は予約・メニュー・Gカレンダー予定をすべて削除します（設定は保持）。
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-brand btn-full" onclick="saveSettings()" style="margin-bottom:32px">設定を保存する</button>
+    </div>
+  </main>
+
+  <!-- Mobile bottom nav -->
+  <nav class="mobile-nav" id="mobile-nav">
+    <button class="mob-btn active" onclick="showPage('book')" id="mb-book"><span class="mob-icon">📅</span>予約</button>
+    <button class="mob-btn" onclick="showPage('mybook')" id="mb-mybook"><span class="mob-icon">📋</span>確認</button>
+    <button class="mob-btn admin-only" onclick="showPage('admin')" id="mb-admin-page"><span class="mob-icon">🗂️</span>管理</button>
+    <button class="mob-btn admin-only" onclick="showPage('gcal')" id="mb-gcal"><span class="mob-icon">📆</span>同期</button>
+    <button class="mob-btn admin-only" onclick="showPage('settings')" id="mb-settings"><span class="mob-icon">⚙️</span>設定</button>
+  </nav>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ====== STORES ======
+const STORES = {
+  oike:  { id:'oike',  name:'御池',     label:'御池スタジオ',     cls:'oike' },
+  shijo: { id:'shijo', name:'四条烏丸', label:'四条烏丸スタジオ', cls:'shijo' },
+};
+function storeChip(id){ const s=STORES[id]; return s ? `<span class="store-chip store-${s.cls}">${s.name}</span>` : ''; }
+// ロゴ表記：末尾の「X」だけブランドオレンジにして返す（例 "NomX" → Nom<span>X</span>）
+function brandHTML(name){
+  const safe = String(name == null ? '' : name);
+  const esc = safe.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  return esc.replace(/X(?=[^X]*$)/, '<span class="logo-x">X</span>');
+}
+function storeName(id){ return STORES[id] ? STORES[id].name : ''; }
+
+// ====== 店舗カラー判定テーブル（実カレンダー準拠）======
+// 予定の「カレンダー由来（nomura / macumba）× イベントの色（colorId）」で店舗を判定する。
+//
+// Google Calendar API の colorId 対応の目安（実際の値は社長が実カレンダーを見て微調整する前提）：
+//   1=Lavender(薄紫) 2=Sage(薄緑) 3=Grape(紫) 4=Flamingo(ピンク) 5=Banana(黄)
+//   6=Tangerine(橙) 7=Peacock(青) 8=Graphite(グレー) 9=Blueberry(濃青)
+//   10=Basil(濃緑) 11=Tomato(赤)
+//   ※ colorId 未設定（null）の予定は「店舗外＝両店舗ブロック」として扱う。
+//
+// resultの意味：
+//   { store:'shijo' }      → その店舗の予約として使う（＝他店舗はこの時間でも予約可）
+//   { store:'oike'  }      → 同上
+//   { block:'old' }        → 旧予約サイトのピンク。今は使わない＝予約不可（ブロック）。店舗割り当てなし
+//   { block:'busy' }       → 社長が動けない時間（バイト/プライベート等）＝両店舗とも予約不可
+//
+// ▼ ここを社長が後で実カレンダーに合わせて調整する想定（calendar:colorId のキーで定義）
+const STORE_COLOR_MAP = {
+  // ノムラ・青 → 四条烏丸（Peacock=7 / Blueberry=9）
+  'nomura:7':  { store:'shijo' },
+  'nomura:9':  { store:'shijo' },
+  // ノムラ・紫 → 御池（Grape=3 / Lavender=1）
+  'nomura:3':  { store:'oike' },
+  'nomura:1':  { store:'oike' },
+  // macumba・緑 → 四条烏丸（Basil=10 / Sage=2）
+  'macumba:10':{ store:'shijo' },
+  'macumba:2': { store:'shijo' },
+  // macumba・黄 → 御池（Banana=5）
+  'macumba:5': { store:'oike' },
+  // ピンク/赤系 → 旧予約サイト＝ブロック（Flamingo=4 / Tomato=11）。どのカレンダーでも。
+  'nomura:4':  { block:'old' },  'macumba:4':  { block:'old' },
+  'nomura:11': { block:'old' },  'macumba:11': { block:'old' },
+};
+
+// 予定1件の店舗/ブロック判定を返す。
+// 戻り値：{ store:'oike'|'shijo' } か { block:'old'|'busy' }
+function classifyEvent(e){
+  const cal = e.source || 'nomura';
+  const cid = (e.colorId === undefined || e.colorId === null) ? null : String(e.colorId);
+  if(cid !== null){
+    const hit = STORE_COLOR_MAP[cal + ':' + cid];
+    if(hit) return hit;
+  }
+  // マップにない色・色なし → 店舗外＝両店舗ブロック（社長が動けない時間）
+  return { block:'busy' };
+}
+
+// この予定が「指定店舗の予約可否」に影響するか判定。
+// 戻り値：'free'（無関係＝無視してよい） / 'store'（この店舗の予定としてブロック） / 'block'（店舗外/旧予約でブロック）
+// reasonLabel：UIに出す理由ラベル
+function eventBlockInfo(e, store){
+  const c = classifyEvent(e);
+  if(c.store){
+    if(c.store === store) return { kind:'store', label:(SRC_LABEL[e.source]||'') + '予定（' + storeName(c.store) + '）' };
+    // 別店舗の予定 → 社長は他店にいる＝この店舗では予約不可
+    return { kind:'block', label:'他店舗（' + storeName(c.store) + '）の予定' };
+  }
+  if(c.block === 'old')  return { kind:'block', label:'旧予約ブロック' };
+  return { kind:'block', label:(SRC_LABEL[e.source] ? SRC_LABEL[e.source]+'・' : '') + '予約不可（他予定）' };
+}
+
+// ====== DATA ======
+let cfg = {
+  name: 'NomX', sub: 'ボディデザインスタジオ / 京都', lineAcc: 'NomX',
+  interval: 30, moveBuffer: 60, open: '09:00', close: '21:00',
+  gcalConnected: true, lineConnected: true,
+  // 2カレンダー対応：ノムラ用とmacumba用（それぞれカンマ区切りで複数可）
+  gcalIds: ['primary', ''], gcalKeyword: 'PT:'
+};
+
+// メニュー（会員様向け2本のみ）※価格は仮・社長確認待ち
+let menus = [
+  { name: 'パーソナルトレーニング 60分', desc: 'マンツーマン指導', price: 8000, dur: 60 },  // ※価格仮・社長確認待ち
+  { name: 'ペアトレーニング 90分', desc: '2名で受けるセッション', price: 12000, dur: 90 }, // ※価格仮・社長確認待ち
+];
+
+let bookings = [
+  { id: 1, store:'oike',  client: 'A.K様', menu: 'パーソナルトレーニング 60分', date: '2026-04-10', time: '10:00', dur: 60, price: 8000, status: 'confirmed', source: 'app' },
+  { id: 2, store:'shijo', client: 'S.I様', menu: 'ペアトレーニング 90分', date: '2026-04-10', time: '16:00', dur: 90, price: 12000, status: 'pending', source: 'app' },
+  { id: 3, store:'oike',  client: 'M.S様', menu: 'ペアトレーニング 90分', date: '2026-04-11', time: '11:00', dur: 90, price: 12000, status: 'confirmed', source: 'app' },
+  { id: 4, store:'shijo', client: 'Y.T様', menu: 'パーソナルトレーニング 60分', date: '2026-04-08', time: '15:00', dur: 60, price: 8000, status: 'cancelled', source: 'app' },
+];
+
+// Googleカレンダーの予定（2カレンダー想定：ノムラ由来 / macumba由来）
+// source: 'nomura' | 'macumba'。各イベントに colorId（数値）を持たせ、
+// calendar(source)×colorId で店舗を判定する（STORE_COLOR_MAP参照）。
+// colorId: 7/9=青(ノムラ→四条) 3/1=紫(ノムラ→御池) 10/2=緑(macumba→四条)
+//          5=黄(macumba→御池) 4/11=ピンク/赤(旧予約=ブロック) 8=グレー(店舗外=両ブロック) null=色なし(両ブロック)
+const SAMPLE_GCAL_EVENTS_DEF = [
+  // ノムラ・青 → 四条烏丸
+  { id: 'g1', title: '四条 PT枠',     date: '2026-04-10', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 7 },
+  // ノムラ・紫 → 御池（この日 13:30終了→15:00開始の空きを作る素にする）
+  { id: 'g2', title: '御池 PT枠',     date: '2026-04-10', startTime: '12:30', endTime: '13:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 3 },
+  { id: 'g3', title: '御池 撮影',     date: '2026-04-10', startTime: '15:00', endTime: '16:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 3 },
+  // macumba・緑 → 四条烏丸
+  { id: 'g4', title: 'macumba 緑枠',  date: '2026-04-11', startTime: '11:00', endTime: '12:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  // macumba・黄 → 御池
+  { id: 'g5', title: 'macumba 黄枠',  date: '2026-04-11', startTime: '14:00', endTime: '15:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 5 },
+  // macumba シフト（色なし＝両店舗ブロック：夜のバイト等）
+  { id: 'g6', title: 'macumba シフト', date: '2026-04-10', startTime: '19:00', endTime: '23:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: null },
+  // 店舗間移動バッファ確認用：四条烏丸（緑）が13:00に終わる日。
+  //   → 御池の予約は60分あけて14:00以降。 同じ四条烏丸なら30分あけて13:30以降から取れる。
+  { id: 'g11', title: '四条 PT枠(午前)', date: '2026-04-15', startTime: '12:00', endTime: '13:00', type: 'personal', source: 'nomura', calendar: 'primary', colorId: 7 },
+  // ピンク＝旧予約サイトのイベント → ブロック（今は使わない色）
+  { id: 'g7', title: '旧予約(ピンク)', date: '2026-04-14', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 4 },
+  // グレー＝店舗外（プライベート）→ 両店舗ブロック
+  { id: 'g8', title: 'プライベート',   date: '2026-04-14', startTime: '13:00', endTime: '14:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 8 },
+  // 手動取り込み用（PT:）
+  { id: 'g9', title: 'PT: T.W様',     date: '2026-04-12', startTime: '09:00', endTime: '10:00', type: 'pt_manual', source: 'nomura', calendar: 'primary', colorId: 7, imported: false },
+  { id: 'g10', title: 'PT: S.N様',    date: '2026-04-17', startTime: '15:00', endTime: '16:00', type: 'pt_manual', source: 'nomura', calendar: 'primary', colorId: 3, imported: false },
+];
+let gcalEvents = JSON.parse(JSON.stringify(SAMPLE_GCAL_EVENTS_DEF));
+
+let selStore = null, selMenu = null, selDate = '', selTime = '', curStep = 1;
+let isAdmin = true, viewY, viewM, adminFilter = 'all', adminStoreFilter = 'all';
+
+const WD = ['日','月','火','水','木','金','土'];
+const MN = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const ALL_SLOTS = ['9:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+const SRC_LABEL = { nomura: 'ノムラ', macumba: 'macumba' };
+
+// ====== MODE ======
+function setMode(m) {
+  isAdmin = (m === 'admin');
+  ['mb-client','mb-admin'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('active', id.includes(m));
+  });
+  ['mb-client-m','mb-admin-m'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) {
+      if(id.includes(m)) { el.style.background='rgba(255,255,255,0.2)'; el.style.color='white'; }
+      else { el.style.background='none'; el.style.color='rgba(255,255,255,0.6)'; }
+    }
+  });
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+  if(!isAdmin && (document.getElementById('page-admin').classList.contains('active') ||
+     document.getElementById('page-gcal').classList.contains('active') ||
+     document.getElementById('page-settings').classList.contains('active'))) {
+    showPage('book');
+  }
+}
+
+// ====== NAVIGATION ======
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mob-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const ni = document.getElementById('ni-' + id);
+  if(ni) ni.classList.add('active');
+  const mb = document.getElementById('mb-' + id) || document.getElementById('mb-' + id + '-page');
+  if(mb) mb.classList.add('active');
+  if(id === 'mybook') renderMyBookings();
+  if(id === 'admin') renderAdmin();
+  if(id === 'gcal') renderGcalPage();
+  if(id === 'settings') renderMenuEdit();
+}
+
+// ====== BOOKING FLOW ======
+function renderStoreOpts() {
+  const el = document.getElementById('store-opts-container');
+  el.innerHTML = Object.values(STORES).map(s => `
+    <div class="store-opt store-opt-${s.cls}${selStore === s.id ? ' sel' : ''}" onclick="pickStore('${s.id}')">
+      <div class="store-mark"></div>
+      <div>
+        <div class="store-opt-name">${s.label}</div>
+        <div class="store-opt-desc">${s.id==='oike' ? '御池エリア' : '四条烏丸エリア'}</div>
+      </div>
+    </div>`).join('');
+}
+function pickStore(id) {
+  selStore = id;
+  renderStoreOpts();
+  document.getElementById('btn-step1').disabled = false;
+}
+
+function renderMenuOpts() {
+  const el = document.getElementById('menu-opts-container');
+  el.innerHTML = menus.map((m, i) => `
+    <div class="menu-opt${selMenu === i ? ' sel' : ''}" onclick="pickMenu(${i})">
+      <div>
+        <div class="menu-opt-name">${m.name}</div>
+        <div class="menu-opt-desc">${m.desc}</div>
+        <div class="menu-opt-dur">所要時間: ${m.dur}分</div>
+      </div>
+    </div>`).join('');
+}
+
+function pickMenu(i) {
+  selMenu = i;
+  renderMenuOpts();
+  document.getElementById('btn-step2').disabled = false;
+}
+
+function goStep(n) {
+  document.getElementById('step' + curStep).style.display = 'none';
+  document.getElementById('step' + n).style.display = 'block';
+  for(let i = 1; i <= 4; i++) {
+    const d = document.getElementById('sd' + i);
+    d.classList.toggle('on', i <= n);
+  }
+  curStep = n;
+  if(n === 3 && !viewY) {
+    const now = new Date(); viewY = now.getFullYear(); viewM = now.getMonth();
+    renderCal();
+  }
+  if(n === 3 && dateView === 'week') renderWeek();
+  document.getElementById('interval-display').textContent = cfg.interval + '分';
+  const mbd = document.getElementById('move-buffer-display');
+  if(mbd) mbd.textContent = (cfg.moveBuffer || 60) + '分';
+  if(n === 4) {
+    const m = menus[selMenu];
+    document.getElementById('sm-store').innerHTML = storeChip(selStore);
+    document.getElementById('sm-menu').textContent = m.name;
+    document.getElementById('sm-date').textContent = selDate + ' ' + selTime;
+    document.getElementById('sm-dur').textContent = m.dur + '分';
+    document.getElementById('sm-gcal').textContent = cfg.gcalConnected ? '自動追加' : '未接続';
+    document.getElementById('sm-line').textContent = cfg.lineConnected ? '送信する' : '未接続';
+  }
+}
+
+// ====== CALENDAR ======
+function prevM() { viewM--; if(viewM < 0) { viewM = 11; viewY--; } renderCal(); }
+function nextM() { viewM++; if(viewM > 11) { viewM = 0; viewY++; } renderCal(); }
+
+function renderCal() {
+  document.getElementById('cal-lbl').textContent = viewY + '年 ' + MN[viewM];
+  const g = document.getElementById('cal-grid');
+  g.innerHTML = WD.map(d => `<div class="cd-lbl">${d}</div>`).join('');
+  const first = new Date(viewY, viewM, 1).getDay();
+  const last = new Date(viewY, viewM + 1, 0).getDate();
+  const now = new Date();
+  const ty = now.getFullYear(), tm = now.getMonth(), td = now.getDate();
+
+  for(let i = 0; i < first; i++) g.innerHTML += `<div class="cd cd-empty"></div>`;
+  for(let d = 1; d <= last; d++) {
+    const dateStr = `${viewY}-${String(viewM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const past = (viewY < ty) || (viewY === ty && viewM < tm) || (viewY === ty && viewM === tm && d < td);
+    const today = viewY === ty && viewM === tm && d === td;
+    const hasApp = bookings.some(b => b.date === dateStr && b.status !== 'cancelled');
+    const hasGcal = gcalEvents.some(e => e.date === dateStr);
+    const selD = selDate === dateStr;
+    let cls = 'cd';
+    if(past) cls += ' cd-past';
+    if(today) cls += ' cd-today';
+    if(hasApp) cls += ' cd-has';
+    if(hasGcal && !selD && !past) cls += ' cd-gcal';
+    if(selD) cls += ' cd-sel';
+    g.innerHTML += `<div class="${cls}" data-date="${dateStr}">${d}</div>`;
+  }
+  g.querySelectorAll('.cd:not(.cd-empty):not(.cd-past)').forEach(el => {
+    el.onclick = () => pickDay(el.dataset.date);
+  });
+  document.getElementById('slot-section').style.display = 'none';
+  selTime = '';
+  document.getElementById('btn-step3').disabled = true;
+}
+
+function pickDay(dateStr) {
+  selDate = dateStr;
+  selTime = '';
+  document.getElementById('btn-step3').disabled = true;
+  renderCal();
+  renderSlots(dateStr);
+  document.getElementById('slot-section').style.display = 'block';
+}
+
+// ====== 月/週 ビュー切替 ======
+let dateView = 'month';     // 'month' | 'week'
+let weekStart = null;       // 週表示の起点（日曜=その週の頭。Date）
+
+function setDateView(v){
+  dateView = v;
+  document.getElementById('vt-month').classList.toggle('active', v === 'month');
+  document.getElementById('vt-week').classList.toggle('active', v === 'week');
+  document.getElementById('month-view').style.display = v === 'month' ? 'block' : 'none';
+  document.getElementById('week-view').style.display  = v === 'week'  ? 'block' : 'none';
+  if(v === 'week'){
+    if(!weekStart){
+      const now = new Date(); now.setHours(0,0,0,0);
+      weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); // 日曜起点
+    }
+    renderWeek();
+  }
+}
+function prevW(){ weekStart.setDate(weekStart.getDate() - 7); renderWeek(); }
+function nextW(){ weekStart.setDate(weekStart.getDate() + 7); renderWeek(); }
+
+function fmtDate(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// 指定日の「予約可能な開始枠」一覧を、既存 checkSlot ロジックそのままで返す
+function availableStartsForDay(dateStr){
+  const dur = menus[selMenu] ? menus[selMenu].dur : 60;
+  const openMin  = timeToMin(cfg.open  || '09:00');
+  const closeMin = timeToMin(cfg.close || '21:00');
+  const now = new Date();
+  const todayStr = fmtDate(now);
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  const out = [];
+  for(let s = openMin; s + dur <= closeMin; s += SLOT_STEP){
+    if(dateStr === todayStr && s <= nowMin) continue; // 過去時刻は除外
+    if(checkSlot(s, s + dur, dateStr).ok) out.push(minToTime(s));
+  }
+  return out;
+}
+
+function renderWeek(){
+  const head = document.getElementById('week-store-head');
+  const cls  = selStore ? STORES[selStore].cls : '';
+  head.innerHTML = '対象店舗： ' + (selStore ? storeChip(selStore) + storeName(selStore) + '店' : '未選択');
+
+  document.getElementById('week-interval-display').textContent = (cfg.interval || 30) + '分';
+  document.getElementById('week-move-buffer-display').textContent = (cfg.moveBuffer || 60) + '分';
+
+  const end = new Date(weekStart); end.setDate(weekStart.getDate() + 6);
+  document.getElementById('week-lbl').textContent =
+    (weekStart.getMonth()+1) + '/' + weekStart.getDate() + ' 〜 ' + (end.getMonth()+1) + '/' + end.getDate();
+
+  // 営業時間・所要時間
+  const dur      = menus[selMenu] ? menus[selMenu].dur : 60;
+  const openMin  = timeToMin(cfg.open  || '09:00');
+  const closeMin = timeToMin(cfg.close || '21:00');
+  const wc = cls === 'shijo' ? 'wc-shijo' : 'wc-oike';
+
+  // 30分刻みで時間軸スロット生成
+  const timeRows = [];
+  for(let s = openMin; s < closeMin; s += 30) timeRows.push(s);
+
+  // 7日分の日付情報
+  const now = new Date(); now.setHours(0,0,0,0);
+  const realNow = new Date();
+  const realNowMin = realNow.getHours() * 60 + realNow.getMinutes();
+  const todayStr = fmtDate(now);
+  const days = [];
+  for(let i = 0; i < 7; i++){
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+    days.push({ d, ds: fmtDate(d), isToday: fmtDate(d) === todayStr, past: d < now });
+  }
+
+  // グリッド構築
+  const g = document.getElementById('week-grid');
+  // ラッパを置く
+  g.innerHTML = '<div class="week-grid-inner" id="wg-inner"></div>';
+  const inner = document.getElementById('wg-inner');
+
+  let html = '';
+
+  // ── ヘッダ行（コーナー + 7日） ──
+  html += '<div class="wg-corner"></div>';
+  for(const { d, isToday } of days){
+    const todayCls = isToday ? ' is-today' : '';
+    html += `<div class="wg-day-head${todayCls}">
+      <span class="wdh-date">${d.getMonth()+1}/${d.getDate()}</span>
+      <span class="wdh-wd">${WD[d.getDay()]}${isToday ? ' 今日' : ''}</span>
+    </div>`;
+  }
+
+  // ── データ行（時間ラベル + 7セル） ──
+  for(const rowMin of timeRows){
+    const endMin = rowMin + dur; // メニュー所要時間後の終了
+
+    // 時間ラベル
+    html += `<div class="wg-time">${minToTime(rowMin)}</div>`;
+
+    for(const { ds, past, isToday } of days){
+      // 過去時刻判定：今日かつその時刻がすでに過ぎている場合も×
+      const pastSlot = past || (isToday && rowMin <= realNowMin);
+      let cellCls, cellContent, onclick = '';
+
+      if(pastSlot){
+        cellCls = 'wg-cell wg-ng';
+        cellContent = '×';
+      } else {
+        const res = checkSlot(rowMin, endMin, ds);
+        if(res.ok){
+          const isSel = selDate === ds && selTime === minToTime(rowMin);
+          cellCls = `wg-cell wg-ok ${wc}${isSel ? ' sel' : ''}`;
+          cellContent = '○';
+          onclick = ` onclick="pickWeekSlot('${ds}','${minToTime(rowMin)}')"`;
+        } else {
+          cellCls = 'wg-cell wg-ng';
+          cellContent = '×';
+        }
+      }
+      html += `<div class="${cellCls}"${onclick}>${cellContent}</div>`;
+    }
+  }
+
+  inner.innerHTML = html;
+}
+
+function pickWeekSlot(dateStr, t){
+  selDate = dateStr;
+  selTime = t;
+  document.getElementById('btn-step3').disabled = false;
+  goStep(4);
+}
+
+// 15分刻みで開始時刻候補を生成し、メニュー所要時間ぶんが空きに収まるかで判定する。
+// セッション間は cfg.interval 分（基本30分）のバッファを前後に確保する。
+const SLOT_STEP = 15; // 開始時刻の刻み（分）
+function minToTime(min){
+  const h = Math.floor(min / 60), m = min % 60;
+  return h + ':' + String(m).padStart(2,'0');
+}
+
+// 指定の開始(min)〜終了(min)が、その店舗で予約可能かを返す。
+// 戻り値：{ ok:true } か { ok:false, label:'理由' }
+// 比較相手の「店舗」と、今予約しようとしている店舗(selStore)を見て、
+// 前後に確保すべきバッファ（分）を返す。
+//   - 同じ店舗どうし          → cfg.interval（既定30分）
+//   - 別店舗をまたぐ／店舗不明 → cfg.moveBuffer（既定60分。社長の移動余裕）
+// otherStore が null/undefined（両店舗ブロック・旧予約など店舗が特定できない予定）も
+// 安全側に倒して移動バッファを適用する（その予定をまたいで詰めない）。
+function bufferFor(otherStore){
+  const interval = cfg.interval || 30;
+  const move = cfg.moveBuffer || 60;
+  if(otherStore && selStore && otherStore === selStore) return interval;
+  return move;
+}
+
+function checkSlot(startMin, endMin, dateStr){
+  // 既存予約との衝突（同店舗＝この店舗の予約／他店舗の予約も社長は別店にいるのでブロック）
+  for(const b of bookings){
+    if(b.date !== dateStr || b.status === 'cancelled') continue;
+    const bStart = timeToMin(b.time), bEnd = bStart + b.dur;
+    // 相手の店舗に応じてバッファを決める（同店30分 / 店舗またぎ60分）
+    const gap = bufferFor(b.store);
+    if(!(endMin + gap <= bStart || startMin >= bEnd + gap)){
+      if(b.store && selStore && b.store !== selStore)
+        return { ok:false, label:'他店舗（' + storeName(b.store) + '）予約' };
+      return { ok:false, label:'予約済み' };
+    }
+  }
+
+  // Googleカレンダー予定（ノムラ＋macumba）との衝突。色で店舗判定→可否を決める。
+  // 相手の店舗（colorIdから判定）と今の店舗で間隔バッファを変える：
+  //   同店30分 / 店舗またぎ・店舗不明（両店舗ブロック等）60分。
+  for(const e of gcalEvents){
+    if(e.date !== dateStr) continue;
+    const info = eventBlockInfo(e, selStore);
+    if(info.kind === 'free') continue;
+    const c = classifyEvent(e);
+    const otherStore = c.store || null; // block(old/busy)は店舗不明＝null
+    const gap = bufferFor(otherStore);
+    const eStart = timeToMin(e.startTime), eEnd = timeToMin(e.endTime);
+    if(!(endMin + gap <= eStart || startMin >= eEnd + gap)){
+      return { ok:false, label:info.label };
+    }
+  }
+  return { ok:true };
+}
+
+function renderSlots(dateStr) {
+  const el = document.getElementById('slots-container');
+  const dur = menus[selMenu] ? menus[selMenu].dur : 60;
+  const openMin  = timeToMin(cfg.open  || '09:00');
+  const closeMin = timeToMin(cfg.close || '21:00');
+
+  // 午前(〜12:00)/午後で区切って表示
+  const groups = { am: [], pm: [] };
+  for(let s = openMin; s + dur <= closeMin; s += SLOT_STEP){
+    const endMin = s + dur;
+    const res = checkSlot(s, endMin, dateStr);
+    const t = minToTime(s);
+    const isSel = selTime === t;
+    const html = `<div class="slot${res.ok ? (isSel ? ' slot-sel' : '') : ' slot-gcal-busy'}" data-time="${t}">
+      <div class="slot-time">${t}</div>
+      <div class="slot-label">${res.ok ? '空き' : res.label}</div>
+    </div>`;
+    (s < 12*60 ? groups.am : groups.pm).push(html);
+  }
+
+  const section = (title, arr) => arr.length
+    ? `<div class="slot-group-title">${title}</div><div class="slots-grid">${arr.join('')}</div>` : '';
+  el.innerHTML = section('午前', groups.am) + section('午後', groups.pm);
+
+  el.querySelectorAll('.slot:not(.slot-busy):not(.slot-gcal-busy)').forEach(s => {
+    s.onclick = () => { selTime = s.dataset.time; renderSlots(dateStr); document.getElementById('btn-step3').disabled = false; };
+  });
+}
+
+function timeToMin(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function confirmBooking() {
+  const m = menus[selMenu];
+  const b = { id: Date.now(), store: selStore, client: 'あなた', menu: m.name, date: selDate, time: selTime, dur: m.dur, price: m.price, status: 'confirmed', source: 'app' };
+  bookings.unshift(b);
+  selStore = null; selMenu = null; selDate = ''; selTime = ''; curStep = 1;
+  document.getElementById('step4').style.display = 'none';
+  document.getElementById('step1').style.display = 'block';
+  for(let i = 1; i <= 4; i++) document.getElementById('sd' + i).classList.toggle('on', i === 1);
+  document.getElementById('btn-step1').disabled = true;
+  document.getElementById('btn-step2').disabled = true;
+  renderStoreOpts();
+  renderMenuOpts();
+  if(cfg.gcalConnected && gcalAuthed) {
+    addEventToGcal(b).then(() => showToast('📅 Googleカレンダーに追加しました'));
+  } else if(cfg.gcalConnected) {
+    showToast('📅 Googleカレンダーに追加しました（デモ）');
+  }
+  setTimeout(() => {
+    if(cfg.lineConnected) showToast('💬 LINEで予約確定を通知しました');
+  }, 1200);
+}
+
+// ====== MY BOOKINGS ======
+function renderMyBookings() {
+  const el = document.getElementById('mybook-container');
+  if(!bookings.length) { el.innerHTML = '<div class="card" style="text-align:center;color:var(--text2);padding:40px">予約がありません</div>'; return; }
+  el.innerHTML = bookings.map(b => {
+    const [y, mo, d] = b.date.split('-');
+    const dl = `${y}年${parseInt(mo)}月${parseInt(d)}日`;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="font-size:15px;font-weight:700">${dl}</div>
+        <span class="badge badge-${b.status === 'confirmed' ? 'ok' : b.status === 'pending' ? 'pending' : 'cancel'}">${b.status === 'confirmed' ? '確定' : b.status === 'pending' ? '保留中' : 'キャンセル'}</span>
+      </div>
+      <div style="margin-bottom:6px">${storeChip(b.store)}</div>
+      <div style="font-size:13px;color:var(--text2)">${b.time} / ${b.menu}</div>
+      ${b.source === 'gcal' ? '<div style="font-size:11px;margin-top:6px"><span class="badge badge-gcal">Gカレンダーから同期</span></div>' : ''}
+      ${b.status !== 'cancelled' ? `<button class="btn btn-danger btn-sm" style="margin-top:12px" onclick="cancelMyBooking(${b.id})">キャンセルする</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function cancelMyBooking(id) {
+  const b = bookings.find(x => x.id === id);
+  if(b) b.status = 'cancelled';
+  renderMyBookings();
+  if(cfg.lineConnected) showToast('💬 LINEでキャンセルを通知しました');
+  if(cfg.gcalConnected && gcalAuthed) {
+    deleteEventFromGcal(b).then(() => showToast('🗑 Googleカレンダーから削除しました'));
+  } else if(cfg.gcalConnected) {
+    showToast('🗑 Googleカレンダーから削除しました（デモ）');
+  }
+}
+
+// ====== ADMIN ======
+function renderAdmin() {
+  const active = bookings.filter(b => b.status !== 'cancelled');
+  const total = bookings.length, cancelled = bookings.filter(b => b.status === 'cancelled').length;
+  document.getElementById('st-count').textContent = active.length;
+  document.getElementById('st-cancel').textContent = total ? Math.round(cancelled / total * 100) + '%' : '0%';
+  renderAdminList();
+  renderTodayTimeline();
+}
+
+function filterBookings(f) {
+  adminFilter = f;
+  ['all','confirmed','pending','cancelled'].forEach(ff => {
+    const btn = document.getElementById('fa-' + ff);
+    if(btn) { btn.style.borderColor = ff === f ? 'var(--brand)' : ''; btn.style.color = ff === f ? 'var(--brand)' : ''; }
+  });
+  renderAdminList();
+}
+
+function filterStore(s) {
+  adminStoreFilter = s;
+  document.getElementById('fs-all').style.borderColor = s === 'all' ? 'var(--brand)' : '';
+  document.getElementById('fs-all').style.color = s === 'all' ? 'var(--brand)' : '';
+  document.getElementById('fs-oike').style.borderColor = s === 'oike' ? 'var(--oike)' : 'var(--oike-border)';
+  document.getElementById('fs-shijo').style.borderColor = s === 'shijo' ? 'var(--shijo)' : 'var(--shijo-border)';
+  renderAdminList();
+}
+
+function renderAdminList() {
+  const el = document.getElementById('admin-bookings-container');
+  let filtered = adminFilter === 'all' ? bookings : bookings.filter(b => b.status === adminFilter);
+  if(adminStoreFilter !== 'all') filtered = filtered.filter(b => b.store === adminStoreFilter);
+  if(!filtered.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text2);padding:8px 0">該当する予約がありません</div>'; return; }
+  el.innerHTML = filtered.map(b => {
+    const [y, mo, d] = b.date.split('-');
+    const dl = `${parseInt(mo)}月${parseInt(d)}日`;
+    return `<div class="admin-row">
+      <div>
+        <div class="admin-name">${storeChip(b.store)} ${b.client} ${b.source === 'gcal' ? '<span class="badge badge-gcal" style="font-size:10px">G同期</span>' : ''}</div>
+        <div class="admin-meta">${dl} ${b.time} · ${b.menu}</div>
+      </div>
+      <div class="admin-actions">
+        <span class="badge badge-${b.status === 'confirmed' ? 'ok' : b.status === 'pending' ? 'pending' : 'cancel'}">${b.status === 'confirmed' ? '確定' : b.status === 'pending' ? '保留' : 'ｷｬﾝｾﾙ'}</span>
+        ${b.status === 'pending' ? `<button class="btn btn-sm btn-accent" onclick="approveBooking(${b.id})">承認</button>` : ''}
+        ${b.status !== 'cancelled' ? `<button class="btn btn-sm btn-danger" onclick="adminCancel(${b.id})">取消</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function approveBooking(id) {
+  const b = bookings.find(x => x.id === id);
+  if(b) b.status = 'confirmed';
+  renderAdmin();
+  if(cfg.lineConnected) showToast('💬 承認をLINEで通知しました');
+  if(cfg.gcalConnected && gcalAuthed) {
+    const bk = bookings.find(x => x.id === id);
+    if(bk) addEventToGcal(bk).then(() => showToast('📅 Googleカレンダーに追加しました'));
+  } else if(cfg.gcalConnected) {
+    showToast('📅 Googleカレンダーに追加しました（デモ）');
+  }
+}
+
+function adminCancel(id) {
+  const b = bookings.find(x => x.id === id);
+  if(b) b.status = 'cancelled';
+  renderAdmin();
+  if(cfg.lineConnected) showToast('💬 キャンセルをLINEで通知しました');
+}
+
+function renderTodayTimeline() {
+  const el = document.getElementById('today-timeline');
+  const today = '2026-04-10';
+  const items = [
+    ...bookings.filter(b => b.date === today && b.status !== 'cancelled').map(b => ({
+      time: b.time, title: b.client, store: b.store, sub: b.menu, type: 'app'
+    })),
+    ...gcalEvents.filter(e => e.date === today).map(e => ({
+      time: e.startTime, title: e.title, sub: e.type === 'pt_manual' ? 'Gカレンダー手動予約' : ((SRC_LABEL[e.source]||'') + ' の予定'), type: 'gcal', source: e.source
+    }))
+  ].sort((a, b) => a.time.localeCompare(b.time));
+
+  if(!items.length) { el.innerHTML = '<div style="font-size:13px;color:var(--text2)">本日の予約・予定はありません</div>'; return; }
+  el.innerHTML = items.map(item => `
+    <div class="tl-item">
+      <div class="tl-dot ${item.type === 'gcal' ? (item.source === 'macumba' ? 'macumba' : 'gcal') : ''}"></div>
+      <div class="tl-time">${item.time}</div>
+      <div class="tl-name">${item.type === 'app' ? storeChip(item.store) : ''} ${item.title}</div>
+      <div class="tl-menu">${item.sub}</div>
+    </div>`).join('');
+}
+
+// ====== GCAL PAGE ======
+function renderGcalPage() {
+  renderGcalEvents();
+  renderGcalImported();
+}
+
+function renderGcalEvents() {
+  const el = document.getElementById('gcal-events-list');
+  const personal = gcalEvents.filter(e => e.type === 'personal');
+  if(!personal.length) { el.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:10px 0">ブロック中の予定なし</div>'; return; }
+  el.innerHTML = personal.map(e => {
+    const [y, mo, d] = e.date.split('-');
+    const src = e.source || 'nomura';
+    const c = classifyEvent(e);
+    let judge;
+    if(c.store) judge = `<span style="color:var(--${STORES[c.store].cls})">▶ ${storeName(c.store)}の予約枠</span>`;
+    else if(c.block === 'old') judge = '<span style="color:#e53e3e">▶ 旧予約＝ブロック</span>';
+    else judge = '<span style="color:var(--text2)">▶ 両店舗ブロック（動けない時間）</span>';
+    const colTxt = (e.colorId === undefined || e.colorId === null) ? '色なし' : 'colorId:' + e.colorId;
+    return `<div class="gcal-event src-${src}">
+      <div class="gcal-event-title">${e.title}<span class="src-tag ${src}">${SRC_LABEL[src] || src}</span></div>
+      <div class="gcal-event-time">${parseInt(mo)}月${parseInt(d)}日 ${e.startTime}〜${e.endTime} · ${colTxt}</div>
+      <div style="font-size:11px;font-weight:700;margin-top:3px">${judge}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderGcalImported() {
+  const el = document.getElementById('gcal-imported-list');
+  const ptManual = gcalEvents.filter(e => e.type === 'pt_manual');
+  if(!ptManual.length) { el.innerHTML = '<div class="card-sm" style="color:var(--text2);font-size:13px">取り込まれた手動予約はありません</div>'; return; }
+  el.innerHTML = ptManual.map(e => {
+    const [y, mo, d] = e.date.split('-');
+    const clientName = e.title.replace('PT: ', '');
+    return `<div class="card-sm" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <div style="font-size:13px;font-weight:700">${clientName}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${parseInt(mo)}月${parseInt(d)}日 ${e.startTime}〜${e.endTime}</div>
+        <div style="font-size:11px;margin-top:4px"><span class="badge ${e.imported ? 'badge-ok' : 'badge-gcal'}">${e.imported ? '取込済み' : 'Gカレンダー'}</span></div>
+      </div>
+      ${!e.imported ? `<button class="btn btn-sm btn-brand" onclick="importGcalBooking('${e.id}')">予約に取り込む</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function importGcalBooking(gcalId) {
+  const e = gcalEvents.find(x => x.id === gcalId);
+  if(!e) return;
+  e.imported = true;
+  const clientName = e.title.replace('PT: ', '');
+  const newBooking = {
+    id: Date.now(), store: 'oike', client: clientName, menu: 'パーソナルトレーニング 60分',
+    date: e.date, time: e.startTime, dur: 60, price: 8000, status: 'confirmed', source: 'gcal'
+  };
+  bookings.unshift(newBooking);
+  renderGcalImported();
+  showToast('✓ ' + clientName + 'の予約を取り込みました');
+}
+
+// ====== GOOGLE CALENDAR API ======
+let gapiReady = false;
+let gisReady = false;
+let tokenClient = null;
+let gcalAuthed = false;
+
+function onGapiLoad() {
+  gapi.load('client', async () => {
+    await gapi.client.init({
+      apiKey: getApiKey(),
+      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+    });
+    gapiReady = true;
+    checkGcalReady();
+  });
+}
+
+function onGisLoad() {
+  const clientId = getClientId();
+  if (!clientId) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/calendar',
+    callback: async (resp) => {
+      if (resp.error) { showToast('⚠️ Googleログインに失敗しました'); return; }
+      gcalAuthed = true;
+      cfg.gcalConnected = true;
+      updateGcalUI(true);
+      await syncGcal();
+    },
+  });
+  gisReady = true;
+  checkGcalReady();
+}
+
+function checkGcalReady() {
+  if (gapiReady && gisReady) {
+    const saved = localStorage.getItem('gcal_token');
+    if (saved) {
+      gapi.client.setToken(JSON.parse(saved));
+      gcalAuthed = true;
+      cfg.gcalConnected = true;
+      updateGcalUI(true);
+    }
+  }
+}
+
+function getClientId() {
+  return document.getElementById('cfg-gcal-client-id')?.value?.trim() || localStorage.getItem('gcal_client_id') || '';
+}
+function getApiKey() {
+  return document.getElementById('cfg-gcal-api-key')?.value?.trim() || localStorage.getItem('gcal_api_key') || '';
+}
+
+// 設定UIから「ノムラ用」「macumba用」のカレンダーIDを集約。
+// 各欄はカンマ区切りで複数IDを書ける。{id, source} の配列で返す。
+function getCalendarSources() {
+  const nomuraRaw  = document.getElementById('cfg-gcal-id-nomura')?.value  ?? (cfg.gcalIds?.[0] || 'primary');
+  const macumbaRaw = document.getElementById('cfg-gcal-id-macumba')?.value ?? (cfg.gcalIds?.[1] || '');
+  const split = raw => (raw || '').split(',').map(s => s.trim()).filter(Boolean);
+  const list = [];
+  split(nomuraRaw).forEach(id  => list.push({ id, source: 'nomura'  }));
+  split(macumbaRaw).forEach(id => list.push({ id, source: 'macumba' }));
+  if(!list.length) list.push({ id: 'primary', source: 'nomura' });
+  return list;
+}
+
+function gcalLogin() {
+  const clientId = getClientId();
+  const apiKey = getApiKey();
+  if (!clientId || !apiKey) {
+    showToast('⚠️ Client IDとAPI Keyを入力してください');
+    showPage('settings');
+    return;
+  }
+  localStorage.setItem('gcal_client_id', clientId);
+  localStorage.setItem('gcal_api_key', apiKey);
+  if (!gapiReady || !gisReady) {
+    showToast('⚠️ Google APIの読み込み中です。少し待ってから再試行してください');
+    return;
+  }
+  if (!tokenClient || tokenClient._clientId !== clientId) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/calendar',
+      callback: async (resp) => {
+        if (resp.error) { showToast('⚠️ Googleログインに失敗しました: ' + resp.error); return; }
+        gapi.client.setToken(resp);
+        localStorage.setItem('gcal_token', JSON.stringify(resp));
+        gcalAuthed = true;
+        cfg.gcalConnected = true;
+        updateGcalUI(true);
+        await syncGcal();
+      },
+    });
+    tokenClient._clientId = clientId;
+  }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function gcalLogout() {
+  const token = gapi.client.getToken();
+  if (token) google.accounts.oauth2.revoke(token.access_token, () => {});
+  gapi.client.setToken(null);
+  localStorage.removeItem('gcal_token');
+  gcalAuthed = false;
+  cfg.gcalConnected = false;
+  gcalEvents = [];
+  updateGcalUI(false);
+  showToast('Googleカレンダーの接続を解除しました');
+}
+
+function updateGcalUI(connected) {
+  const dot = document.getElementById('gcal-dot');
+  const txt = document.getElementById('gcal-status-text');
+  const btn = document.getElementById('gcal-toggle-btn');
+  const syncBar = document.getElementById('gcal-sync-bar');
+  const loginArea = document.getElementById('gcal-login-area');
+  if (dot) dot.className = 'status-dot ' + (connected ? 'on' : 'off');
+  if (txt) txt.textContent = connected ? '接続済み' : '未接続';
+  if (btn) { btn.textContent = connected ? '解除' : '接続'; }
+  if (syncBar) syncBar.style.display = connected ? 'flex' : 'none';
+  if (loginArea) loginArea.style.display = connected ? 'none' : 'block';
+  const syncBtn = document.getElementById('gcal-sync-btn');
+  if (syncBtn) syncBtn.style.display = connected ? 'inline-block' : 'none';
+}
+
+// 複数カレンダー（ノムラ＋macumba）をループしてイベントをマージ
+async function syncGcal() {
+  if (!gcalAuthed) { gcalLogin(); return; }
+  const elEvents = document.getElementById('gcal-events-list');
+  if (elEvents) elEvents.innerHTML = '<div class="gcal-loading"><div class="spinner"></div>Googleカレンダー（ノムラ＋macumba）と同期中...</div>';
+
+  try {
+    const sources = getCalendarSources();
+    const now = new Date();
+    const future = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+    const keyword = document.getElementById('gcal-keyword')?.value || 'PT:';
+
+    const merged = [];
+    for (const src of sources) {
+      const resp = await gapi.client.calendar.events.list({
+        calendarId: src.id,
+        timeMin: now.toISOString(),
+        timeMax: future.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: 100,
+      });
+      const items = resp.result.items || [];
+      items.filter(ev => ev.start?.dateTime).forEach(ev => {
+        merged.push({
+          id: ev.id,
+          title: ev.summary || '(無題)',
+          date: ev.start.dateTime.slice(0, 10),
+          startTime: ev.start.dateTime.slice(11, 16),
+          endTime: ev.end.dateTime.slice(11, 16),
+          type: (ev.summary || '').startsWith(keyword) ? 'pt_manual' : 'personal',
+          source: src.source,       // 'nomura' | 'macumba'
+          calendar: src.id,         // どのカレンダー由来か
+          colorId: ev.colorId ? parseInt(ev.colorId) : null, // 店舗判定用（色なしは両店舗ブロック）
+          imported: bookings.some(b => b.gcalId === ev.id),
+          gcalEventId: ev.id,
+        });
+      });
+    }
+    gcalEvents = merged;
+
+    const now2 = new Date();
+    document.getElementById('last-sync-time').textContent =
+      now2.getHours() + ':' + String(now2.getMinutes()).padStart(2, '0');
+    renderGcalPage();
+    showToast('📅 ' + sources.length + 'カレンダー・' + merged.length + '件の予定を同期しました');
+  } catch (err) {
+    showToast('⚠️ 同期エラー: ' + (err.result?.error?.message || err.message || '不明なエラー'));
+    if (elEvents) elEvents.innerHTML = '<div style="color:#e53e3e;font-size:13px;padding:10px 0">同期に失敗しました。カレンダーID・Client ID・API Keyを確認してください。</div>';
+  }
+}
+
+// 予約は「ノムラ」カレンダー（最初のID）に追加する
+async function addEventToGcal(booking) {
+  if (!gcalAuthed) return;
+  try {
+    const calId = getCalendarSources().find(s => s.source === 'nomura')?.id || 'primary';
+    const [y, mo, d] = booking.date.split('-');
+    const [h, m] = booking.time.split(':').map(Number);
+    const startDt = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), h, m||0);
+    const endDt = new Date(startDt.getTime() + booking.dur * 60000);
+    const toISO = dt => dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0') + 'T' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0') + ':00';
+    const ev = await gapi.client.calendar.events.insert({
+      calendarId: calId,
+      resource: {
+        summary: 'PT[' + storeName(booking.store) + ']: ' + booking.client + ' — ' + booking.menu,
+        start: { dateTime: toISO(startDt), timeZone: 'Asia/Tokyo' },
+        end: { dateTime: toISO(endDt), timeZone: 'Asia/Tokyo' },
+        description: '店舗: ' + storeName(booking.store) + ' / メニュー: ' + booking.menu,
+      },
+    });
+    booking.gcalEventId = ev.result.id;
+  } catch(err) {
+    console.error('GCal add error', err);
+  }
+}
+
+async function deleteEventFromGcal(booking) {
+  if (!gcalAuthed || !booking.gcalEventId) return;
+  try {
+    const calId = getCalendarSources().find(s => s.source === 'nomura')?.id || 'primary';
+    await gapi.client.calendar.events.delete({ calendarId: calId, eventId: booking.gcalEventId });
+  } catch(err) { console.error('GCal delete error', err); }
+}
+
+function simulateSync() { syncGcal(); }
+
+// ====== SETTINGS ======
+function renderMenuEdit() {
+  const el = document.getElementById('menu-edit-rows');
+  el.innerHTML = menus.map((m, i) => `
+    <div class="menu-edit-row" style="display:grid;grid-template-columns:1fr 64px 28px;gap:6px;align-items:center">
+      <input class="form-input" value="${m.name}" oninput="menus[${i}].name=this.value">
+      <input class="form-input dur-input" type="number" value="${m.dur}" oninput="menus[${i}].dur=parseInt(this.value)||60">
+      <button class="del-btn" onclick="deleteMenu(${i})">✕</button>
+    </div>
+    <div class="menu-edit-row" style="margin-top:-2px;margin-bottom:12px">
+      <input class="form-input" value="${m.desc || ''}" placeholder="説明" oninput="menus[${i}].desc=this.value">
+    </div>`).join('');
+}
+
+function deleteMenu(i) { menus.splice(i, 1); renderMenuEdit(); renderMenuOpts(); }
+function addMenuRow() { menus.push({ name: '新しいメニュー', desc: '', price: 5000, dur: 60 }); renderMenuEdit(); renderMenuOpts(); }
+
+function toggleLine() {
+  cfg.lineConnected = !cfg.lineConnected;
+  document.getElementById('line-dot').className = 'status-dot ' + (cfg.lineConnected ? 'on' : 'off');
+  document.getElementById('line-status-text').textContent = cfg.lineConnected ? '接続済み' : '未接続';
+  document.getElementById('line-toggle-btn').textContent = cfg.lineConnected ? '解除' : '接続';
+  showToast(cfg.lineConnected ? '💬 LINEと接続しました' : 'LINEの接続を解除しました');
+}
+
+function toggleGcal() {
+  if(gcalAuthed) { gcalLogout(); } else { gcalLogin(); }
+}
+
+function saveSettings() {
+  cfg.name = document.getElementById('cfg-name').value;
+  cfg.sub = document.getElementById('cfg-sub').value;
+  cfg.lineAcc = document.getElementById('cfg-line-name').value;
+  cfg.interval = parseInt(document.getElementById('cfg-interval').value) || 30;
+  cfg.moveBuffer = parseInt(document.getElementById('cfg-move-buffer').value) || 60;
+  cfg.open = document.getElementById('cfg-open').value;
+  cfg.close = document.getElementById('cfg-close').value;
+  cfg.gcalKeyword = document.getElementById('gcal-keyword')?.value || cfg.gcalKeyword;
+  cfg.gcalIds = [
+    document.getElementById('cfg-gcal-id-nomura')?.value || '',
+    document.getElementById('cfg-gcal-id-macumba')?.value || '',
+  ];
+  document.getElementById('sb-name').innerHTML = brandHTML(cfg.name);
+  document.getElementById('sb-sub').textContent = cfg.sub;
+  document.getElementById('mh-name').innerHTML = brandHTML(cfg.name);
+  document.getElementById('mh-sub').textContent = cfg.sub;
+  renderMenuOpts();
+  showToast('✓ 設定を保存しました');
+}
+
+// ====== EXPORT / IMPORT ======
+function exportData(type) {
+  let data = {};
+  const ts = new Date().toISOString().slice(0,10);
+
+  if (type === 'all' || type === 'settings') {
+    data.cfg = {
+      name: document.getElementById('cfg-name')?.value || cfg.name,
+      sub: document.getElementById('cfg-sub')?.value || cfg.sub,
+      lineAcc: document.getElementById('cfg-line-name')?.value || cfg.lineAcc,
+      interval: parseInt(document.getElementById('cfg-interval')?.value) || cfg.interval,
+      moveBuffer: parseInt(document.getElementById('cfg-move-buffer')?.value) || cfg.moveBuffer,
+      open: document.getElementById('cfg-open')?.value || cfg.open,
+      close: document.getElementById('cfg-close')?.value || cfg.close,
+      gcalIds: [
+        document.getElementById('cfg-gcal-id-nomura')?.value || (cfg.gcalIds?.[0] || ''),
+        document.getElementById('cfg-gcal-id-macumba')?.value || (cfg.gcalIds?.[1] || ''),
+      ],
+      gcalKeyword: document.getElementById('gcal-keyword')?.value || cfg.gcalKeyword,
+    };
+  }
+  if (type === 'all' || type === 'menus') {
+    data.menus = menus;
+  }
+  if (type === 'all' || type === 'bookings') {
+    data.bookings = bookings;
+  }
+  if (type === 'all') {
+    data.gcalEvents = gcalEvents;
+    data.exportedAt = new Date().toISOString();
+    data.version = '2.0';
+  }
+
+  const labels = { all: 'all', bookings: 'bookings', menus: 'menus', settings: 'settings' };
+  const filename = `nomx-booking-${labels[type]}-${ts}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📦 ' + filename + ' をダウンロードしました');
+}
+
+let pendingImportData = null;
+
+function handleImportDrop(e) {
+  e.preventDefault();
+  document.getElementById('import-drop-zone').style.borderColor = '';
+  document.getElementById('import-drop-zone').style.background = '';
+  const file = e.dataTransfer.files[0];
+  if (file) readImportFile(file);
+}
+
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (file) readImportFile(file);
+  e.target.value = '';
+}
+
+function readImportFile(file) {
+  if (!file.name.endsWith('.json')) { showToast('⚠️ .json ファイルを選択してください'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      pendingImportData = data;
+      showImportPreview(data, file.name);
+    } catch {
+      showToast('⚠️ ファイルの読み込みに失敗しました');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showImportPreview(data, filename) {
+  const lines = [];
+  lines.push('<strong>' + filename + '</strong>');
+  if (data.exportedAt) lines.push('エクスポート日時: ' + new Date(data.exportedAt).toLocaleString('ja-JP'));
+  if (data.bookings) lines.push('予約データ: <strong>' + data.bookings.length + '件</strong>');
+  if (data.menus) lines.push('メニュー: <strong>' + data.menus.length + '件</strong>');
+  if (data.cfg) lines.push('設定情報: <strong>あり</strong> (名前: ' + (data.cfg.name || '—') + ')');
+  if (data.gcalEvents) lines.push('Gカレンダー予定: <strong>' + data.gcalEvents.length + '件</strong>');
+
+  document.getElementById('import-preview-content').innerHTML = lines.join('<br>');
+  document.getElementById('import-preview').style.display = 'block';
+  document.getElementById('import-drop-zone').style.display = 'none';
+}
+
+function applyImport() {
+  if (!pendingImportData) return;
+  const d = pendingImportData;
+  let applied = [];
+
+  if (d.bookings) {
+    bookings = d.bookings;
+    applied.push('予約 ' + bookings.length + '件');
+  }
+  if (d.menus) {
+    menus = d.menus;
+    renderMenuEdit();
+    renderMenuOpts();
+    applied.push('メニュー ' + menus.length + '件');
+  }
+  if (d.gcalEvents) {
+    gcalEvents = d.gcalEvents;
+    applied.push('Gカレンダー予定 ' + gcalEvents.length + '件');
+  }
+  if (d.cfg) {
+    Object.assign(cfg, d.cfg);
+    syncUIFromCfg();
+    applied.push('設定');
+  }
+
+  cancelImport();
+  showToast('✓ インポートしました: ' + applied.join(' / '));
+}
+
+function cancelImport() {
+  pendingImportData = null;
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('import-drop-zone').style.display = 'block';
+}
+
+// サンプル（初期）データ定義 — 2店舗・2カレンダー想定
+const SAMPLE_MENUS = [
+  { name: 'パーソナルトレーニング 60分', desc: 'マンツーマン指導', price: 8000, dur: 60 },  // ※価格仮・社長確認待ち
+  { name: 'ペアトレーニング 90分', desc: '2名で受けるセッション', price: 12000, dur: 90 }, // ※価格仮・社長確認待ち
+];
+const SAMPLE_BOOKINGS = [
+  { id: 1, store:'oike',  client: 'A.K様', menu: 'パーソナルトレーニング 60分', date: '2026-04-10', time: '10:00', dur: 60, price: 8000, status: 'confirmed', source: 'app' },
+  { id: 2, store:'shijo', client: 'S.I様', menu: 'ペアトレーニング 90分', date: '2026-04-10', time: '16:00', dur: 90, price: 12000, status: 'pending', source: 'app' },
+  { id: 3, store:'oike',  client: 'M.S様', menu: 'ペアトレーニング 90分', date: '2026-04-11', time: '11:00', dur: 90, price: 12000, status: 'confirmed', source: 'app' },
+  { id: 4, store:'shijo', client: 'Y.T様', menu: 'パーソナルトレーニング 60分', date: '2026-04-08', time: '15:00', dur: 60, price: 8000, status: 'cancelled', source: 'app' },
+];
+const SAMPLE_GCAL_EVENTS = SAMPLE_GCAL_EVENTS_DEF;
+
+function resetData(type) {
+  const msg = type === 'sample'
+    ? 'サンプルデータに戻します。\n現在の予約・メニュー・Gカレンダー予定はすべて上書きされます。\n\nよろしいですか？'
+    : 'すべての予約・メニュー・Gカレンダー予定を削除します。\nこの操作は取り消せません。\n\nよろしいですか？';
+  if (!confirm(msg)) return;
+
+  if (type === 'sample') {
+    menus      = JSON.parse(JSON.stringify(SAMPLE_MENUS));
+    bookings   = JSON.parse(JSON.stringify(SAMPLE_BOOKINGS));
+    gcalEvents = JSON.parse(JSON.stringify(SAMPLE_GCAL_EVENTS));
+    showToast('🔄 サンプルデータに戻しました');
+  } else {
+    menus = [];
+    bookings = [];
+    gcalEvents = [];
+    showToast('🗑 すべてのデータを削除しました');
+  }
+
+  saveToStorage();
+  renderMenuEdit();
+  renderMenuOpts();
+  renderMyBookings();
+  if (document.getElementById('page-admin').classList.contains('active')) renderAdmin();
+  if (document.getElementById('page-gcal').classList.contains('active'))  renderGcalPage();
+}
+
+// ====== TOAST ======
+function showToast(msg) {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  container.appendChild(t);
+  requestAnimationFrame(() => { requestAnimationFrame(() => { t.classList.add('show'); }); });
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 300);
+  }, 2800);
+}
+
+// ====== PERSIST (localStorage 自動保存・自動読み込み) ======
+const STORAGE_KEY = 'nomx_booking_data';
+
+function saveToStorage() {
+  const snap = { cfg, menus, bookings, gcalEvents, savedAt: new Date().toISOString() };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snap)); } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const snap = JSON.parse(raw);
+    if (snap.cfg)        Object.assign(cfg, snap.cfg);
+    if (snap.menus)      menus = snap.menus;
+    if (snap.bookings)   bookings = snap.bookings;
+    if (snap.gcalEvents) gcalEvents = snap.gcalEvents;
+    return snap.savedAt || true;
+  } catch(e) { return false; }
+}
+
+function syncUIFromCfg() {
+  const fields = [
+    ['cfg-name','name'],['cfg-sub','sub'],['cfg-line-name','lineAcc'],
+    ['cfg-interval','interval'],['cfg-move-buffer','moveBuffer'],['cfg-open','open'],['cfg-close','close']
+  ];
+  fields.forEach(([id,key]) => {
+    const el = document.getElementById(id);
+    if (el && cfg[key] !== undefined) el.value = cfg[key];
+  });
+  // 2カレンダーID
+  if (Array.isArray(cfg.gcalIds)) {
+    const n = document.getElementById('cfg-gcal-id-nomura');
+    const m = document.getElementById('cfg-gcal-id-macumba');
+    if (n) n.value = cfg.gcalIds[0] || '';
+    if (m) m.value = cfg.gcalIds[1] || '';
+  }
+  const kw = document.getElementById('gcal-keyword');
+  if (kw && cfg.gcalKeyword) kw.value = cfg.gcalKeyword;
+  document.getElementById('sb-name').innerHTML = brandHTML(cfg.name);
+  document.getElementById('sb-sub').textContent  = cfg.sub;
+  document.getElementById('mh-name').innerHTML = brandHTML(cfg.name);
+  document.getElementById('mh-sub').textContent  = cfg.sub;
+}
+
+// 各操作後に自動保存
+const _oSave    = saveSettings;    saveSettings    = () => { _oSave();    saveToStorage(); };
+const _oApply   = applyImport;     applyImport     = () => { _oApply();   saveToStorage(); };
+const _oConfirm = confirmBooking;  confirmBooking  = () => { _oConfirm(); saveToStorage(); };
+const _oCancel  = cancelMyBooking; cancelMyBooking = (id) => { _oCancel(id); saveToStorage(); };
+const _oACancel = adminCancel;     adminCancel     = (id) => { _oACancel(id); saveToStorage(); };
+const _oApprove = approveBooking;  approveBooking  = (id) => { _oApprove(id); saveToStorage(); };
+const _oImport  = importGcalBooking; importGcalBooking = (id) => { _oImport(id); saveToStorage(); };
+
+// ====== INIT ======
+window.addEventListener('DOMContentLoaded', () => {
+  const savedAt = loadFromStorage();
+  setMode('admin');
+  renderStoreOpts();
+  renderMenuOpts();
+  syncUIFromCfg();
+  renderMenuEdit();
+
+  const savedKey = localStorage.getItem('gcal_api_key');
+  const savedId  = localStorage.getItem('gcal_client_id');
+  if (savedKey && document.getElementById('cfg-gcal-api-key')) document.getElementById('cfg-gcal-api-key').value = savedKey;
+  if (savedId  && document.getElementById('cfg-gcal-client-id')) document.getElementById('cfg-gcal-client-id').value = savedId;
+  if (savedKey && savedId) updateGcalUI(false);
+
+  if (savedAt) {
+    const dt = typeof savedAt === 'string' ? new Date(savedAt).toLocaleString('ja-JP') : '以前';
+    showToast('💾 保存データを読み込みました（' + dt + '）');
+  }
+});
+</script>
+<script src="https://apis.google.com/js/api.js" onload="onGapiLoad()"></script>
+<script src="https://accounts.google.com/gsi/client" onload="onGisLoad()"></script>
+</body>
+</html>
