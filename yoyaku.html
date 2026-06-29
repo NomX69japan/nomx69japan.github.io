@@ -849,6 +849,8 @@ function classifyEvent(e){
 // 戻り値：'free'（無関係＝無視してよい） / 'store'（この店舗の予定としてブロック） / 'block'（店舗外/旧予約でブロック）
 // reasonLabel：UIに出す理由ラベル
 function eventBlockInfo(e, store){
+  // macumbaは別スタッフ → ノムラの空き判定に影響しない
+  if(e.source === 'macumba') return { kind:'free' };
   const c = classifyEvent(e);
   if(c.store){
     if(c.store === store) return { kind:'store', label:(SRC_LABEL[e.source]||'') + '予定（' + storeName(c.store) + '）' };
