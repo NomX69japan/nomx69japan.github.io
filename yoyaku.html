@@ -849,12 +849,12 @@ function classifyEvent(e){
 // 戻り値：'free'（無関係＝無視してよい） / 'store'（この店舗の予定としてブロック） / 'block'（店舗外/旧予約でブロック）
 // reasonLabel：UIに出す理由ラベル
 function eventBlockInfo(e, store){
-  // macumbaは別スタッフ → ノムラの空き判定に影響しない
-  if(e.source === 'macumba') return { kind:'free' };
   const c = classifyEvent(e);
   if(c.store){
     if(c.store === store) return { kind:'store', label:(SRC_LABEL[e.source]||'') + '予定（' + storeName(c.store) + '）' };
-    // 別店舗の予定 → 社長は他店にいる＝この店舗では予約不可
+    // macumbaが別店舗を使用中 → その店舗はmacumbaが占有しているだけ。ノムラは移動不要でフリー
+    if(e.source === 'macumba') return { kind:'free' };
+    // ノムラ自身が別店舗にいる → 移動バッファ付きでブロック
     return { kind:'block', label:'他店舗（' + storeName(c.store) + '）の予定' };
   }
   if(c.block === 'old')  return { kind:'block', label:'旧予約ブロック' };
