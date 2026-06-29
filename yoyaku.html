@@ -403,14 +403,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
           <div class="gcal-sync-text">Googleカレンダー（ノムラ＋macumba）と同期 — 本当に空いてる枠だけ表示</div>
         </div>
 
-        <!-- 月表示 / 週表示 トグル -->
-        <div class="view-tabs">
-          <button class="view-tab active" id="vt-month" onclick="setDateView('month')">月表示</button>
-          <button class="view-tab" id="vt-week" onclick="setDateView('week')">週表示</button>
-        </div>
-
         <!-- 週表示 -->
-        <div id="week-view" style="display:none">
+        <div id="week-view">
           <div class="week-store-head" id="week-store-head"></div>
           <div class="cal-header">
             <button class="cal-nav" onclick="prevW()">‹</button>
@@ -426,30 +420,6 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
           </div>
         </div>
 
-        <!-- 月表示 -->
-        <div id="month-view">
-        <div class="cal-wrap">
-          <div class="cal-header">
-            <button class="cal-nav" onclick="prevM()">‹</button>
-            <div class="cal-month" id="cal-lbl"></div>
-            <button class="cal-nav" onclick="nextM()">›</button>
-          </div>
-          <div class="cal-grid" id="cal-grid"></div>
-        </div>
-        <div id="slot-section" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div style="font-size:13px;font-weight:700">時間帯を選ぶ</div>
-            <div style="font-size:11px;color:var(--text2)">
-              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:4px"></span>空き
-              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#9aa;margin-left:10px;margin-right:4px"></span>予約不可（理由表示）
-            </div>
-          </div>
-          <div id="slots-container" style="max-height:340px;overflow-y:auto"></div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:12px">
-            セッション間隔: 同じ店舗 <span id="interval-display">30分</span> / 店舗をまたぐとき <span id="move-buffer-display">60分</span>確保
-          </div>
-        </div>
-        </div><!-- /month-view -->
         <button class="btn btn-brand btn-full" id="btn-step3" disabled onclick="goStep(4)">内容を確認する →</button>
         <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="goStep(2)">← 戻る</button>
       </div>
@@ -1033,14 +1003,10 @@ function goStep(n) {
     d.classList.toggle('on', i <= n);
   }
   curStep = n;
-  if(n === 3 && !viewY) {
-    const now = new Date(); viewY = now.getFullYear(); viewM = now.getMonth();
-    renderCal();
+  if(n === 3){
+    initWeekStart();
+    renderWeek();
   }
-  if(n === 3 && dateView === 'week') renderWeek();
-  document.getElementById('interval-display').textContent = cfg.interval + '分';
-  const mbd = document.getElementById('move-buffer-display');
-  if(mbd) mbd.textContent = (cfg.moveBuffer || 60) + '分';
   if(n === 4) {
     const m = menus[selMenu];
     document.getElementById('sm-store').innerHTML = storeChip(selStore);
@@ -1098,26 +1064,19 @@ function pickDay(dateStr) {
   document.getElementById('slot-section').style.display = 'block';
 }
 
-// ====== 月/週 ビュー切替 ======
-let dateView = 'month';     // 'month' | 'week'
-let weekStart = null;       // 週表示の起点（日曜=その週の頭。Date）
+// ====== 週ビュー ======
+let dateView = 'week';
+let weekStart = null;       // 週表示の起点（月曜=その週の頭。Date）
 
-function setDateView(v){
-  dateView = v;
-  document.getElementById('vt-month').classList.toggle('active', v === 'month');
-  document.getElementById('vt-week').classList.toggle('active', v === 'week');
-  document.getElementById('month-view').style.display = v === 'month' ? 'block' : 'none';
-  document.getElementById('week-view').style.display  = v === 'week'  ? 'block' : 'none';
-  if(v === 'week'){
-    if(!weekStart){
-      const now = new Date(); now.setHours(0,0,0,0);
-      weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); // 日曜起点
-    }
-    renderWeek();
+function initWeekStart(){
+  if(!weekStart){
+    const now = new Date(); now.setHours(0,0,0,0);
+    const dayOffset = now.getDay() === 0 ? 6 : now.getDay() - 1; // 月曜起点
+    weekStart = new Date(now); weekStart.setDate(now.getDate() - dayOffset);
   }
 }
-function prevW(){ weekStart.setDate(weekStart.getDate() - 7); renderWeek(); }
-function nextW(){ weekStart.setDate(weekStart.getDate() + 7); renderWeek(); }
+function prevW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() - 7); renderWeek(); }
+function nextW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() + 7); renderWeek(); }
 
 function fmtDate(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
