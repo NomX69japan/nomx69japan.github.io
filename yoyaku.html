@@ -841,7 +841,9 @@ function classifyEvent(e){
     const hit = STORE_COLOR_MAP[cal + ':' + cid];
     if(hit) return hit;
   }
-  // マップにない色・色なし → 店舗外＝両店舗ブロック（社長が動けない時間）
+  // macumbaの色なし → 四条烏丸のデフォルト枠（個別色指定なし＝カレンダー全体の緑色が四条烏丸を示す）
+  if(cal === 'macumba') return { store:'shijo' };
+  // ノムラの色なし・マップ外 → 店舗不明＝両店舗ブロック（社長が動けない時間）
   return { block:'busy' };
 }
 
