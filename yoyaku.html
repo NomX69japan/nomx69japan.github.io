@@ -862,10 +862,8 @@ function eventBlockInfo(e, store){
   const c = classifyEvent(e);
   if(c.store){
     if(c.store === store) return { kind:'store', label:(SRC_LABEL[e.source]||'') + '予定（' + storeName(c.store) + '）' };
-    // macumbaが別店舗を使用中 → その店舗はmacumbaが占有しているだけ。ノムラは移動不要でフリー
-    if(e.source === 'macumba') return { kind:'free' };
-    // ノムラ自身が別店舗にいる → 移動バッファ付きでブロック
-    return { kind:'block', label:'他店舗（' + storeName(c.store) + '）の予定' };
+    // 別店舗の予定（ノムラ・macumba問わず）→ その店舗を占有しているだけで、今選んでいる店舗には影響しない
+    return { kind:'free' };
   }
   if(c.block === 'old')  return { kind:'block', label:'旧予約ブロック' };
   return { kind:'block', label:(SRC_LABEL[e.source] ? SRC_LABEL[e.source]+'・' : '') + '予約不可（他予定）' };
