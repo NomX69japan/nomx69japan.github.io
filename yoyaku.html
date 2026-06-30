@@ -219,17 +219,29 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .gcal-sync-text{font-size:12px;color:#1a56db;font-weight:500}
 
-/* Gcal event preview */
-.gcal-event{border-left:3px solid #1a73e8;background:#e8f0fe;border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 12px;margin-bottom:6px}
-.gcal-event.src-nomura{border-left-color:#1a73e8}
-.gcal-event.src-macumba{border-left-color:#d97706;background:#fff7ed}
-.gcal-event-title{font-size:12px;font-weight:700;color:#1a56db}
-.gcal-event.src-macumba .gcal-event-title{color:#b45309}
-.gcal-event-time{font-size:11px;color:#1a56db;opacity:0.8;margin-top:1px}
-.gcal-event.src-macumba .gcal-event-time{color:#b45309}
+/* Gcal event preview — 視覚カラーは店舗ベース（四条=緑/御池=橙）、トレーナーはタグで区別 */
+.gcal-event{border-left:3px solid var(--text3);background:var(--bg);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 12px;margin-bottom:6px}
+.gcal-event.ev-shijo{border-left-color:var(--shijo);background:var(--shijo-bg)}
+.gcal-event.ev-oike {border-left-color:var(--oike); background:var(--oike-bg)}
+.gcal-event.ev-block{border-left-color:#e53e3e;background:#fee2e2}
+.gcal-event-title{font-size:12px;font-weight:700;color:var(--text)}
+.gcal-event.ev-shijo .gcal-event-title{color:var(--shijo)}
+.gcal-event.ev-oike  .gcal-event-title{color:var(--oike)}
+.gcal-event.ev-block .gcal-event-title{color:#991b1b}
+.gcal-event-time{font-size:11px;color:var(--text2);opacity:0.9;margin-top:1px}
+.gcal-event.ev-shijo .gcal-event-time{color:var(--shijo)}
+.gcal-event.ev-oike  .gcal-event-time{color:var(--oike)}
 .src-tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;margin-left:6px}
 .src-tag.nomura{background:#dbeafe;color:#1d4ed8}
 .src-tag.macumba{background:#ffedd5;color:#c2410c}
+/* GCal カレンダー色の小バッジ（4色：青/紫/緑/黄） */
+.gc-color-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle;border:1px solid rgba(0,0,0,0.1)}
+.gc-color-dot.c-blue{background:#4285F4}
+.gc-color-dot.c-purple{background:#8e24aa}
+.gc-color-dot.c-green{background:#0b8043}
+.gc-color-dot.c-yellow{background:#f6bf26}
+.gc-color-dot.c-gray{background:#616161}
+.gc-color-dot.c-pink{background:#d50000}
 
 /* Settings */
 .settings-block{margin-bottom:20px}
@@ -287,7 +299,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
 .week-scroll-wrap{overflow-x:hidden;margin:0}
-.week-grid{display:grid;border-collapse:separate;width:100%}
+.week-grid{display:grid;border-collapse:separate;width:100%;max-width:640px}
 /* 1列目=時間軸、2〜8列目=7日分（画面幅いっぱいに収める。横スクロール不要） */
 .week-grid-inner{display:grid;grid-template-columns:30px repeat(7,1fr);gap:0;width:100%}
 /* ヘッダ行 */
@@ -845,13 +857,10 @@ const STORE_COLOR_MAP = {
 function classifyEvent(e){
   const cal = e.source || 'nomura';
   const cid = (e.colorId === undefined || e.colorId === null || e.colorId === '') ? null : String(e.colorId);
-  if(cid !== null){
-    const hit = STORE_COLOR_MAP[cal + ':' + cid];
-    if(hit) return hit;
-  }
-  // ノムラ・macumba共通：色なし（個別色指定なし）＝カレンダーのデフォルト色（四条烏丸）の予定
-  if(cal === 'nomura' || cal === 'macumba') return { store:'shijo' };
-  // マップ外 → 店舗不明＝両店舗ブロック
+  // 色なし or 未マップ色 → 店舗不明＝両店舗ブロック（安全側）
+  if(cid === null) return { block:'busy' };
+  const hit = STORE_COLOR_MAP[cal + ':' + cid];
+  if(hit) return hit;
   return { block:'busy' };
 }
 
@@ -1480,6 +1489,22 @@ function renderGcalPage() {
   renderGcalImported();
 }
 
+// colorId → カレンダー色名（実色準拠の小バッジ用）
+function colorClassFromId(cid){
+  if(cid === null || cid === undefined) return 'c-gray';
+  const n = parseInt(cid);
+  if(n === 7 || n === 9) return 'c-blue';   // Peacock/Blueberry
+  if(n === 3 || n === 1) return 'c-purple'; // Grape/Lavender
+  if(n === 10 || n === 2) return 'c-green'; // Basil/Sage
+  if(n === 5) return 'c-yellow';            // Banana
+  if(n === 4 || n === 11) return 'c-pink';  // Flamingo/Tomato
+  return 'c-gray';
+}
+function colorNameFromId(cid){
+  const k = colorClassFromId(cid);
+  return ({'c-blue':'青','c-purple':'紫','c-green':'緑','c-yellow':'黄','c-pink':'ピンク','c-gray':'色なし'})[k];
+}
+
 function renderGcalEvents() {
   const el = document.getElementById('gcal-events-list');
   const personal = gcalEvents.filter(e => e.type === 'personal');
@@ -1488,14 +1513,22 @@ function renderGcalEvents() {
     const [y, mo, d] = e.date.split('-');
     const src = e.source || 'nomura';
     const c = classifyEvent(e);
+    // 視覚カラーは店舗別（四条=緑/御池=橙）。両ブロックは赤系。
+    let evClass = 'ev-block';
     let judge;
-    if(c.store) judge = `<span style="color:var(--${STORES[c.store].cls})">▶ ${storeName(c.store)}の予約枠</span>`;
-    else if(c.block === 'old') judge = '<span style="color:#e53e3e">▶ 旧予約＝ブロック</span>';
-    else judge = '<span style="color:var(--text2)">▶ 両店舗ブロック（動けない時間）</span>';
-    const colTxt = (e.colorId === undefined || e.colorId === null) ? '色なし' : 'colorId:' + e.colorId;
-    return `<div class="gcal-event src-${src}">
-      <div class="gcal-event-title">${e.title}<span class="src-tag ${src}">${SRC_LABEL[src] || src}</span></div>
-      <div class="gcal-event-time">${parseInt(mo)}月${parseInt(d)}日 ${e.startTime}〜${e.endTime} · ${colTxt}</div>
+    if(c.store){
+      evClass = c.store === 'shijo' ? 'ev-shijo' : 'ev-oike';
+      judge = `<span style="color:var(--${STORES[c.store].cls})">▶ ${storeName(c.store)}の予約枠</span>`;
+    } else if(c.block === 'old'){
+      judge = '<span style="color:#e53e3e">▶ 旧予約＝ブロック</span>';
+    } else {
+      judge = '<span style="color:#991b1b">▶ 両店舗ブロック（動けない時間）</span>';
+    }
+    const colorCls = colorClassFromId(e.colorId);
+    const colorLabel = colorNameFromId(e.colorId);
+    return `<div class="gcal-event ${evClass}">
+      <div class="gcal-event-title"><span class="gc-color-dot ${colorCls}"></span>${e.title}<span class="src-tag ${src}">${SRC_LABEL[src] || src}</span></div>
+      <div class="gcal-event-time">${parseInt(mo)}月${parseInt(d)}日 ${e.startTime}〜${e.endTime} · ${colorLabel}</div>
       <div style="font-size:11px;font-weight:700;margin-top:3px">${judge}</div>
     </div>`;
   }).join('');
@@ -1722,6 +1755,8 @@ async function addEventToGcal(booking) {
     const startDt = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), h, m||0);
     const endDt = new Date(startDt.getTime() + booking.dur * 60000);
     const toISO = dt => dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0') + 'T' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0') + ':00';
+    // 店舗に応じて Googleカレンダーの色IDを設定（四条=青(7) / 御池=紫(3)）
+    const colorIdForStore = booking.store === 'shijo' ? '7' : booking.store === 'oike' ? '3' : undefined;
     const ev = await gapi.client.calendar.events.insert({
       calendarId: calId,
       resource: {
@@ -1729,6 +1764,7 @@ async function addEventToGcal(booking) {
         start: { dateTime: toISO(startDt), timeZone: 'Asia/Tokyo' },
         end: { dateTime: toISO(endDt), timeZone: 'Asia/Tokyo' },
         description: '店舗: ' + storeName(booking.store) + ' / メニュー: ' + booking.menu,
+        ...(colorIdForStore ? { colorId: colorIdForStore } : {}),
       },
     });
     booking.gcalEventId = ev.result.id;
