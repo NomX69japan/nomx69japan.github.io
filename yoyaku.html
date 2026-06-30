@@ -164,6 +164,10 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .slot{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;background:var(--bg2);transition:all 0.12s}
 .slot:hover:not(.slot-busy):not(.slot-gcal-busy){border-color:var(--brand)}
 .slot.slot-sel{background:var(--brand);border-color:var(--brand);color:white}
+.slot.slot-tight{border:1.5px solid #f59e0b;background:#fffbeb}
+.slot.slot-tight.slot-sel{background:#f59e0b;border-color:#f59e0b;color:white}
+.slot-tight-tag{display:inline-block;font-size:9px;background:#f59e0b;color:white;padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle;font-weight:700;letter-spacing:0.04em}
+.tight-notice{background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--radius-sm);padding:9px 13px;margin-bottom:12px;font-size:12px;color:#92400e;line-height:1.5}
 .slot.slot-busy{background:var(--bg);color:var(--text3);cursor:default}
 .slot.slot-gcal-busy{background:#e8f0fe;border-color:#bcd0f5;cursor:default}
 .slot-time{font-size:14px;font-weight:700}
@@ -596,8 +600,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
           <div class="form-group">
             <label class="form-label">セッション間の空き時間（最短・同じ店舗どうし）</label>
             <select class="form-input form-select" id="cfg-interval">
-              <option value="15">最短 15分</option>
-              <option value="30" selected>標準 30分</option>
+              <option value="15">最低 15分（タイトモード自動適用）</option>
+              <option value="30" selected>基本 30分（推奨）</option>
               <option value="45">余裕 45分</option>
               <option value="60">ゆとり 60分</option>
             </select>
@@ -896,10 +900,10 @@ let menus = [
 ];
 
 let bookings = [
-  { id: 1, store:'oike',  client: 'A.K様', menu: 'パーソナルトレーニング 60分', date: '2026-04-10', time: '10:00', dur: 60, price: 8000, status: 'confirmed', source: 'app' },
-  { id: 2, store:'shijo', client: 'S.I様', menu: 'ペアトレーニング 90分', date: '2026-04-10', time: '16:00', dur: 90, price: 12000, status: 'pending', source: 'app' },
-  { id: 3, store:'oike',  client: 'M.S様', menu: 'ペアトレーニング 90分', date: '2026-04-11', time: '11:00', dur: 90, price: 12000, status: 'confirmed', source: 'app' },
-  { id: 4, store:'shijo', client: 'Y.T様', menu: 'パーソナルトレーニング 60分', date: '2026-04-08', time: '15:00', dur: 60, price: 8000, status: 'cancelled', source: 'app' },
+  { id: 1, store:'oike',  client: 'A.K様', menu: 'パーソナルトレーニング 60分', date: '2026-07-02', time: '10:00', dur: 60, price: 8000, status: 'confirmed', source: 'app' },
+  { id: 2, store:'shijo', client: 'S.I様', menu: 'ペアトレーニング 90分', date: '2026-07-03', time: '16:00', dur: 90, price: 12000, status: 'pending', source: 'app' },
+  { id: 3, store:'oike',  client: 'M.S様', menu: 'ペアトレーニング 90分', date: '2026-07-06', time: '11:00', dur: 90, price: 12000, status: 'confirmed', source: 'app' },
+  { id: 4, store:'shijo', client: 'Y.T様', menu: 'パーソナルトレーニング 60分', date: '2026-07-04', time: '15:00', dur: 60, price: 8000, status: 'cancelled', source: 'app' },
 ];
 
 // Googleカレンダーの予定（2カレンダー想定：ノムラ由来 / macumba由来）
@@ -908,27 +912,56 @@ let bookings = [
 // colorId: 7/9=青(ノムラ→四条) 3/1=紫(ノムラ→御池) 10/2=緑(macumba→四条)
 //          5=黄(macumba→御池) 4/11=ピンク/赤(旧予約=ブロック) 8=グレー(店舗外=両ブロック) null=色なし(両ブロック)
 const SAMPLE_GCAL_EVENTS_DEF = [
-  // ノムラ・青 → 四条烏丸
-  { id: 'g1', title: '四条 PT枠',     date: '2026-04-10', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 7 },
-  // ノムラ・紫 → 御池（この日 13:30終了→15:00開始の空きを作る素にする）
-  { id: 'g2', title: '御池 PT枠',     date: '2026-04-10', startTime: '12:30', endTime: '13:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 3 },
-  { id: 'g3', title: '御池 撮影',     date: '2026-04-10', startTime: '15:00', endTime: '16:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 3 },
-  // macumba・緑 → 四条烏丸
-  { id: 'g4', title: 'macumba 緑枠',  date: '2026-04-11', startTime: '11:00', endTime: '12:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
-  // macumba・黄 → 御池
-  { id: 'g5', title: 'macumba 黄枠',  date: '2026-04-11', startTime: '14:00', endTime: '15:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 5 },
-  // macumba シフト（色なし＝両店舗ブロック：夜のバイト等）
-  { id: 'g6', title: 'macumba シフト', date: '2026-04-10', startTime: '19:00', endTime: '23:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: null },
-  // 店舗間移動バッファ確認用：四条烏丸（緑）が13:00に終わる日。
-  //   → 御池の予約は60分あけて14:00以降。 同じ四条烏丸なら30分あけて13:30以降から取れる。
-  { id: 'g11', title: '四条 PT枠(午前)', date: '2026-04-15', startTime: '12:00', endTime: '13:00', type: 'personal', source: 'nomura', calendar: 'primary', colorId: 7 },
-  // ピンク＝旧予約サイトのイベント → ブロック（今は使わない色）
-  { id: 'g7', title: '旧予約(ピンク)', date: '2026-04-14', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 4 },
-  // グレー＝店舗外（プライベート）→ 両店舗ブロック
-  { id: 'g8', title: 'プライベート',   date: '2026-04-14', startTime: '13:00', endTime: '14:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 8 },
+  // ===== 2026-07-01（水）実カレンダー再現 =====
+  // 烏丸(緑=macumba四条)：中村09-10, 中村10-11, 森脇11:30-12:30,
+  //                     大岸17:30-18:30, 竹田18:30-19:30, 中島19:30-20:30
+  // 烏丸(青=ノムラ四条)：⑩D:村田様2 13:30-14:30
+  // 御池(黄=macumba御池)：森田15:00-16:00
+  // 想定OK: 烏丸 → 15:00,15:30,16:00,21:00 / 御池 → 9:00〜11:30,16:30以降
+  { id: 'r1', title: '中村さま',       date: '2026-07-01', startTime: '09:00', endTime: '10:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 'r2', title: '中村さま',       date: '2026-07-01', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 'r3', title: '森脇さま',       date: '2026-07-01', startTime: '11:30', endTime: '12:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 'r4', title: '⑩D:村田様2',     date: '2026-07-01', startTime: '13:30', endTime: '14:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 7  },
+  { id: 'r5', title: '森田さま',       date: '2026-07-01', startTime: '15:00', endTime: '16:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 5  },
+  { id: 'r6', title: 'ペア 大岸さま①', date: '2026-07-01', startTime: '17:30', endTime: '18:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 'r7', title: '竹田さま①',      date: '2026-07-01', startTime: '18:30', endTime: '19:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 'r8', title: '中島さま',       date: '2026-07-01', startTime: '19:30', endTime: '20:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+
+  // ===== 2026-07-02（木）実カレンダー再現 =====
+  // 9-19頃 macumba四条 中心、土田様(ノムラ御池) 10-11、依藤様(ノムラ四条) 20-21
+  // 想定OK（60分・基本30分）: 烏丸 15:30/16:00/16:30 / 御池 11:30〜17:30（30分刻み）
+  { id: 't1', title: '三輪さま①',     date: '2026-07-02', startTime: '09:00', endTime: '10:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 't2', title: '⑤土田様2',      date: '2026-07-02', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 3  },
+  { id: 't3', title: '岡部さま',       date: '2026-07-02', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 't4', title: '笹川さま',       date: '2026-07-02', startTime: '11:00', endTime: '12:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 't5', title: '長谷会長',       date: '2026-07-02', startTime: '12:30', endTime: '13:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 't6', title: '田中さま',       date: '2026-07-02', startTime: '14:00', endTime: '15:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 't7', title: '藤原さま',       date: '2026-07-02', startTime: '18:00', endTime: '19:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 't8', title: '⑤D:依藤様5',    date: '2026-07-02', startTime: '20:00', endTime: '21:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 7  },
+
+  // ===== 各色パターンの確認用（他の日付） =====
+  // ノムラ紫 → 御池
+  { id: 'g2', title: '御池 PT枠',      date: '2026-07-02', startTime: '12:30', endTime: '13:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 3 },
+  // ===== 2026-07-03（金）実カレンダー再現 =====
+  // 9-15は macumba四条 連続、武田奥様(macumba四条) 16-17、林 18:30-19:30、吉岡 19:30-20:30
+  // 想定OK（60分メニュー）: 烏丸 17:15のみ / 御池 9:00-11:00, 15:00以降
+  { id: 's1', title: '小笠さま',       date: '2026-07-03', startTime: '09:00', endTime: '10:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's2', title: '奥田さま',       date: '2026-07-03', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's3', title: '榊原さま',       date: '2026-07-03', startTime: '11:00', endTime: '12:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's4', title: '真神さま',       date: '2026-07-03', startTime: '12:00', endTime: '13:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's5', title: '廣安さま',       date: '2026-07-03', startTime: '13:00', endTime: '14:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's6', title: '全力ストレッチ', date: '2026-07-03', startTime: '13:00', endTime: '14:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 4 },
+  { id: 's7', title: '八木さま',       date: '2026-07-03', startTime: '14:00', endTime: '15:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's8', title: '武田さま 奥様',  date: '2026-07-03', startTime: '16:00', endTime: '17:00', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's9', title: '林さま4/10',     date: '2026-07-03', startTime: '18:30', endTime: '19:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  { id: 's10', title: '吉岡さま',      date: '2026-07-03', startTime: '19:30', endTime: '20:30', type: 'personal', source: 'macumba', calendar: 'macumba', colorId: 10 },
+  // ピンク＝旧予約 → ブロック
+  { id: 'g7', title: '旧予約(ピンク)', date: '2026-07-04', startTime: '10:00', endTime: '11:00', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 4 },
+  // グレー＝店舗外 → 両店舗ブロック
+  { id: 'g8', title: 'プライベート',   date: '2026-07-04', startTime: '13:00', endTime: '14:30', type: 'personal', source: 'nomura',  calendar: 'primary', colorId: 8 },
   // 手動取り込み用（PT:）
-  { id: 'g9', title: 'PT: T.W様',     date: '2026-04-12', startTime: '09:00', endTime: '10:00', type: 'pt_manual', source: 'nomura', calendar: 'primary', colorId: 7, imported: false },
-  { id: 'g10', title: 'PT: S.N様',    date: '2026-04-17', startTime: '15:00', endTime: '16:00', type: 'pt_manual', source: 'nomura', calendar: 'primary', colorId: 3, imported: false },
+  { id: 'g9', title: 'PT: T.W様',     date: '2026-07-06', startTime: '09:00', endTime: '10:00', type: 'pt_manual', source: 'nomura', calendar: 'primary', colorId: 7, imported: false },
+  { id: 'g10', title: 'PT: S.N様',    date: '2026-07-08', startTime: '15:00', endTime: '16:00', type: 'pt_manual', source: 'nomura', calendar: 'primary', colorId: 3, imported: false },
 ];
 let gcalEvents = JSON.parse(JSON.stringify(SAMPLE_GCAL_EVENTS_DEF));
 
@@ -1251,37 +1284,34 @@ function minToTime(min){
 //   - 別店舗をまたぐ／店舗不明 → cfg.moveBuffer（既定60分。社長の移動余裕）
 // otherStore が null/undefined（両店舗ブロック・旧予約など店舗が特定できない予定）も
 // 安全側に倒して移動バッファを適用する（その予定をまたいで詰めない）。
-function bufferFor(otherStore){
-  const interval = cfg.interval || 30;
+function bufferFor(otherStore, interval){
+  const iv = interval || cfg.interval || 30;
   const move = cfg.moveBuffer || 60;
-  if(otherStore && selStore && otherStore === selStore) return interval;
+  if(otherStore && selStore && otherStore === selStore) return iv;
   return move;
 }
 
-function checkSlot(startMin, endMin, dateStr){
-  // 既存予約との衝突（同店舗＝この店舗の予約／他店舗の予約も社長は別店にいるのでブロック）
+// interval パラメータでバッファ分数を上書きできる（comfort=30 / tight=15 で2段階判定するため）
+function checkSlot(startMin, endMin, dateStr, interval){
+  // 既存予約との衝突
   for(const b of bookings){
     if(b.date !== dateStr || b.status === 'cancelled') continue;
     const bStart = timeToMin(b.time), bEnd = bStart + b.dur;
-    // 相手の店舗に応じてバッファを決める（同店30分 / 店舗またぎ60分）
-    const gap = bufferFor(b.store);
+    const gap = bufferFor(b.store, interval);
     if(!(endMin + gap <= bStart || startMin >= bEnd + gap)){
       if(b.store && selStore && b.store !== selStore)
         return { ok:false, label:'他店舗（' + storeName(b.store) + '）予約' };
       return { ok:false, label:'予約済み' };
     }
   }
-
-  // Googleカレンダー予定（ノムラ＋macumba）との衝突。色で店舗判定→可否を決める。
-  // 相手の店舗（colorIdから判定）と今の店舗で間隔バッファを変える：
-  //   同店30分 / 店舗またぎ・店舗不明（両店舗ブロック等）60分。
+  // Googleカレンダー予定
   for(const e of gcalEvents){
     if(e.date !== dateStr) continue;
     const info = eventBlockInfo(e, selStore);
     if(info.kind === 'free') continue;
     const c = classifyEvent(e);
-    const otherStore = c.store || null; // block(old/busy)は店舗不明＝null
-    const gap = bufferFor(otherStore);
+    const otherStore = c.store || null;
+    const gap = bufferFor(otherStore, interval);
     const eStart = timeToMin(e.startTime), eEnd = timeToMin(e.endTime);
     if(!(endMin + gap <= eStart || startMin >= eEnd + gap)){
       return { ok:false, label:info.label };
@@ -1290,21 +1320,49 @@ function checkSlot(startMin, endMin, dateStr){
   return { ok:true };
 }
 
+// 指定設定で OK スロット数をカウント（comfort/tight 判定用）
+function countOkSlots(dateStr, dur, openMin, closeMin, interval, step){
+  let n = 0;
+  for(let s = openMin; s + dur <= closeMin; s += step){
+    const r = checkSlot(s, s + dur, dateStr, interval);
+    if(r.ok) n++;
+  }
+  return n;
+}
+
 function renderSlots(dateStr) {
   const el = document.getElementById('slots-container');
   const dur = menus[selMenu] ? menus[selMenu].dur : 60;
   const openMin  = timeToMin(cfg.open  || '09:00');
   const closeMin = timeToMin(cfg.close || '21:00');
 
-  // 午前(〜12:00)/午後で区切って表示
+  // ===== 2段階判定 =====
+  // 1) 基本: 30分バッファ + 30分刻み（:00 / :30）でOK枠を探す
+  // 2) なければタイト: 15分バッファ + 15分刻み（:00 :15 :30 :45）でぴったり枠を出す
+  const BASE_INTERVAL = cfg.interval || 30;
+  const MIN_INTERVAL  = 15;
+  let interval = BASE_INTERVAL, step = BASE_INTERVAL, isTight = false;
+
+  if(countOkSlots(dateStr, dur, openMin, closeMin, BASE_INTERVAL, BASE_INTERVAL) === 0){
+    // 基本で取れない日のみ、最低バッファに緩めて再探索
+    interval = MIN_INTERVAL; step = MIN_INTERVAL; isTight = true;
+  }
+
   const groups = { am: [], pm: [] };
-  for(let s = openMin; s + dur <= closeMin; s += SLOT_STEP){
+  for(let s = openMin; s + dur <= closeMin; s += step){
     const endMin = s + dur;
-    const res = checkSlot(s, endMin, dateStr);
+    const res = checkSlot(s, endMin, dateStr, interval);
     const t = minToTime(s);
     const isSel = selTime === t;
-    const html = `<div class="slot${res.ok ? (isSel ? ' slot-sel' : '') : ' slot-gcal-busy'}" data-time="${t}">
-      <div class="slot-time">${t}</div>
+    const cls = ['slot'];
+    if(!res.ok) cls.push('slot-gcal-busy');
+    else {
+      if(isSel) cls.push('slot-sel');
+      if(isTight) cls.push('slot-tight');
+    }
+    const tag = (res.ok && isTight) ? '<span class="slot-tight-tag">ピッタリ</span>' : '';
+    const html = `<div class="${cls.join(' ')}" data-time="${t}">
+      <div class="slot-time">${t}${tag}</div>
       <div class="slot-label">${res.ok ? '空き' : res.label}</div>
     </div>`;
     (s < 12*60 ? groups.am : groups.pm).push(html);
@@ -1312,7 +1370,11 @@ function renderSlots(dateStr) {
 
   const section = (title, arr) => arr.length
     ? `<div class="slot-group-title">${title}</div><div class="slots-grid">${arr.join('')}</div>` : '';
-  el.innerHTML = section('午前', groups.am) + section('午後', groups.pm);
+
+  const notice = isTight
+    ? '<div class="tight-notice">⚠️ この日は通常30分空きで取れる枠がありません。15分空きでピッタリ入る枠のみ表示しています。</div>'
+    : '';
+  el.innerHTML = notice + section('午前', groups.am) + section('午後', groups.pm);
 
   el.querySelectorAll('.slot:not(.slot-busy):not(.slot-gcal-busy)').forEach(s => {
     s.onclick = () => { selTime = s.dataset.time; renderSlots(dateStr); document.getElementById('btn-step3').disabled = false; };
@@ -1964,10 +2026,10 @@ const SAMPLE_MENUS = [
   { name: 'ペアトレーニング 90分', desc: '2名で受けるセッション', price: 12000, dur: 90 }, // ※価格仮・社長確認待ち
 ];
 const SAMPLE_BOOKINGS = [
-  { id: 1, store:'oike',  client: 'A.K様', menu: 'パーソナルトレーニング 60分', date: '2026-04-10', time: '10:00', dur: 60, price: 8000, status: 'confirmed', source: 'app' },
-  { id: 2, store:'shijo', client: 'S.I様', menu: 'ペアトレーニング 90分', date: '2026-04-10', time: '16:00', dur: 90, price: 12000, status: 'pending', source: 'app' },
-  { id: 3, store:'oike',  client: 'M.S様', menu: 'ペアトレーニング 90分', date: '2026-04-11', time: '11:00', dur: 90, price: 12000, status: 'confirmed', source: 'app' },
-  { id: 4, store:'shijo', client: 'Y.T様', menu: 'パーソナルトレーニング 60分', date: '2026-04-08', time: '15:00', dur: 60, price: 8000, status: 'cancelled', source: 'app' },
+  { id: 1, store:'oike',  client: 'A.K様', menu: 'パーソナルトレーニング 60分', date: '2026-07-02', time: '10:00', dur: 60, price: 8000, status: 'confirmed', source: 'app' },
+  { id: 2, store:'shijo', client: 'S.I様', menu: 'ペアトレーニング 90分', date: '2026-07-03', time: '16:00', dur: 90, price: 12000, status: 'pending', source: 'app' },
+  { id: 3, store:'oike',  client: 'M.S様', menu: 'ペアトレーニング 90分', date: '2026-07-06', time: '11:00', dur: 90, price: 12000, status: 'confirmed', source: 'app' },
+  { id: 4, store:'shijo', client: 'Y.T様', menu: 'パーソナルトレーニング 60分', date: '2026-07-04', time: '15:00', dur: 60, price: 8000, status: 'cancelled', source: 'app' },
 ];
 const SAMPLE_GCAL_EVENTS = SAMPLE_GCAL_EVENTS_DEF;
 
