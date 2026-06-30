@@ -844,14 +844,14 @@ const STORE_COLOR_MAP = {
 // 戻り値：{ store:'oike'|'shijo' } か { block:'old'|'busy' }
 function classifyEvent(e){
   const cal = e.source || 'nomura';
-  const cid = (e.colorId === undefined || e.colorId === null) ? null : String(e.colorId);
+  const cid = (e.colorId === undefined || e.colorId === null || e.colorId === '') ? null : String(e.colorId);
   if(cid !== null){
     const hit = STORE_COLOR_MAP[cal + ':' + cid];
     if(hit) return hit;
   }
-  // macumbaの色なし → 四条烏丸のデフォルト枠（個別色指定なし＝カレンダー全体の緑色が四条烏丸を示す）
-  if(cal === 'macumba') return { store:'shijo' };
-  // ノムラの色なし・マップ外 → 店舗不明＝両店舗ブロック（社長が動けない時間）
+  // ノムラ・macumba共通：色なし（個別色指定なし）＝カレンダーのデフォルト色（四条烏丸）の予定
+  if(cal === 'nomura' || cal === 'macumba') return { store:'shijo' };
+  // マップ外 → 店舗不明＝両店舗ブロック
   return { block:'busy' };
 }
 
