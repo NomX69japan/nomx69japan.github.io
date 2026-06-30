@@ -286,20 +286,20 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
-.week-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px}
-.week-grid{display:grid;border-collapse:separate;min-width:480px}
-/* 1列目=時間軸、2〜8列目=7日分 */
-.week-grid-inner{display:grid;grid-template-columns:52px repeat(7,minmax(56px,1fr));gap:0}
+.week-scroll-wrap{overflow-x:hidden;margin:0}
+.week-grid{display:grid;border-collapse:separate;width:100%}
+/* 1列目=時間軸、2〜8列目=7日分（画面幅いっぱいに収める。横スクロール不要） */
+.week-grid-inner{display:grid;grid-template-columns:30px repeat(7,1fr);gap:0;width:100%}
 /* ヘッダ行 */
 .wg-corner{position:sticky;left:0;z-index:3;background:var(--bg);border-bottom:2px solid var(--border2);border-right:1px solid var(--border)}
-.wg-day-head{text-align:center;font-size:11px;font-weight:700;padding:6px 2px;border-bottom:2px solid var(--border2);border-right:1px solid var(--border);line-height:1.3;background:var(--bg2)}
+.wg-day-head{text-align:center;font-size:10px;font-weight:700;padding:4px 1px;border-bottom:2px solid var(--border2);border-right:1px solid var(--border);line-height:1.25;background:var(--bg2)}
 .wg-day-head.is-today{background:var(--accent);color:white;border-bottom-color:var(--accent2)}
-.wg-day-head .wdh-date{display:block;font-size:12px}
-.wg-day-head .wdh-wd{display:block;font-size:10px;opacity:0.75}
+.wg-day-head .wdh-date{display:block;font-size:11px}
+.wg-day-head .wdh-wd{display:block;font-size:9px;opacity:0.75}
 /* 時間ラベル列 */
-.wg-time{position:sticky;left:0;z-index:2;background:var(--bg);font-size:10px;color:var(--text2);text-align:right;padding:0 6px 0 0;line-height:1;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:32px}
+.wg-time{position:sticky;left:0;z-index:2;background:var(--bg);font-size:9px;color:var(--text2);text-align:right;padding:0 2px 0 0;line-height:1;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:28px}
 /* セル */
-.wg-cell{display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:32px;font-size:18px;font-weight:900;cursor:default;transition:filter 0.1s}
+.wg-cell{display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:28px;font-size:14px;font-weight:900;cursor:default;transition:filter 0.1s}
 .wg-cell.wg-ok{cursor:pointer}
 .wg-cell.wg-ok.wc-shijo{background:#bbf7d0;color:#15803d;border-bottom:1px solid #86efac}
 .wg-cell.wg-ok.wc-oike{background:#fde68a;color:#b45309;border-bottom:1px solid #fcd34d}
@@ -862,8 +862,10 @@ function eventBlockInfo(e, store){
   const c = classifyEvent(e);
   if(c.store){
     if(c.store === store) return { kind:'store', label:(SRC_LABEL[e.source]||'') + '予定（' + storeName(c.store) + '）' };
-    // 別店舗の予定（ノムラ・macumba問わず）→ その店舗を占有しているだけで、今選んでいる店舗には影響しない
-    return { kind:'free' };
+    // macumba（別スタッフ）が別店舗を使用中 → 社長は別店舗にいないので、今選んでいる店舗には影響しない
+    if(e.source === 'macumba') return { kind:'free' };
+    // ノムラ（社長本人）が別店舗にいる → 移動バッファ付きでブロック
+    return { kind:'block', label:'他店舗（' + storeName(c.store) + '）の予定' };
   }
   if(c.block === 'old')  return { kind:'block', label:'旧予約ブロック' };
   return { kind:'block', label:(SRC_LABEL[e.source] ? SRC_LABEL[e.source]+'・' : '') + '予約不可（他予定）' };
