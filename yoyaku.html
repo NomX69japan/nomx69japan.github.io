@@ -1104,7 +1104,7 @@ async function syncEventsFromGAS() {
       const s = new Date(ev.start), f = new Date(ev.end);
       const jst = d => new Date(d.getTime() + 9*60*60*1000).toISOString();
       return {
-        id: ev.start + ev.source, source: ev.source,
+        id: ev.start + ev.source, source: ev.source, title: ev.title || '(無題)',
         date: jst(s).slice(0,10), startTime: jst(s).slice(11,16), endTime: jst(f).slice(11,16),
         colorId: ev.colorId ? parseInt(ev.colorId) : null, type: 'personal'
       };
