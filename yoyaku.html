@@ -860,30 +860,28 @@ const STORE_COLOR_MAP = {
 // 予定1件の店舗/ブロック判定を返す。
 // 戻り値：{ store:'oike'|'shijo' } か { block:'old'|'busy' }
 function classifyEvent(e){
+  // source は syncGcal 時に付与（'nomura' | 'macumba'）
+  // サンプルデータにも source が入っているのでそのまま使える
   const cal = e.source || 'nomura';
   const cid = (e.colorId === undefined || e.colorId === null || e.colorId === '') ? null : String(e.colorId);
 
-  // colorId がある場合：STORE_COLOR_MAP で判定（最優先）
+  // [Step1] colorId がある → STORE_COLOR_MAP で判定（最優先）
   if(cid !== null){
     const hit = STORE_COLOR_MAP[cal + ':' + cid];
     if(hit) return hit;
-    // マップ外のcolorId → カレンダーデフォルト色にフォールバック
+    // マップ外の colorId
+    // macumba の未知色 → デフォルトで四条扱い
+    if(cal === 'macumba') return { store:'shijo' };
+    // nomura の未知色 → 両店舗ブロック
+    return { block:'busy' };
   }
 
-  // colorId なし or マップ外 → calendarDefaultColors（カレンダー自体の色）で判定
-  const calId = e.calendar || null;
-  if(calId && calendarDefaultColors[calId]) {
-    const def = calendarDefaultColors[calId];
-    // nomura は colorId のみで判定するため、色なし=ブロック
-    if(def.storeHint === 'nomura_use_colorId_only') return { block:'busy' };
-    if(def.storeHint === 'shijo') return { store:'shijo' };
-    if(def.storeHint === 'oike')  return { store:'oike' };
-    if(def.storeHint === null)    return { block:'busy' };
-  }
+  // [Step2] colorId なし → source で判定
+  // macumba の色なし = 四条烏丸のデフォルト勤務
+  if(cal === 'macumba') return { store:'shijo' };
 
-  // カレンダー色情報もない場合：sourceベースのフォールバック
-  if(cal === 'macumba') return { store:'shijo' }; // macumba未取得→四条扱い
-  return { block:'busy' }; // nomura未取得→ブロック
+  // nomura の色なし = 店舗不明 → 両店舗ブロック（安全側）
+  return { block:'busy' };
 }
 
 // この予定が「指定店舗の予約可否」に影響するか判定。
@@ -1670,7 +1668,7 @@ function onGisLoad() {
   if (!clientId) return;
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
-    scope: 'https://www.googleapis.com/auth/calendar',
+    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.readonly',
     callback: async (resp) => {
       if (resp.error) { showToast('⚠️ Googleログインに失敗しました'); return; }
       gcalAuthed = true;
@@ -1732,7 +1730,7 @@ function gcalLogin() {
   if (!tokenClient || tokenClient._clientId !== clientId) {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/calendar',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.readonly',
       callback: async (resp) => {
         if (resp.error) { showToast('⚠️ Googleログインに失敗しました: ' + resp.error); return; }
         gapi.client.setToken(resp);
@@ -1834,8 +1832,8 @@ async function syncGcal() {
     const future = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
     const keyword = document.getElementById('gcal-keyword')?.value || 'PT:';
 
-    // まずカレンダーのデフォルト色を取得（colorId=nullのイベント判定に使う）
-    await fetchCalendarColors(sources);
+    // ※ fetchCalendarColors は classifyEvent で使用しなくなったためスキップ
+    // （source='nomura'|'macumba' で直接判定するため不要）
 
     const merged = [];
     const errors = [];
