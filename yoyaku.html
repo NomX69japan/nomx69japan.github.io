@@ -305,20 +305,38 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .week-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0;border-radius:var(--radius-sm)}
 .week-grid{display:block;width:100%;max-width:100%}
 @media(max-width:768px){
-  /* 7列を画面内に収める: 時間軸24px + 7列均等 */
-  .week-grid{max-width:100%;min-width:unset;display:block}
-  .week-scroll-wrap{overflow-x:hidden}
-  .wg-time{position:static!important}
-  .wg-corner{position:static!important}
-  .week-grid-inner{grid-template-columns:24px repeat(7,1fr)!important}
-  /* セルを極小に */
-  .wg-cell{min-height:20px!important;font-size:10px!important}
-  .wg-time{min-height:20px!important;font-size:7px!important;padding-right:1px}
-  .wg-day-head{font-size:8px!important;padding:3px 0!important}
-  .wg-day-head .wdh-date{font-size:8px!important}
-  .wg-day-head .wdh-wd{font-size:7px!important}
-  .wg-corner{min-height:0}
-  /* その他モバイル調整 */
+  /* ===== 週グリッド: full-bleed で7列を確実に収める ===== */
+  /* week-scroll-wrap を画面端まで広げる */
+  .week-scroll-wrap{
+    overflow-x:hidden;
+    margin:0 -8px;          /* page の padding 8px を打ち消す */
+    padding:0;
+  }
+  .week-grid{
+    max-width:100%;min-width:unset;display:block;
+    width:100%;
+  }
+  /* week-grid-inner: 時間軸32px + 7列均等（画面幅100vw） */
+  .week-grid-inner{
+    display:grid!important;
+    grid-template-columns:32px repeat(7,1fr)!important;
+    width:100vw!important;
+    gap:0!important;
+  }
+  /* セル・時間ラベル */
+  .wg-cell{min-height:22px!important;font-size:11px!important;font-weight:700}
+  .wg-time{
+    min-height:22px!important;font-size:8px!important;
+    padding-right:2px;
+    position:static!important;  /* sticky解除 */
+    width:32px;
+  }
+  .wg-day-head{font-size:9px!important;padding:4px 0!important;line-height:1.2}
+  .wg-day-head .wdh-date{font-size:9px!important}
+  .wg-day-head .wdh-wd{font-size:8px!important}
+  .wg-corner{position:static!important;min-height:0;width:32px}
+
+  /* ===== その他モバイル調整 ===== */
   .page-title{font-size:18px}
   .card{padding:12px 10px}
   .stats-grid{grid-template-columns:1fr 1fr}
