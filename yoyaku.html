@@ -1191,10 +1191,62 @@ async function prevW(){ initWeekStart(); weekStart.setDate(weekStart.getDate()-7
 async function nextW(){ initWeekStart(); weekStart.setDate(weekStart.getDate()+7); await renderWeek(); }
 
 async function syncEventsFromGAS() {
-  // GAS連携は廃止。Google Calendar API（syncGcal）で直接取得したデータを使用。
-  // gcalEvents はすでに syncGcal で正しく設定済みなので何もしない。
-  return;
+  if (!weekStart) return;
+  // GASは認証不要でノムラ+macumba両カレンダーを返してくれる
+  // → お客様がアクセスしても正しい空き枠が表示される
+  const start = new Date(weekStart);
+  const end   = new Date(weekStart);
+  end.setDate(end.getDate() + 7);
+  const url = GAS_URL + '?action=events'
+    + '&start=' + encodeURIComponent(start.toISOString())
+    + '&end='   + encodeURIComponent(end.toISOString());
+  try {
+    const resp = await fetch(url, { redirect: 'follow' });
+    if (!resp.ok) { console.warn('GAS error:', resp.status); return; }
+    const data = await resp.json();
+    if (!Array.isArray(data)) { console.warn('GAS invalid response'); return; }
+
+    const jstOffset = 9 * 60 * 60 * 1000;
+    const gasItems = data
+      .filter(ev => ev.start && ev.end)
+      .map(ev => {
+        const s = new Date(ev.start);
+        const f = new Date(ev.end);
+        // JSTに変換
+        const sJst = new Date(s.getTime() + jstOffset);
+        const fJst = new Date(f.getTime() + jstOffset);
+        // GASの getColor() は文字列("7","3","") → 数値 or null
+        const colorRaw = ev.colorId;
+        const colorId = (colorRaw && colorRaw !== '' && colorRaw !== '0')
+          ? parseInt(colorRaw) : null;
+        return {
+          id: ev.start + '_' + (ev.title||''),
+          source: ev.source || 'nomura',
+          title:  ev.title  || '(無題)',
+          date:      sJst.toISOString().slice(0, 10),
+          startTime: sJst.toISOString().slice(11, 16),
+          endTime:   fJst.toISOString().slice(11, 16),
+          colorId,
+          type: 'personal',
+          calendar: ev.source === 'macumba' ? MACUMBA_ID_KEY : NOMURA_ID_KEY,
+        };
+      });
+
+    // gcalEvents をGASデータで置き換え（認証済みの場合は syncGcal が優先）
+    if (!gcalAuthed) {
+      gcalEvents = gasItems;
+      console.log('GAS sync:', gasItems.length, '件 (nomura:' +
+        gasItems.filter(e=>e.source==='nomura').length + ' macumba:' +
+        gasItems.filter(e=>e.source==='macumba').length + ')');
+    }
+  } catch(err) {
+    console.warn('GAS sync failed:', err.message || err);
+  }
 }
+
+// GASで使うカレンダーID参照キー（classifyEvent の calendar フィールド用）
+const NOMURA_ID_KEY  = 'nomura_primary';
+const MACUMBA_ID_KEY = 'macumba_primary';
 
 function fmtDate(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
