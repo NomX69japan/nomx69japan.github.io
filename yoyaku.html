@@ -1190,6 +1190,10 @@ async function renderWeek(){
   document.getElementById('week-interval-display').textContent = (cfg.interval || 30) + '分';
   document.getElementById('week-move-buffer-display').textContent = (cfg.moveBuffer || 60) + '分';
 
+  // モバイル(<=768px)は3日、PCは7日表示
+  const isMobile = window.innerWidth <= 768;
+  const dayCount = isMobile ? 3 : 7;
+
   const end = new Date(weekStart); end.setDate(weekStart.getDate() + dayCount - 1);
   document.getElementById('week-lbl').textContent =
     (weekStart.getMonth()+1) + '/' + weekStart.getDate() + ' 〜 ' + (end.getMonth()+1) + '/' + end.getDate();
@@ -1204,13 +1208,13 @@ async function renderWeek(){
   const timeRows = [];
   for(let s = openMin; s < closeMin; s += 30) timeRows.push(s);
 
-  // 7日分の日付情報
+  // 日付情報（モバイル3日/PC7日）
   const now = new Date(); now.setHours(0,0,0,0);
   const realNow = new Date();
   const realNowMin = realNow.getHours() * 60 + realNow.getMinutes();
   const todayStr = fmtDate(now);
   const days = [];
-  for(let i = 0; i < 7; i++){
+  for(let i = 0; i < dayCount; i++){
     const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
     days.push({ d, ds: fmtDate(d), isToday: fmtDate(d) === todayStr, past: d < now });
   }
@@ -1220,6 +1224,7 @@ async function renderWeek(){
   // ラッパを置く
   g.innerHTML = '<div class="week-grid-inner" id="wg-inner"></div>';
   const inner = document.getElementById('wg-inner');
+  if(isMobile) inner.style.gridTemplateColumns = '38px repeat(3,1fr)';
 
   let html = '';
 
