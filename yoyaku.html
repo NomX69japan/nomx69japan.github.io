@@ -910,6 +910,10 @@ const STORE_COLOR_MAP = {
 // 戻り値：{ store:'oike'|'shijo' } か { block:'old'|'busy' }
 function classifyEvent(e){
   const cal = e.source || 'nomura';
+
+  // [Step0] 「ノム宅」など完全プライベート予定 → 色に関わらず常に両店舗ブロック
+  if(cal === 'private_block') return { block:'private' };
+
   const cid = (e.colorId === undefined || e.colorId === null || e.colorId === '') ? null : String(e.colorId);
 
   // [Step1] colorId がある → STORE_COLOR_MAP で判定（最優先）
@@ -938,7 +942,8 @@ function eventBlockInfo(e, store){
     // ノムラ（社長本人）が別店舗にいる → 移動バッファ付きでブロック
     return { kind:'block', label:'他店舗（' + storeName(c.store) + '）の予定' };
   }
-  if(c.block === 'old')  return { kind:'block', label:'旧予約ブロック' };
+  if(c.block === 'old')     return { kind:'block', label:'旧予約ブロック' };
+  if(c.block === 'private') return { kind:'block', label:'プライベート予定（両店舗ブロック）' };
   return { kind:'block', label:(SRC_LABEL[e.source] ? SRC_LABEL[e.source]+'・' : '') + '予約不可（他予定）' };
 }
 
@@ -1032,7 +1037,7 @@ let isAdmin = ADMIN_ACCESS, viewY, viewM, adminFilter = 'all', adminStoreFilter 
 const WD = ['日','月','火','水','木','金','土'];
 const MN = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 const ALL_SLOTS = ['9:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
-const SRC_LABEL = { nomura: 'ノムラ', macumba: 'macumba' };
+const SRC_LABEL = { nomura: 'ノムラ', macumba: 'macumba', private_block: 'ノム宅' };
 
 // ====== MODE ======
 function setMode(m) {
