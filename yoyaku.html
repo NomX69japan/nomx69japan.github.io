@@ -302,27 +302,17 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
-.week-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0;border-radius:var(--radius-sm)}
+.week-scroll-wrap{overflow-x:hidden;margin:0}
 .week-grid{display:block;width:100%;max-width:100%}
 @media(max-width:768px){
   /* ===== 週グリッド: full-bleed で7列を確実に収める ===== */
   /* week-scroll-wrap を画面端まで広げる */
-  .week-scroll-wrap{
-    overflow-x:hidden;
-    margin:0 -8px;          /* page の padding 8px を打ち消す */
-    padding:0;
-  }
+  .week-scroll-wrap{overflow-x:hidden;margin:0;padding:0}
   .week-grid{
     max-width:100%;min-width:unset;display:block;
     width:100%;
   }
-  /* week-grid-inner: 時間軸32px + 7列均等（画面幅100vw） */
-  .week-grid-inner{
-    display:grid!important;
-    grid-template-columns:32px repeat(7,1fr)!important;
-    width:100vw!important;
-    gap:0!important;
-  }
+  /* week-grid-inner はJSのインラインスタイルで制御 */
   /* セル・時間ラベル */
   .wg-cell{min-height:22px!important;font-size:11px!important;font-weight:700}
   .wg-time{
@@ -345,8 +335,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   .admin-actions{flex-wrap:wrap;gap:4px;margin-top:6px}
   .main{padding-bottom:70px}
 }
-/* 1列目=時間軸、2〜8列目=7日分（画面幅いっぱいに収める。横スクロール不要） */
-.week-grid-inner{display:grid;grid-template-columns:26px repeat(7,1fr);gap:0;width:100%}
+/* week-grid-inner: デフォルト(PC) */
+.week-grid-inner{display:grid;grid-template-columns:36px repeat(7,1fr);gap:0;width:100%}
 /* ヘッダ行 */
 .wg-corner{position:sticky;left:0;z-index:3;background:var(--bg);border-bottom:2px solid var(--border2);border-right:1px solid var(--border)}
 .wg-day-head{text-align:center;font-size:9px;font-weight:700;padding:3px 1px;border-bottom:2px solid var(--border2);border-right:1px solid var(--border);line-height:1.25;background:var(--bg2)}
@@ -1258,12 +1248,17 @@ async function renderWeek(){
   // ラッパを置く
   g.innerHTML = '<div class="week-grid-inner" id="wg-inner"></div>';
   const inner = document.getElementById('wg-inner');
-  // モバイルでも7列: JS側でインラインスタイルを直接設定（CSS @media より確実）
-  const timeColW = isMobile ? '32px' : '36px';
-  inner.style.gridTemplateColumns = timeColW + ' repeat(7,1fr)';
-  inner.style.width = isMobile ? '100vw' : '100%';
+  // グリッド列をJS側でインラインスタイル設定（CSS競合を完全に避ける）
+  inner.style.display = 'grid';
+  inner.style.gap = '0';
   if(isMobile){
-    inner.style.marginLeft = '-8px'; // page padding を打ち消す
+    // モバイル: page padding(8px×2=16px)を除いた幅で計算
+    // 時間軸30px固定、残り7列均等
+    inner.style.gridTemplateColumns = '30px repeat(7,1fr)';
+    inner.style.width = 'calc(100vw - 16px)'; // page padding分を引く
+  } else {
+    inner.style.gridTemplateColumns = '36px repeat(7,1fr)';
+    inner.style.width = '100%';
   }
 
   let html = '';
