@@ -397,7 +397,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="nav-item active" onclick="showPage('book')" id="ni-book">
         <span class="nav-icon">📅</span>予約する
       </div>
-      <div class="nav-item" onclick="showPage('mybook')" id="ni-mybook">
+      <div class="nav-item admin-only" onclick="showPage('mybook')" id="ni-mybook">
         <span class="nav-icon">📋</span>予約確認
       </div>
       <div class="nav-item admin-only" onclick="showPage('admin')" id="ni-admin">
@@ -848,7 +848,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   <!-- Mobile bottom nav -->
   <nav class="mobile-nav" id="mobile-nav">
     <button class="mob-btn active" onclick="showPage('book')" id="mb-book"><span class="mob-icon">📅</span>予約</button>
-    <button class="mob-btn" onclick="showPage('mybook')" id="mb-mybook"><span class="mob-icon">📋</span>確認</button>
+    <button class="mob-btn admin-only" onclick="showPage('mybook')" id="mb-mybook"><span class="mob-icon">📋</span>確認</button>
     <button class="mob-btn admin-only" onclick="showPage('admin')" id="mb-admin-page"><span class="mob-icon">🗂️</span>管理</button>
     <button class="mob-btn admin-only" onclick="showPage('gcal')" id="mb-gcal"><span class="mob-icon">📆</span>同期</button>
     <button class="mob-btn admin-only" onclick="showPage('settings')" id="mb-settings"><span class="mob-icon">⚙️</span>設定</button>
