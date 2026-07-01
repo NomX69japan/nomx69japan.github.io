@@ -1490,6 +1490,42 @@
   }
   .bk-empty { text-align: center; color: #aaa; font-size: 13px; padding: 40px 0; }
 
+  /* 来店ログ編集：指名キャスト行（狭い画面では2段に自動折り返し） */
+  .vle-cast-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0ebe0;
+  }
+  .vle-cast-name-label {
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer;
+    flex: 1 1 auto;
+    min-width: 90px;
+  }
+  .vle-cast-name-label span { font-size: 13px; }
+  .vle-cast-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .vle-cast-controls .nom-toggle { display: flex; gap: 2px; }
+  .vle-cast-controls .nom-btn {
+    padding: 4px 8px; font-size: 11px; border-radius: 4px;
+    border: 1px solid #ddd; background: #fafafa; cursor: pointer;
+  }
+  .vle-cast-controls .nom-btn.active.a { background: #ffd54f; }
+  .vle-cast-controls .nom-btn.active.b { background: #ffb74d; }
+  .vle-cast-controls .nom-btn.active.none { background: #e0e0e0; }
+  @media (max-width: 480px) {
+    .vle-cast-row { flex-direction: column; align-items: stretch; }
+    .vle-cast-controls { margin-left: 0; justify-content: flex-end; }
+  }
+
   /* 保管場所別 横スクロールタブ */
   .bk-loc-tabs {
     display: flex;
@@ -1968,17 +2004,23 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 4px;
       flex: 1;
-      grid-auto-rows: 1fr;
+      /* 内容量に応じて縦に伸びられるようにする（固定1frだと経過時間等がはみ出す） */
+      grid-auto-rows: minmax(min-content, 1fr);
+      align-items: stretch;
     }
     .page#page-floor .table-grid.private {
       grid-template-columns: 1fr;
       gap: 4px;
+      grid-auto-rows: minmax(min-content, 1fr);
     }
     .table-card {
       min-height: 0;
       padding: 5px 6px;
       gap: 1px;
       border-radius: 5px;
+      /* カードの中身がはみ出さないよう、内容に応じて高さを許容 */
+      height: auto;
+      overflow: visible;
     }
     .table-card .name {
       font-size: 11px;
@@ -1992,6 +2034,7 @@
     }
     .table-card .timer {
       font-size: 11px; letter-spacing: 0;
+      margin-top: 2px;
     }
     .table-card .set-badge {
       font-size: 8px; padding: 0 3px; margin-left: 3px;
@@ -2765,9 +2808,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.14b';
+const APP_VERSION = '2026.06.15';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.15',
+    date: '2026-06-15',
+    title: '🔧 レイアウト崩れ修正＋顧客情報の項目追加＋洋室相席対応',
+    items: [
+      '【フロアのレイアウト崩れ修正】スマホで、内容の多い卓カードの経過時間表示が枠からはみ出す問題を修正しました。カードが内容に応じて自然に高さを持てるようにしました。',
+      '【来店記録編集のキャストレイアウト修正】履歴から来店記録を編集する際、指名キャストの表示が名前とA/B/なしボタンで重なって崩れる問題を修正しました。狭い画面では自動的に2段表示になります。',
+      '【顧客情報に領収書欄を追加】「領収書が必要」チェックと、宛名などの備考欄を追加しました。',
+      '【顧客情報に喫煙欄を追加】「タバコを吸う」チェックと、銘柄の備考欄を追加しました。',
+      '【テーブル移動で洋室に相席可能に】洋室が使用中でも、テーブル移動の候補に「(相席)」表示付きで出るようになりました。選ぶと既存のお客様はそのまま、新しいお客様が合流します。',
+      '【安定性】これまでの同期修正（退店の巻き戻り対策・古い端末への対応）は引き続き有効です。自動延長は正常に他端末へ反映される仕組みになっています。',
+    ],
+  },
   {
     version: '2026.06.14b',
     date: '2026-06-14',
@@ -4764,19 +4820,21 @@ function openVisitLogEditModal(logId) {
     const isDohan = dohanIds.has(c.id);
     const trialMark = c.trial ? '<span style="background:#ffe0e6; color:#c2185b; font-size:10px; padding:1px 4px; border-radius:3px; margin-left:4px;">体験</span>' : '';
     return `
-      <div class="cast-pick-row" style="display:flex; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid #f0ebe0;">
-        <label style="display:flex; align-items:center; flex:1; cursor:pointer; min-width:0;">
-          <input type="checkbox" class="vle-cast-pick" data-cast-pick="${c.id}" value="${c.id}" ${checked?'checked':''} style="margin-right:6px;">
-          <span style="font-size:13px;">${escapeHtml(c.name)}${trialMark}</span>
+      <div class="cast-pick-row vle-cast-row">
+        <label class="vle-cast-name-label">
+          <input type="checkbox" class="vle-cast-pick" data-cast-pick="${c.id}" value="${c.id}" ${checked?'checked':''}>
+          <span>${escapeHtml(c.name)}${trialMark}</span>
         </label>
-        <label class="dohan-toggle ${isDohan?'is-dohan':''}" data-vle-dohan-wrap="${c.id}" title="同伴" style="margin:0;">
-          <input type="checkbox" class="vle-cast-dohan" data-vle-dohan="${c.id}" ${isDohan?'checked':''}>
-          <span>同</span>
-        </label>
-        <div class="nom-toggle" data-vle-nom-toggle="${c.id}" style="display:flex; gap:2px;">
-          <button type="button" class="nom-btn ${nom==='A'?'active a':''}" data-nom="A" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='A'?'#ffd54f':'#fafafa'}; cursor:pointer;">A</button>
-          <button type="button" class="nom-btn ${nom==='B'?'active b':''}" data-nom="B" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='B'?'#ffb74d':'#fafafa'}; cursor:pointer;">B</button>
-          <button type="button" class="nom-btn ${nom==='none'?'active none':''}" data-nom="none" style="padding:3px 7px; font-size:11px; border-radius:4px; border:1px solid #ddd; background:${nom==='none'?'#e0e0e0':'#fafafa'}; cursor:pointer;">なし</button>
+        <div class="vle-cast-controls">
+          <label class="dohan-toggle ${isDohan?'is-dohan':''}" data-vle-dohan-wrap="${c.id}" title="同伴">
+            <input type="checkbox" class="vle-cast-dohan" data-vle-dohan="${c.id}" ${isDohan?'checked':''}>
+            <span>同</span>
+          </label>
+          <div class="nom-toggle" data-vle-nom-toggle="${c.id}">
+            <button type="button" class="nom-btn ${nom==='A'?'active a':''}" data-nom="A">A</button>
+            <button type="button" class="nom-btn ${nom==='B'?'active b':''}" data-nom="B">B</button>
+            <button type="button" class="nom-btn ${nom==='none'?'active none':''}" data-nom="none">なし</button>
+          </div>
         </div>
       </div>
     `;
@@ -6759,11 +6817,15 @@ function openMoveTableDialog() {
 
   // 空席テーブル一覧（同種別を上に、別種別を下に）
   const t = DEFAULT_TABLES.find(x => x.id === editingTableId);
-  const sameType = DEFAULT_TABLES.filter(x => x.id !== editingTableId && x.type === t.type && !(state.tables[x.id] && state.tables[x.id].occupied));
-  const otherType = DEFAULT_TABLES.filter(x => x.id !== editingTableId && x.type !== t.type && !(state.tables[x.id] && state.tables[x.id].occupied));
+  const isVacant = (x) => !(state.tables[x.id] && state.tables[x.id].occupied);
+  // 洋室は相席可能なため、使用中でも「合流」移動先として候補に出す
+  const canJoin = (x) => x.id === 'YOSHITSU' && state.tables[x.id] && state.tables[x.id].occupied;
+  const sameType = DEFAULT_TABLES.filter(x => x.id !== editingTableId && x.type === t.type && (isVacant(x) || canJoin(x)));
+  const otherType = DEFAULT_TABLES.filter(x => x.id !== editingTableId && x.type !== t.type && (isVacant(x) || canJoin(x)));
   const buildBtn = (tt) => {
     const label = tt.type === 'private' ? `🛋 ${tt.name}` : `🪑 ${tt.name}`;
-    return `<button type="button" class="btn btn-sm move-target-btn" data-move-to="${tt.id}" style="min-width:90px;">${label}</button>`;
+    const joinBadge = canJoin(tt) ? ' <span style="font-size:10px; color:#c65a00;">(相席)</span>' : '';
+    return `<button type="button" class="btn btn-sm move-target-btn" data-move-to="${tt.id}" style="min-width:90px;">${label}${joinBadge}</button>`;
   };
   const sameHtml = sameType.length > 0 ? sameType.map(buildBtn).join('') : '<span style="color:#888; font-size:12px;">空きなし</span>';
   const otherHtml = otherType.length > 0 ? otherType.map(buildBtn).join('') : '<span style="color:#888; font-size:12px;">空きなし</span>';
@@ -6799,12 +6861,62 @@ function openMoveTableDialog() {
     btn.addEventListener('click', () => {
       const toId = btn.getAttribute('data-move-to');
       const toName = getTableName(toId);
-      if (!confirm(`${currentName} → ${toName} に移動しますか？`)) return;
-      moveTable(editingTableId, toId);
+      const willJoin = toId === 'YOSHITSU' && state.tables[toId] && state.tables[toId].occupied;
+      const msg = willJoin
+        ? `${currentName} を ${toName} に相席（合流）させますか？\n${toName}の既存のお客様はそのまま、新しいお客様が加わります。`
+        : `${currentName} → ${toName} に移動しますか？`;
+      if (!confirm(msg)) return;
+      if (willJoin) {
+        joinTableAsSeatShare(editingTableId, toId);
+      } else {
+        moveTable(editingTableId, toId);
+      }
       close();
       closeTableModal();
     });
   });
+}
+
+// 相席合流：fromId のお客様を、既に使用中の toId（洋室）に合流させる。
+// toId 側の既存お客様はそのまま、fromId の分を guestList に追加する。
+function joinTableAsSeatShare(fromId, toId) {
+  const fromData = state.tables[fromId];
+  const toData = state.tables[toId];
+  if (!fromData || !fromData.occupied) return;
+  if (!toData || !toData.occupied) { moveTable(fromId, toId); return; } // 念のため空席ならただの移動
+
+  const now = Date.now();
+  // 両者を guestList 形式に統一
+  const toGuestList = tdataToGuestList(toData);
+  const fromGuestList = tdataToGuestList(fromData).map(g => ({
+    ...g,
+    id: genId('g'), // ID衝突回避
+    joinedAt: now,  // 合流時刻を記録
+  }));
+  const mergedGuestList = toGuestList.concat(fromGuestList);
+  const mergedGuests = mergedGuestList.reduce((s, g) => s + (g.exited ? 0 : (g.guests || 0)), 0);
+
+  // 移動履歴（合流である旨を記録）
+  const tableMoves = Array.isArray(toData.tableMoves) ? toData.tableMoves.slice() : [];
+  tableMoves.push({
+    fromTableId: fromId, fromTableName: getTableName(fromId),
+    toTableId: toId, toTableName: getTableName(toId),
+    at: now, joined: true,
+  });
+
+  state.tables[toId] = {
+    ...toData,
+    guestList: mergedGuestList,
+    guests: mergedGuests,
+    tableMoves,
+    _updated: now,
+  };
+  // 元テーブルを空席に（来店記録は作らない：合流先の来店ログで管理されるため）
+  state.tables[fromId] = emptyTableData();
+
+  persistSave();
+  renderFloor();
+  showToast(`${getTableName(fromId)} が ${getTableName(toId)} に相席合流しました`, 'normal');
 }
 
 // テーブル移動本体：tdata を fromId から toId にコピー、fromId は空席に
@@ -8649,6 +8761,22 @@ function rebuildCustomerModalBody(cust) {
         <span class="lab">誕生日</span>
         <input type="text" id="cstBday" value="${escapeHtml(cust.birthday||'')}" placeholder="例: 1990-04-15 / 4月15日">
       </label>
+      <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="cstReceiptNeeded" ${cust.receiptNeeded ? 'checked' : ''} onchange="toggleReceiptNoteVisibility()" style="width:auto; margin:0;">
+        <span class="lab" style="margin:0;">🧾 領収書が必要</span>
+      </label>
+      <label class="field" id="cstReceiptNoteWrap" style="display:${cust.receiptNeeded ? 'flex' : 'none'};">
+        <span class="lab">領収書の備考（宛名など）</span>
+        <input type="text" id="cstReceiptNote" value="${escapeHtml(cust.receiptNote||'')}" placeholder="例: 株式会社◯◯ 上様">
+      </label>
+      <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="cstSmoker" ${cust.smoker ? 'checked' : ''} onchange="toggleSmokerBrandVisibility()" style="width:auto; margin:0;">
+        <span class="lab" style="margin:0;">🚬 タバコを吸う</span>
+      </label>
+      <label class="field" id="cstSmokerBrandWrap" style="display:${cust.smoker ? 'flex' : 'none'};">
+        <span class="lab">銘柄</span>
+        <input type="text" id="cstSmokerBrand" value="${escapeHtml(cust.smokerBrand||'')}" placeholder="例: マールボロ">
+      </label>
     </div>
 
     <div class="cust-detail-section">
@@ -8707,6 +8835,18 @@ function rebuildCustomerModalBody(cust) {
   `;
 }
 
+// 領収書・喫煙のチェックに応じて備考欄の表示切替
+function toggleReceiptNoteVisibility() {
+  const wrap = document.getElementById('cstReceiptNoteWrap');
+  const cb = document.getElementById('cstReceiptNeeded');
+  if (wrap && cb) wrap.style.display = cb.checked ? 'flex' : 'none';
+}
+function toggleSmokerBrandVisibility() {
+  const wrap = document.getElementById('cstSmokerBrandWrap');
+  const cb = document.getElementById('cstSmoker');
+  if (wrap && cb) wrap.style.display = cb.checked ? 'flex' : 'none';
+}
+
 function saveCustomer() {
   if (!custEditing) return;
   const n = document.getElementById('cstName').value.trim();
@@ -8718,6 +8858,12 @@ function saveCustomer() {
   custEditing.phone = document.getElementById('cstPhone').value.trim();
   custEditing.birthday = document.getElementById('cstBday').value.trim();
   custEditing.memo = document.getElementById('cstMemo').value;
+  // 領収書の要否・備考
+  custEditing.receiptNeeded = !!document.getElementById('cstReceiptNeeded')?.checked;
+  custEditing.receiptNote = (document.getElementById('cstReceiptNote')?.value || '').trim();
+  // 喫煙の有無・銘柄
+  custEditing.smoker = !!document.getElementById('cstSmoker')?.checked;
+  custEditing.smokerBrand = (document.getElementById('cstSmokerBrand')?.value || '').trim();
   custEditing._updated = Date.now();
 
   if (editingCustId) {
