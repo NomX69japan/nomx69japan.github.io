@@ -1871,14 +1871,20 @@ async function syncGcal() {
       }
     }
     gcalEvents = merged;
+    saveToStorage(); // 同期したデータを即座にlocalStorageに保存
 
     const now2 = new Date();
     document.getElementById('last-sync-time').textContent =
       now2.getHours() + ':' + String(now2.getMinutes()).padStart(2, '0');
     renderGcalPage();
+    // 予約画面の週グリッドも再描画
+    if(typeof renderWeekView === 'function' && selStore) renderWeekView();
 
     if (errors.length === 0) {
-      showToast('📅 ' + sources.length + 'カレンダー・' + merged.length + '件の予定を同期しました');
+      const macumbaCount = merged.filter(e => e.source === 'macumba').length;
+      const nomuraCount  = merged.filter(e => e.source === 'nomura').length;
+      showToast('📅 同期完了: ノムラ' + nomuraCount + '件 / macumba' + macumbaCount + '件');
+      console.log('gcalEvents after sync:', gcalEvents.map(e => ({source:e.source,date:e.date,time:e.startTime,title:e.title,colorId:e.colorId})));
     } else {
       // 成功分は表示しつつ、エラー詳細を画面に出す
       const errHtml = errors.map(e => `
@@ -2183,10 +2189,19 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const snap = JSON.parse(raw);
-    if (snap.cfg)        Object.assign(cfg, snap.cfg);
-    if (snap.menus)      menus = snap.menus;
-    if (snap.bookings)   bookings = snap.bookings;
-    if (snap.gcalEvents) gcalEvents = snap.gcalEvents;
+    if (snap.cfg)      Object.assign(cfg, snap.cfg);
+    if (snap.menus)    menus = snap.menus;
+    if (snap.bookings) bookings = snap.bookings;
+    if (snap.gcalEvents) {
+      // 古いデータに source がない場合は空にして再同期させる
+      const hasSource = snap.gcalEvents.every(e => e.source);
+      if (hasSource) {
+        gcalEvents = snap.gcalEvents;
+      } else {
+        console.warn('古いgcalEventsデータ(sourceなし)を破棄。再同期してください。');
+        gcalEvents = []; // 再同期で正しいデータを取得
+      }
+    }
     return snap.savedAt || true;
   } catch(e) { return false; }
 }
