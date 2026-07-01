@@ -1857,7 +1857,7 @@ async function syncGcal() {
           timeMax: future.toISOString(),
           singleEvents: true,
           orderBy: 'startTime',
-          maxResults: 100,
+          maxResults: 250,
         });
         const items = resp.result.items || [];
         items.filter(ev => ev.start?.dateTime).forEach(ev => {
