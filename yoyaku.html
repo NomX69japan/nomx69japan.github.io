@@ -618,9 +618,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">営業時間</label>
             <div style="display:flex;gap:8px;align-items:center">
-              <input class="form-input" type="time" id="cfg-open" value="09:00" style="width:auto">
+              <input class="form-input" type="time" id="cfg-open" value="07:00" style="width:auto">
               <span style="color:var(--text2)">〜</span>
-              <input class="form-input" type="time" id="cfg-close" value="21:00" style="width:auto">
+              <input class="form-input" type="time" id="cfg-close" value="22:00" style="width:auto">
             </div>
           </div>
         </div>
@@ -887,7 +887,7 @@ function eventBlockInfo(e, store){
 // ====== DATA ======
 let cfg = {
   name: 'NomX', sub: 'ボディデザインスタジオ / 京都', lineAcc: 'NomX',
-  interval: 30, moveBuffer: 60, open: '09:00', close: '21:00',
+  interval: 30, moveBuffer: 60, open: '07:00', close: '22:00',
   gcalConnected: true, lineConnected: true,
   // 2カレンダー対応：ノムラ用とmacumba用（それぞれカンマ区切りで複数可）
   gcalIds: ['primary', ''], gcalKeyword: 'PT:'
@@ -1162,8 +1162,8 @@ function fmtDate(d){
 // 指定日の「予約可能な開始枠」一覧を、既存 checkSlot ロジックそのままで返す
 function availableStartsForDay(dateStr){
   const dur = menus[selMenu] ? menus[selMenu].dur : 60;
-  const openMin  = timeToMin(cfg.open  || '09:00');
-  const closeMin = timeToMin(cfg.close || '21:00');
+  const openMin  = timeToMin(cfg.open  || '07:00');
+  const closeMin = timeToMin(cfg.close || '22:00');
   const now = new Date();
   const todayStr = fmtDate(now);
   const nowMin = now.getHours()*60 + now.getMinutes();
@@ -1190,8 +1190,8 @@ async function renderWeek(){
 
   // 営業時間・所要時間
   const dur      = menus[selMenu] ? menus[selMenu].dur : 60;
-  const openMin  = timeToMin(cfg.open  || '09:00');
-  const closeMin = timeToMin(cfg.close || '21:00');
+  const openMin  = timeToMin(cfg.open  || '07:00');
+  const closeMin = timeToMin(cfg.close || '22:00');
   const wc = cls === 'shijo' ? 'wc-shijo' : 'wc-oike';
 
   // 30分刻みで時間軸スロット生成
@@ -1333,8 +1333,8 @@ function countOkSlots(dateStr, dur, openMin, closeMin, interval, step){
 function renderSlots(dateStr) {
   const el = document.getElementById('slots-container');
   const dur = menus[selMenu] ? menus[selMenu].dur : 60;
-  const openMin  = timeToMin(cfg.open  || '09:00');
-  const closeMin = timeToMin(cfg.close || '21:00');
+  const openMin  = timeToMin(cfg.open  || '07:00');
+  const closeMin = timeToMin(cfg.close || '22:00');
 
   // ===== 2段階判定 =====
   // 1) 基本: 30分バッファ + 30分刻み（:00 / :30）でOK枠を探す
