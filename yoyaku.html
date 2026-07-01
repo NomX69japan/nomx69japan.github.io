@@ -1264,7 +1264,7 @@ async function renderWeek(){
     const endMin = rowMin + dur;
     html += `<tr><td class="wt-time">${minToTime(rowMin)}</td>`;
     for(const { ds, past, isToday } of days){
-      const pastSlot = past || (isToday && rowMin <= realNowMin);
+      const pastSlot = past || isToday; // 当日は全時間帯予約不可
       if(pastSlot){
         html += `<td class="wt-cell wt-ng">×</td>`;
       } else {
