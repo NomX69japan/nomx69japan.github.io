@@ -37,12 +37,12 @@
 body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;overflow-x:hidden}
 
 /* Layout */
-.app-shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh;max-width:100vw;overflow-x:hidden}
+.app-shell{display:block;min-height:100vh;overflow-x:hidden}
 @media(max-width:768px){.app-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}}
 
 /* Sidebar */
-.sidebar{background:var(--brand);color:white;display:flex;flex-direction:column;padding:0;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;width:200px;min-width:0}
-@media(max-width:768px){.sidebar{display:none}}
+.sidebar{background:var(--brand);color:white;display:flex;flex-direction:column;padding:0;position:fixed;top:0;left:0;height:100vh;width:190px;overflow-y:auto;overflow-x:hidden;z-index:100}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}}
 .sidebar-logo{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.08)}
 .sidebar-logo .dm{font-family:'DM Serif Display',serif;font-size:24px;letter-spacing:0.02em}
 .logo-x{color:var(--brand-x)}
@@ -69,7 +69,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .mh-sub{font-size:10px;opacity:0.5;letter-spacing:0.08em}
 
 /* Main content */
-.main{background:var(--bg);overflow-y:auto;overflow-x:hidden;min-width:0}
+.main{background:var(--bg);overflow-x:hidden;margin-left:190px;min-height:100vh}
 .page{display:none;padding:20px 16px}
 .page.active{display:block}
 @media(max-width:768px){.page{padding:16px}}
@@ -303,7 +303,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
 .week-scroll-wrap{overflow-x:hidden;margin:0}
-.week-grid{display:grid;border-collapse:separate;width:100%;max-width:100%}
+.week-grid{display:grid;border-collapse:separate;width:100%;max-width:calc(100vw - 210px)}
 /* 1列目=時間軸、2〜8列目=7日分（画面幅いっぱいに収める。横スクロール不要） */
 .week-grid-inner{display:grid;grid-template-columns:26px repeat(7,1fr);gap:0;width:100%}
 /* ヘッダ行 */
@@ -874,6 +874,8 @@ function classifyEvent(e){
   const calId = e.calendar || null;
   if(calId && calendarDefaultColors[calId]) {
     const def = calendarDefaultColors[calId];
+    // nomura は colorId のみで判定するため、色なし=ブロック
+    if(def.storeHint === 'nomura_use_colorId_only') return { block:'busy' };
     if(def.storeHint === 'shijo') return { store:'shijo' };
     if(def.storeHint === 'oike')  return { store:'oike' };
     if(def.storeHint === null)    return { block:'busy' };
@@ -1778,21 +1780,20 @@ function updateGcalUI(connected) {
 async function fetchCalendarColors(sources) {
   // Google Calendar の代表的な backgroundColor → colorId 近似マッピング
   // 参考: https://developers.google.com/calendar/api/v3/reference/colors
-  const BG_TO_STORE = {
+  // macumba カレンダーのみ背景色で店舗を判定する
+  // nomura(primary) は colorId で判定するためデフォルト色は使わない
+  const MACUMBA_BG_TO_STORE = {
     // 緑系 → 四条烏丸
     '#0f9d58': 'shijo', '#33b679': 'shijo', '#51b749': 'shijo',
     '#16a765': 'shijo', '#7bd148': 'shijo', '#b3dc6c': 'shijo',
-    // 青系 → 四条烏丸（ノムラ）
-    '#4285f4': 'shijo', '#9fc6e7': 'shijo', '#5484ed': 'shijo',
-    '#3f51b5': 'shijo', '#41bce2': 'shijo',
     // 黄/橙系 → 御池
-    '#f6bf26': 'oike', '#f6c026': 'oike', '#ffad46': 'oike',
-    '#e67c73': null, // 赤系 → ブロック（旧予約）
-    // 紫系 → 御池（ノムラ）
+    '#f6bf26': 'oike', '#f6c026': 'oike', '#ffad46': 'oike', '#f09300': 'oike',
+    // 紫系 → 御池
     '#7986cb': 'oike', '#a47ae2': 'oike', '#cd74e6': 'oike',
-    '#9a9cff': 'oike', '#b99aff': 'oike',
-    // グレー/黒 → ブロック
-    '#616161': null, '#c0ca33': null,
+    // 青系 → 四条（macumbaが青カレンダーの場合）
+    '#4285f4': 'shijo', '#5484ed': 'shijo',
+    // 赤/グレー → ブロック
+    '#e67c73': null, '#616161': null,
   };
 
   for (const src of sources) {
@@ -1800,17 +1801,22 @@ async function fetchCalendarColors(sources) {
       const resp = await gapi.client.calendar.calendarList.get({ calendarId: src.id });
       const cal = resp.result;
       const bg = (cal.backgroundColor || '').toLowerCase();
-      const storeHint = BG_TO_STORE[bg] ?? (src.source === 'macumba' ? 'shijo' : null);
-      calendarDefaultColors[src.id] = {
-        backgroundColor: bg,
-        storeHint,        // 'shijo' | 'oike' | null(ブロック)
-        source: src.source,
-        summaryOverride: cal.summaryOverride || cal.summary || src.id,
-      };
-      console.log('Calendar color:', src.id, bg, '→ store:', storeHint);
+      let storeHint;
+      if (src.source === 'macumba') {
+        // macumba: 背景色で判定。マップにない色は四条をデフォルトに
+        storeHint = (bg in MACUMBA_BG_TO_STORE) ? MACUMBA_BG_TO_STORE[bg] : 'shijo';
+      } else {
+        // nomura: カレンダー色では判定しない（colorId のみで判定）
+        storeHint = 'nomura_use_colorId_only';
+      }
+      calendarDefaultColors[src.id] = { backgroundColor: bg, storeHint, source: src.source };
+      console.log('Calendar color:', src.source, src.id, bg, '→', storeHint);
     } catch(e) {
-      // 取得失敗してもフォールバックで動作継続
-      calendarDefaultColors[src.id] = { storeHint: src.source === 'macumba' ? 'shijo' : null, source: src.source };
+      // 取得失敗: macumbaは四条フォールバック、nomuraはcolorIdのみ
+      calendarDefaultColors[src.id] = {
+        storeHint: src.source === 'macumba' ? 'shijo' : 'nomura_use_colorId_only',
+        source: src.source
+      };
       console.warn('calendarList.get failed for', src.id, e);
     }
   }
