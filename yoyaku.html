@@ -1149,26 +1149,9 @@ async function prevW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() -
 async function nextW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() + 7); await renderWeek(); }
 
 async function syncEventsFromGAS() {
-  if (!weekStart) return;
-  const start = new Date(weekStart);
-  const end   = new Date(weekStart);
-  end.setDate(end.getDate() + 7);
-  const url = GAS_URL + '?action=events&start=' + encodeURIComponent(start.toISOString()) + '&end=' + encodeURIComponent(end.toISOString());
-  try {
-    const resp = await fetch(url, { redirect: 'follow' });
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const gasItems = data.map(ev => {
-      const s = new Date(ev.start), f = new Date(ev.end);
-      const jst = d => new Date(d.getTime() + 9*60*60*1000).toISOString();
-      return {
-        id: ev.start + ev.source, source: ev.source, title: ev.title || '(無題)',
-        date: jst(s).slice(0,10), startTime: jst(s).slice(11,16), endTime: jst(f).slice(11,16),
-        colorId: ev.colorId ? parseInt(ev.colorId) : null, type: 'personal'
-      };
-    });
-    gcalEvents = [...gcalEvents.filter(e => e.source === 'app' || e.imported), ...gasItems];
-  } catch(err) { console.warn('GAS sync:', err); }
+  // GAS連携は廃止。Google Calendar API（syncGcal）で直接取得したデータを使用。
+  // gcalEvents はすでに syncGcal で正しく設定済みなので何もしない。
+  return;
 }
 
 function fmtDate(d){
