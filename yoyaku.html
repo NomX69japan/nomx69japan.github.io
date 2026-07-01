@@ -1242,8 +1242,9 @@ async function syncEventsFromGAS() {
         };
       });
 
-    // gcalEvents をGASデータで置き換え（認証済みの場合は syncGcal が優先）
-    if (!gcalAuthed) {
+    // お客様向けURL（?admin=1 なし）では常にGASを優先する。
+    // 管理者URLでGoogleログイン済みの場合のみ、より高精度なAPIデータ(syncGcal)を優先。
+    if (!ADMIN_ACCESS || !gcalAuthed) {
       gcalEvents = gasItems;
       console.log('GAS sync:', gasItems.length, '件 (nomura:' +
         gasItems.filter(e=>e.source==='nomura').length + ' macumba:' +
@@ -1750,6 +1751,9 @@ function onGisLoad() {
 }
 
 function checkGcalReady() {
+  // お客様向けURL（?admin=1なし）ではGoogleログイン状態を復元しない
+  // → 常にGAS経由の最新データが使われるようにする
+  if (!ADMIN_ACCESS) return;
   if (gapiReady && gisReady) {
     const saved = localStorage.getItem('gcal_token');
     if (saved) {
