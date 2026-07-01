@@ -571,10 +571,11 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="gcal-sync-bar" style="margin-bottom:20px">
         <div class="gcal-sync-dot"></div>
         <div class="gcal-sync-text">最終同期: <span id="last-sync-time">数秒前</span></div>
-        <button class="btn btn-sm btn-ghost" id="gcal-sync-btn" onclick="simulateSync()" style="margin-left:auto;display:none">今すぐ同期</button>
+        <button class="btn btn-sm btn-ghost" id="gcal-sync-btn" onclick="simulateSync().then(()=>debugShowGcalEvents())" style="margin-left:auto;display:none">今すぐ同期</button>
       </div>
 
       <div style="font-size:15px;font-weight:700;margin-bottom:12px">ブロック中の予定（ノムラ＋macumba）</div>
+      <div id="debug-gcal-output"></div>
       <div id="gcal-events-list"></div>
 
       <div class="divider"></div>
@@ -1959,6 +1960,26 @@ async function deleteEventFromGcal(booking) {
 }
 
 function simulateSync() { syncGcal(); }
+
+// デバッグ: gcalEventsの内容をコンソールとUIに表示
+function debugShowGcalEvents(){
+  const el = document.getElementById('debug-gcal-output');
+  if(!el) return;
+  // 7/4のイベントだけ絞り込み
+  const jul4 = gcalEvents.filter(e => e.date === '2026-07-04');
+  const all  = gcalEvents.slice(0,5); // 先頭5件
+  let html = '<div style="font-size:11px;font-family:monospace;background:#f0f4ff;border-radius:6px;padding:10px;margin-bottom:10px">';
+  html += '<strong>7/4の予定 (' + jul4.length + '件):</strong><br>';
+  jul4.forEach(e => {
+    html += `${e.startTime} ${e.title} | source:${e.source} | colorId:${e.colorId} | cal:${e.calendar}<br>`;
+  });
+  html += '<br><strong>先頭5件:</strong><br>';
+  all.forEach(e => {
+    html += `${e.date} ${e.startTime} ${e.title} | src:${e.source} | cid:${e.colorId}<br>`;
+  });
+  html += '<strong>総件数: ' + gcalEvents.length + '件</strong></div>';
+  el.innerHTML = html;
+}
 
 // ====== SETTINGS ======
 function renderMenuEdit() {
