@@ -389,7 +389,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="dm" id="sb-name">Nom<span class="logo-x">X</span></div>
       <div class="sub" id="sb-sub">ボディデザインスタジオ / 京都</div>
     </div>
-    <div class="sidebar-mode">
+    <div class="sidebar-mode" id="sidebar-mode-switch">
       <button class="mode-btn" id="mb-client" onclick="setMode('client')">顧客画面</button>
       <button class="mode-btn active" id="mb-admin" onclick="setMode('admin')">管理者</button>
     </div>
@@ -419,7 +419,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="mh-name" id="mh-name">Nom<span class="logo-x">X</span></div>
       <div class="mh-sub" id="mh-sub">ボディデザインスタジオ / 京都</div>
     </div>
-    <div style="display:flex;gap:6px">
+    <div style="display:flex;gap:6px" id="mobile-mode-switch">
       <button class="mode-btn" id="mb-client-m" onclick="setMode('client')" style="font-size:11px;padding:5px 10px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:none;color:rgba(255,255,255,0.6);cursor:pointer">顧客</button>
       <button class="mode-btn active" id="mb-admin-m" onclick="setMode('admin')" style="font-size:11px;padding:5px 10px;border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:rgba(255,255,255,0.2);color:white;cursor:pointer">管理</button>
     </div>
@@ -1024,7 +1024,10 @@ const SAMPLE_GCAL_EVENTS_DEF = [
 let gcalEvents = JSON.parse(JSON.stringify(SAMPLE_GCAL_EVENTS_DEF));
 
 let selStore = null, selMenu = null, selDate = '', selTime = '', curStep = 1;
-let isAdmin = true, viewY, viewM, adminFilter = 'all', adminStoreFilter = 'all';
+// URLに ?admin=1 が付いている場合のみ管理者モードへの切り替えを許可する
+// 通常のお客様向けURLでは管理画面・切り替えボタン自体が表示されない
+const ADMIN_ACCESS = new URLSearchParams(window.location.search).get('admin') === '1';
+let isAdmin = ADMIN_ACCESS, viewY, viewM, adminFilter = 'all', adminStoreFilter = 'all';
 
 const WD = ['日','月','火','水','木','金','土'];
 const MN = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
@@ -1033,6 +1036,8 @@ const SRC_LABEL = { nomura: 'ノムラ', macumba: 'macumba' };
 
 // ====== MODE ======
 function setMode(m) {
+  // ?admin=1 が無いURLからは管理者モードに切り替えられない（常に顧客モード）
+  if(m === 'admin' && !ADMIN_ACCESS) { m = 'client'; }
   isAdmin = (m === 'admin');
   ['mb-client','mb-admin'].forEach(id => {
     const el = document.getElementById(id);
@@ -1048,6 +1053,11 @@ function setMode(m) {
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = isAdmin ? '' : 'none';
   });
+  // 管理者アクセス権が無いURLでは「顧客/管理者」切り替えボタン自体も隠す
+  const sw1 = document.getElementById('sidebar-mode-switch');
+  const sw2 = document.getElementById('mobile-mode-switch');
+  if(sw1) sw1.style.display = ADMIN_ACCESS ? '' : 'none';
+  if(sw2) sw2.style.display = ADMIN_ACCESS ? '' : 'none';
   if(!isAdmin && (document.getElementById('page-admin').classList.contains('active') ||
      document.getElementById('page-gcal').classList.contains('active') ||
      document.getElementById('page-settings').classList.contains('active'))) {
@@ -2320,7 +2330,7 @@ const _oImport  = importGcalBooking; importGcalBooking = (id) => { _oImport(id);
 // ====== INIT ======
 window.addEventListener('DOMContentLoaded', () => {
   const savedAt = loadFromStorage();
-  setMode('admin');
+  setMode(ADMIN_ACCESS ? 'admin' : 'client');
   renderStoreOpts();
   renderMenuOpts();
   syncUIFromCfg();
