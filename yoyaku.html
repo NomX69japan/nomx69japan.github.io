@@ -34,16 +34,16 @@
   --shijo-bg:#e8f7ee;
   --shijo-border:#a7e0bd;
 }
-body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;overflow-x:hidden}
 
 /* Layout */
-.app-shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.app-shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh;max-width:100vw;overflow-x:hidden}
 @media(max-width:768px){.app-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}}
 
 /* Sidebar */
-.sidebar{background:var(--brand);color:white;display:flex;flex-direction:column;padding:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar{background:var(--brand);color:white;display:flex;flex-direction:column;padding:0;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;width:200px;min-width:0}
 @media(max-width:768px){.sidebar{display:none}}
-.sidebar-logo{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.sidebar-logo{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.08)}
 .sidebar-logo .dm{font-family:'DM Serif Display',serif;font-size:24px;letter-spacing:0.02em}
 .logo-x{color:var(--brand-x)}
 .sidebar-logo .sub{font-size:11px;opacity:0.5;margin-top:2px;letter-spacing:0.08em}
@@ -51,7 +51,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .mode-btn{flex:1;padding:6px;font-size:11px;border:1px solid rgba(255,255,255,0.2);border-radius:var(--radius-sm);background:none;color:rgba(255,255,255,0.6);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s}
 .mode-btn.active{background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.4)}
 .sidebar-nav{flex:1;padding:8px 12px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;color:rgba(255,255,255,0.6);transition:all 0.15s;margin-bottom:2px;font-size:13px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:rgba(255,255,255,0.6);transition:all 0.15s;margin-bottom:2px;font-size:12px}
 .nav-item:hover{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.9)}
 .nav-item.active{background:rgba(255,255,255,0.15);color:white}
 .nav-icon{font-size:15px;width:20px;text-align:center}
@@ -69,8 +69,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .mh-sub{font-size:10px;opacity:0.5;letter-spacing:0.08em}
 
 /* Main content */
-.main{background:var(--bg);overflow-y:auto}
-.page{display:none;padding:32px}
+.main{background:var(--bg);overflow-y:auto;overflow-x:hidden;min-width:0}
+.page{display:none;padding:20px 16px}
 .page.active{display:block}
 @media(max-width:768px){.page{padding:16px}}
 
@@ -303,19 +303,19 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
 .week-scroll-wrap{overflow-x:hidden;margin:0}
-.week-grid{display:grid;border-collapse:separate;width:100%;max-width:640px}
+.week-grid{display:grid;border-collapse:separate;width:100%;max-width:100%}
 /* 1列目=時間軸、2〜8列目=7日分（画面幅いっぱいに収める。横スクロール不要） */
-.week-grid-inner{display:grid;grid-template-columns:30px repeat(7,1fr);gap:0;width:100%}
+.week-grid-inner{display:grid;grid-template-columns:26px repeat(7,1fr);gap:0;width:100%}
 /* ヘッダ行 */
 .wg-corner{position:sticky;left:0;z-index:3;background:var(--bg);border-bottom:2px solid var(--border2);border-right:1px solid var(--border)}
-.wg-day-head{text-align:center;font-size:10px;font-weight:700;padding:4px 1px;border-bottom:2px solid var(--border2);border-right:1px solid var(--border);line-height:1.25;background:var(--bg2)}
+.wg-day-head{text-align:center;font-size:9px;font-weight:700;padding:3px 1px;border-bottom:2px solid var(--border2);border-right:1px solid var(--border);line-height:1.25;background:var(--bg2)}
 .wg-day-head.is-today{background:var(--accent);color:white;border-bottom-color:var(--accent2)}
 .wg-day-head .wdh-date{display:block;font-size:11px}
 .wg-day-head .wdh-wd{display:block;font-size:9px;opacity:0.75}
 /* 時間ラベル列 */
-.wg-time{position:sticky;left:0;z-index:2;background:var(--bg);font-size:9px;color:var(--text2);text-align:right;padding:0 2px 0 0;line-height:1;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:28px}
+.wg-time{position:sticky;left:0;z-index:2;background:var(--bg);font-size:9px;color:var(--text2);text-align:right;padding:0 2px 0 0;line-height:1;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:26px}
 /* セル */
-.wg-cell{display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:28px;font-size:14px;font-weight:900;cursor:default;transition:filter 0.1s}
+.wg-cell{display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:26px;font-size:12px;font-weight:900;cursor:default;transition:filter 0.1s}
 .wg-cell.wg-ok{cursor:pointer}
 .wg-cell.wg-ok.wc-shijo{background:#bbf7d0;color:#15803d;border-bottom:1px solid #86efac}
 .wg-cell.wg-ok.wc-oike{background:#fde68a;color:#b45309;border-bottom:1px solid #fcd34d}
