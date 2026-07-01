@@ -42,7 +42,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 
 /* Sidebar */
 .sidebar{background:var(--brand);color:white;display:flex;flex-direction:column;padding:0;position:fixed;top:0;left:0;height:100vh;width:190px;overflow-y:auto;overflow-x:hidden;z-index:100}
-@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0!important;width:100%!important}.page{padding:12px 10px;max-width:100%!important}}
 .sidebar-logo{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.08)}
 .sidebar-logo .dm{font-family:'DM Serif Display',serif;font-size:24px;letter-spacing:0.02em}
 .logo-x{color:var(--brand-x)}
@@ -58,19 +58,19 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .sidebar-footer{padding:16px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;opacity:0.4}
 
 /* Mobile bottom nav */
-.mobile-nav{display:none;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 16px}
+.mobile-nav{display:none;background:var(--bg2);border-top:1px solid var(--border);padding:8px 0 max(16px,env(safe-area-inset-bottom))}
 @media(max-width:768px){.mobile-nav{display:flex}}
 .mob-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px;background:none;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text2);font-size:10px}
 .mob-btn.active{color:var(--brand)}
 .mob-icon{font-size:20px}
-.mobile-header{display:none;background:var(--brand);color:white;padding:16px 20px;align-items:center;justify-content:space-between}
+.mobile-header{display:none;background:var(--brand);color:white;padding:14px 16px;align-items:center;justify-content:space-between}
 @media(max-width:768px){.mobile-header{display:flex}}
 .mh-name{font-size:18px;font-weight:700;font-family:'DM Serif Display',serif}
 .mh-sub{font-size:10px;opacity:0.5;letter-spacing:0.08em}
 
 /* Main content */
 .main{background:var(--bg);overflow-x:hidden;margin-left:190px;min-height:100vh}
-.page{display:none;padding:20px 16px}
+.page{display:none;padding:20px 16px;max-width:100%;box-sizing:border-box}
 .page.active{display:block}
 @media(max-width:768px){.page{padding:16px}}
 
@@ -302,8 +302,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
-.week-scroll-wrap{overflow-x:hidden;margin:0}
+.week-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0;border-radius:var(--radius-sm)}
 .week-grid{display:grid;border-collapse:separate;width:100%;max-width:calc(100vw - 210px)}
+@media(max-width:768px){
+  .week-grid{max-width:100%;min-width:480px}
+  .week-grid-inner{grid-template-columns:36px repeat(7,1fr)}
+  .wg-cell{min-height:32px;font-size:13px}
+  .wg-time{min-height:32px;font-size:10px;padding-right:3px}
+  .wg-day-head{font-size:10px;padding:4px 2px}
+}
 /* 1列目=時間軸、2〜8列目=7日分（画面幅いっぱいに収める。横スクロール不要） */
 .week-grid-inner{display:grid;grid-template-columns:26px repeat(7,1fr);gap:0;width:100%}
 /* ヘッダ行 */
@@ -1145,8 +1152,8 @@ function initWeekStart(){
     weekStart = new Date(now); weekStart.setDate(now.getDate() - dayOffset);
   }
 }
-async function prevW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() - 7); await renderWeek(); }
-async function nextW(){ initWeekStart(); weekStart.setDate(weekStart.getDate() + 7); await renderWeek(); }
+async function prevW(){ initWeekStart(); const step=window.innerWidth<=768?3:7; weekStart.setDate(weekStart.getDate()-step); await renderWeek(); }
+async function nextW(){ initWeekStart(); const step=window.innerWidth<=768?3:7; weekStart.setDate(weekStart.getDate()+step); await renderWeek(); }
 
 async function syncEventsFromGAS() {
   // GAS連携は廃止。Google Calendar API（syncGcal）で直接取得したデータを使用。
@@ -1183,7 +1190,7 @@ async function renderWeek(){
   document.getElementById('week-interval-display').textContent = (cfg.interval || 30) + '分';
   document.getElementById('week-move-buffer-display').textContent = (cfg.moveBuffer || 60) + '分';
 
-  const end = new Date(weekStart); end.setDate(weekStart.getDate() + 6);
+  const end = new Date(weekStart); end.setDate(weekStart.getDate() + dayCount - 1);
   document.getElementById('week-lbl').textContent =
     (weekStart.getMonth()+1) + '/' + weekStart.getDate() + ' 〜 ' + (end.getMonth()+1) + '/' + end.getDate();
 
