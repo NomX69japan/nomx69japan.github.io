@@ -300,10 +300,27 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .view-tab{flex:1;padding:8px;font-size:13px;font-weight:500;border:none;border-radius:6px;background:none;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.15s}
 .view-tab.active{background:var(--bg2);color:var(--text);box-shadow:var(--shadow)}
 
-/* Week view — ○×グリッド */
+/* Week view — ○×テーブル */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
-.week-scroll-wrap{overflow-x:hidden;margin:0}
-.week-grid{display:block;width:100%;max-width:100%}
+.week-scroll-wrap{overflow-x:hidden;margin:0;width:100%}
+.week-table{width:100%;table-layout:fixed;border-collapse:collapse}
+.week-table td,.week-table th{border:1px solid var(--border);text-align:center;padding:0;line-height:1}
+.week-table .wt-time{width:36px;font-size:9px;color:var(--text2);text-align:right;padding-right:3px;white-space:nowrap;background:var(--bg)}
+.week-table .wt-head{font-size:10px;font-weight:700;padding:4px 1px;background:var(--bg2);line-height:1.3}
+.week-table .wt-head.is-today{background:var(--accent);color:white}
+.week-table .wt-cell{height:26px;font-size:12px;font-weight:900;cursor:default}
+.week-table .wt-ok{cursor:pointer}
+.week-table .wt-ok.wc-shijo{background:#bbf7d0;color:#15803d}
+.week-table .wt-ok.wc-oike{background:#fde68a;color:#b45309}
+.week-table .wt-ok:hover{filter:brightness(0.9)}
+.week-table .wt-ok.sel{background:var(--brand);color:white}
+.week-table .wt-ng{color:#d0d0dc;font-size:12px;font-weight:400}
+@media(max-width:768px){
+  .week-table .wt-time{width:28px;font-size:7px;padding-right:1px}
+  .week-table .wt-head{font-size:8px;padding:3px 0}
+  .week-table .wt-cell{height:20px;font-size:10px}
+  .week-table .wt-ng{font-size:10px}
+}
 @media(max-width:768px){
   /* ===== 週グリッド: full-bleed で7列を確実に収める ===== */
   /* week-scroll-wrap を画面端まで広げる */
@@ -459,7 +476,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
             <button class="cal-nav" onclick="nextW()">›</button>
           </div>
           <div class="week-scroll-wrap">
-            <div class="week-grid" id="week-grid"></div>
+            <table class="week-table" id="week-grid"></table>
           </div>
           <div style="font-size:11px;color:var(--text2);margin-top:10px">
             ○をタップするとその日時で確認に進みます。<br>
@@ -1214,25 +1231,21 @@ async function renderWeek(){
   document.getElementById('week-interval-display').textContent = (cfg.interval || 30) + '分';
   document.getElementById('week-move-buffer-display').textContent = (cfg.moveBuffer || 60) + '分';
 
-  // モバイル(<=768px)は3日、PCは7日表示
   const isMobile = window.innerWidth <= 768;
-  const dayCount = isMobile ? 3 : 7;
+  const dayCount = 7;
 
   const end = new Date(weekStart); end.setDate(weekStart.getDate() + dayCount - 1);
   document.getElementById('week-lbl').textContent =
     (weekStart.getMonth()+1) + '/' + weekStart.getDate() + ' 〜 ' + (end.getMonth()+1) + '/' + end.getDate();
 
-  // 営業時間・所要時間
-  const dur      = menus[selMenu] ? menus[selMenu].dur : 60;
-  const openMin  = timeToMin(cfg.open  || '07:00');
-  const closeMin = timeToMin(cfg.close || '22:00');
+  const dur     = menus[selMenu] ? menus[selMenu].dur : 60;
+  const openMin = timeToMin(cfg.open  || '07:00');
+  const closeMin= timeToMin(cfg.close || '22:00');
   const wc = cls === 'shijo' ? 'wc-shijo' : 'wc-oike';
 
-  // 30分刻みで時間軸スロット生成
   const timeRows = [];
   for(let s = openMin; s < closeMin; s += 30) timeRows.push(s);
 
-  // 日付情報（モバイル3日/PC7日）
   const now = new Date(); now.setHours(0,0,0,0);
   const realNow = new Date();
   const realNowMin = realNow.getHours() * 60 + realNow.getMinutes();
@@ -1243,68 +1256,37 @@ async function renderWeek(){
     days.push({ d, ds: fmtDate(d), isToday: fmtDate(d) === todayStr, past: d < now });
   }
 
-  // グリッド構築
-  const g = document.getElementById('week-grid');
-  // ラッパを置く
-  g.innerHTML = '<div class="week-grid-inner" id="wg-inner"></div>';
-  const inner = document.getElementById('wg-inner');
-  // グリッド列をJS側でインラインスタイル設定（CSS競合を完全に避ける）
-  inner.style.display = 'grid';
-  inner.style.gap = '0';
-  if(isMobile){
-    // モバイル: page padding(8px×2=16px)を除いた幅で計算
-    // 時間軸30px固定、残り7列均等
-    inner.style.gridTemplateColumns = '30px repeat(7,1fr)';
-    inner.style.width = 'calc(100vw - 16px)'; // page padding分を引く
-  } else {
-    inner.style.gridTemplateColumns = '36px repeat(7,1fr)';
-    inner.style.width = '100%';
-  }
-
-  let html = '';
-
-  // ── ヘッダ行（コーナー + 7日） ──
-  html += '<div class="wg-corner"></div>';
+  // table 生成
+  const tbl = document.getElementById('week-grid');
+  let html = '<thead><tr><th class="wt-time wt-head"></th>';
   for(const { d, isToday } of days){
-    const todayCls = isToday ? ' is-today' : '';
-    html += `<div class="wg-day-head${todayCls}">
-      <span class="wdh-date">${d.getMonth()+1}/${d.getDate()}</span>
-      <span class="wdh-wd">${WD[d.getDay()]}${isToday ? ' 今日' : ''}</span>
-    </div>`;
+    const cls2 = isToday ? ' is-today' : '';
+    html += `<th class="wt-head${cls2}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:0.85em;opacity:0.75">${WD[d.getDay()]}${isToday?' 今':''}`;
+    html += `</span></th>`;
   }
+  html += '</tr></thead><tbody>';
 
-  // ── データ行（時間ラベル + 7セル） ──
   for(const rowMin of timeRows){
-    const endMin = rowMin + dur; // メニュー所要時間後の終了
-
-    // 時間ラベル
-    html += `<div class="wg-time">${minToTime(rowMin)}</div>`;
-
+    const endMin = rowMin + dur;
+    html += `<tr><td class="wt-time">${minToTime(rowMin)}</td>`;
     for(const { ds, past, isToday } of days){
-      // 過去時刻判定：今日かつその時刻がすでに過ぎている場合も×
       const pastSlot = past || (isToday && rowMin <= realNowMin);
-      let cellCls, cellContent, onclick = '';
-
       if(pastSlot){
-        cellCls = 'wg-cell wg-ng';
-        cellContent = '×';
+        html += `<td class="wt-cell wt-ng">×</td>`;
       } else {
         const res = checkSlot(rowMin, endMin, ds);
         if(res.ok){
           const isSel = selDate === ds && selTime === minToTime(rowMin);
-          cellCls = `wg-cell wg-ok ${wc}${isSel ? ' sel' : ''}`;
-          cellContent = '○';
-          onclick = ` onclick="pickWeekSlot('${ds}','${minToTime(rowMin)}')"`;
+          html += `<td class="wt-cell wt-ok ${wc}${isSel?' sel':''}" onclick="pickWeekSlot('${ds}','${minToTime(rowMin)}')">○</td>`;
         } else {
-          cellCls = 'wg-cell wg-ng';
-          cellContent = '×';
+          html += `<td class="wt-cell wt-ng">×</td>`;
         }
       }
-      html += `<div class="${cellCls}"${onclick}>${cellContent}</div>`;
     }
+    html += '</tr>';
   }
-
-  inner.innerHTML = html;
+  html += '</tbody>';
+  tbl.innerHTML = html;
 }
 
 function pickWeekSlot(dateStr, t){
