@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" style="overflow-x:hidden">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -830,7 +830,8 @@ function storeName(id){ return STORES[id] ? STORES[id].name : ''; }
 //   1=Lavender(薄紫) 2=Sage(薄緑) 3=Grape(紫) 4=Flamingo(ピンク) 5=Banana(黄)
 //   6=Tangerine(橙) 7=Peacock(青) 8=Graphite(グレー) 9=Blueberry(濃青)
 //   10=Basil(濃緑) 11=Tomato(赤)
-//   ※ colorId 未設定（null）の予定は「店舗外＝両店舗ブロック」として扱う。
+//   ※ macumba の colorId 未設定（null）は「四条烏丸のデフォルト勤務」として扱う。
+//   ※ nomura の colorId 未設定（null）は「店舗外＝両店舗ブロック」として扱う。
 //
 // resultの意味：
 //   { store:'shijo' }      → その店舗の予約として使う（＝他店舗はこの時間でも予約可）
@@ -861,11 +862,26 @@ const STORE_COLOR_MAP = {
 function classifyEvent(e){
   const cal = e.source || 'nomura';
   const cid = (e.colorId === undefined || e.colorId === null || e.colorId === '') ? null : String(e.colorId);
-  // 色なし or 未マップ色 → 店舗不明＝両店舗ブロック（安全側）
-  if(cid === null) return { block:'busy' };
-  const hit = STORE_COLOR_MAP[cal + ':' + cid];
-  if(hit) return hit;
-  return { block:'busy' };
+
+  // colorId がある場合：STORE_COLOR_MAP で判定（最優先）
+  if(cid !== null){
+    const hit = STORE_COLOR_MAP[cal + ':' + cid];
+    if(hit) return hit;
+    // マップ外のcolorId → カレンダーデフォルト色にフォールバック
+  }
+
+  // colorId なし or マップ外 → calendarDefaultColors（カレンダー自体の色）で判定
+  const calId = e.calendar || null;
+  if(calId && calendarDefaultColors[calId]) {
+    const def = calendarDefaultColors[calId];
+    if(def.storeHint === 'shijo') return { store:'shijo' };
+    if(def.storeHint === 'oike')  return { store:'oike' };
+    if(def.storeHint === null)    return { block:'busy' };
+  }
+
+  // カレンダー色情報もない場合：sourceベースのフォールバック
+  if(cal === 'macumba') return { store:'shijo' }; // macumba未取得→四条扱い
+  return { block:'busy' }; // nomura未取得→ブロック
 }
 
 // この予定が「指定店舗の予約可否」に影響するか判定。
@@ -1633,6 +1649,8 @@ let gapiReady = false;
 let gisReady = false;
 let tokenClient = null;
 let gcalAuthed = false;
+// カレンダーID → デフォルト色情報 { backgroundColor, colorId相当 }
+let calendarDefaultColors = {}; // { 'primary': { bgColor:'#4285F4', storeHint:'shijo' }, ... }
 
 function onGapiLoad() {
   gapi.load('client', async () => {
@@ -1755,6 +1773,49 @@ function updateGcalUI(connected) {
   if (syncBtn) syncBtn.style.display = connected ? 'inline-block' : 'none';
 }
 
+// Googleカレンダーのデフォルト色を取得し calendarDefaultColors に格納
+// backgroundColor の16進数カラーコードでカレンダーの色（緑/青/黄/紫等）を判定する
+async function fetchCalendarColors(sources) {
+  // Google Calendar の代表的な backgroundColor → colorId 近似マッピング
+  // 参考: https://developers.google.com/calendar/api/v3/reference/colors
+  const BG_TO_STORE = {
+    // 緑系 → 四条烏丸
+    '#0f9d58': 'shijo', '#33b679': 'shijo', '#51b749': 'shijo',
+    '#16a765': 'shijo', '#7bd148': 'shijo', '#b3dc6c': 'shijo',
+    // 青系 → 四条烏丸（ノムラ）
+    '#4285f4': 'shijo', '#9fc6e7': 'shijo', '#5484ed': 'shijo',
+    '#3f51b5': 'shijo', '#41bce2': 'shijo',
+    // 黄/橙系 → 御池
+    '#f6bf26': 'oike', '#f6c026': 'oike', '#ffad46': 'oike',
+    '#e67c73': null, // 赤系 → ブロック（旧予約）
+    // 紫系 → 御池（ノムラ）
+    '#7986cb': 'oike', '#a47ae2': 'oike', '#cd74e6': 'oike',
+    '#9a9cff': 'oike', '#b99aff': 'oike',
+    // グレー/黒 → ブロック
+    '#616161': null, '#c0ca33': null,
+  };
+
+  for (const src of sources) {
+    try {
+      const resp = await gapi.client.calendar.calendarList.get({ calendarId: src.id });
+      const cal = resp.result;
+      const bg = (cal.backgroundColor || '').toLowerCase();
+      const storeHint = BG_TO_STORE[bg] ?? (src.source === 'macumba' ? 'shijo' : null);
+      calendarDefaultColors[src.id] = {
+        backgroundColor: bg,
+        storeHint,        // 'shijo' | 'oike' | null(ブロック)
+        source: src.source,
+        summaryOverride: cal.summaryOverride || cal.summary || src.id,
+      };
+      console.log('Calendar color:', src.id, bg, '→ store:', storeHint);
+    } catch(e) {
+      // 取得失敗してもフォールバックで動作継続
+      calendarDefaultColors[src.id] = { storeHint: src.source === 'macumba' ? 'shijo' : null, source: src.source };
+      console.warn('calendarList.get failed for', src.id, e);
+    }
+  }
+}
+
 // 複数カレンダー（ノムラ＋macumba）をループしてイベントをマージ
 async function syncGcal() {
   if (!gcalAuthed) { gcalLogin(); return; }
@@ -1766,6 +1827,9 @@ async function syncGcal() {
     const now = new Date();
     const future = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
     const keyword = document.getElementById('gcal-keyword')?.value || 'PT:';
+
+    // まずカレンダーのデフォルト色を取得（colorId=nullのイベント判定に使う）
+    await fetchCalendarColors(sources);
 
     const merged = [];
     const errors = [];
