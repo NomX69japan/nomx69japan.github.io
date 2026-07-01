@@ -783,11 +783,11 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
           <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">データのリセット</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
             <button class="btn btn-ghost btn-full" onclick="resetData('sample')">🔄 サンプルデータに戻す</button>
-            <button class="btn btn-danger btn-full" onclick="resetData('empty')">🗑 すべて空にする</button>
+            <button class="btn btn-danger btn-full" onclick="resetData('empty')">🗑 予約・カレンダーをリセット</button>
           </div>
           <div style="font-size:11px;color:var(--text3);line-height:1.5">
             「サンプルデータに戻す」は初期のテストデータに上書きします。<br>
-            「すべて空にする」は予約・メニュー・Gカレンダー予定をすべて削除します（設定は保持）。
+            「予約・カレンダーをリセット」は予約とGカレンダー予定を削除します（メニュー・設定は保持）。
           </div>
         </div>
       </div>
@@ -2148,10 +2148,10 @@ function resetData(type) {
     gcalEvents = JSON.parse(JSON.stringify(SAMPLE_GCAL_EVENTS));
     showToast('🔄 サンプルデータに戻しました');
   } else {
-    menus = [];
+    // メニューは残す（予約とGカレンダー予定のみクリア）
     bookings = [];
     gcalEvents = [];
-    showToast('🗑 すべてのデータを削除しました');
+    showToast('🗑 予約・カレンダーデータを削除しました（メニューは保持）');
   }
 
   saveToStorage();
