@@ -1768,31 +1768,39 @@ async function syncGcal() {
     const keyword = document.getElementById('gcal-keyword')?.value || 'PT:';
 
     const merged = [];
+    const errors = [];
     for (const src of sources) {
-      const resp = await gapi.client.calendar.events.list({
-        calendarId: src.id,
-        timeMin: now.toISOString(),
-        timeMax: future.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-        maxResults: 100,
-      });
-      const items = resp.result.items || [];
-      items.filter(ev => ev.start?.dateTime).forEach(ev => {
-        merged.push({
-          id: ev.id,
-          title: ev.summary || '(無題)',
-          date: ev.start.dateTime.slice(0, 10),
-          startTime: ev.start.dateTime.slice(11, 16),
-          endTime: ev.end.dateTime.slice(11, 16),
-          type: (ev.summary || '').startsWith(keyword) ? 'pt_manual' : 'personal',
-          source: src.source,       // 'nomura' | 'macumba'
-          calendar: src.id,         // どのカレンダー由来か
-          colorId: ev.colorId ? parseInt(ev.colorId) : null, // 店舗判定用（色なしは両店舗ブロック）
-          imported: bookings.some(b => b.gcalId === ev.id),
-          gcalEventId: ev.id,
+      try {
+        const resp = await gapi.client.calendar.events.list({
+          calendarId: src.id,
+          timeMin: now.toISOString(),
+          timeMax: future.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime',
+          maxResults: 100,
         });
-      });
+        const items = resp.result.items || [];
+        items.filter(ev => ev.start?.dateTime).forEach(ev => {
+          merged.push({
+            id: ev.id,
+            title: ev.summary || '(無題)',
+            date: ev.start.dateTime.slice(0, 10),
+            startTime: ev.start.dateTime.slice(11, 16),
+            endTime: ev.end.dateTime.slice(11, 16),
+            type: (ev.summary || '').startsWith(keyword) ? 'pt_manual' : 'personal',
+            source: src.source,
+            calendar: src.id,
+            colorId: ev.colorId ? parseInt(ev.colorId) : null,
+            imported: bookings.some(b => b.gcalId === ev.id),
+            gcalEventId: ev.id,
+          });
+        });
+      } catch (calErr) {
+        const msg = calErr.result?.error?.message || calErr.message || '不明なエラー';
+        const code = calErr.result?.error?.code || calErr.status || '';
+        errors.push({ src: src.source, id: src.id, msg, code });
+        console.error('Calendar error:', src.source, src.id, calErr);
+      }
     }
     gcalEvents = merged;
 
@@ -1800,10 +1808,31 @@ async function syncGcal() {
     document.getElementById('last-sync-time').textContent =
       now2.getHours() + ':' + String(now2.getMinutes()).padStart(2, '0');
     renderGcalPage();
-    showToast('📅 ' + sources.length + 'カレンダー・' + merged.length + '件の予定を同期しました');
+
+    if (errors.length === 0) {
+      showToast('📅 ' + sources.length + 'カレンダー・' + merged.length + '件の予定を同期しました');
+    } else {
+      // 成功分は表示しつつ、エラー詳細を画面に出す
+      const errHtml = errors.map(e => `
+        <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:#991b1b">❌ ${e.src}カレンダー (${e.id}) の読み込みに失敗</div>
+          <div style="font-size:12px;color:#7f1d1d;margin-top:4px">エラー ${e.code}: ${e.msg}</div>
+          ${e.code == 403 ? '<div style="font-size:12px;color:#7f1d1d;margin-top:4px">→ このカレンダーへのアクセス権限がありません。カレンダーの共有設定を確認してください。</div>' : ''}
+          ${e.code == 404 ? '<div style="font-size:12px;color:#7f1d1d;margin-top:4px">→ カレンダーIDが見つかりません。IDを確認してください。</div>' : ''}
+          ${e.code == 401 ? '<div style="font-size:12px;color:#7f1d1d;margin-top:4px">→ 認証エラーです。一度ログアウトして再ログインしてください。</div>' : ''}
+        </div>`).join('');
+      if (elEvents) elEvents.innerHTML = errHtml + (elEvents.innerHTML || '');
+      showToast('⚠️ ' + errors.length + 'カレンダーでエラー（' + merged.length + '件は同期済み）');
+    }
   } catch (err) {
-    showToast('⚠️ 同期エラー: ' + (err.result?.error?.message || err.message || '不明なエラー'));
-    if (elEvents) elEvents.innerHTML = '<div style="color:#e53e3e;font-size:13px;padding:10px 0">同期に失敗しました。カレンダーID・Client ID・API Keyを確認してください。</div>';
+    const msg = err.result?.error?.message || err.message || '不明なエラー';
+    const code = err.result?.error?.code || '';
+    showToast('⚠️ 同期エラー ' + code + ': ' + msg);
+    if (elEvents) elEvents.innerHTML = `
+      <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:12px 14px">
+        <div style="font-size:13px;font-weight:700;color:#991b1b">同期エラー ${code}</div>
+        <div style="font-size:12px;color:#7f1d1d;margin-top:4px">${msg}</div>
+      </div>`;
   }
 }
 
