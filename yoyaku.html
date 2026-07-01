@@ -303,11 +303,13 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 /* Week view — ○×グリッド */
 .week-store-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:12px}
 .week-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0;border-radius:var(--radius-sm)}
-.week-grid{display:grid;border-collapse:separate;width:100%;max-width:calc(100vw - 210px)}
+.week-grid{display:block;width:100%;max-width:100%}
 @media(max-width:768px){
   /* 7列を画面内に収める: 時間軸24px + 7列均等 */
-  .week-grid{max-width:100%;min-width:unset}
+  .week-grid{max-width:100%;min-width:unset;display:block}
   .week-scroll-wrap{overflow-x:hidden}
+  .wg-time{position:static!important}
+  .wg-corner{position:static!important}
   .week-grid-inner{grid-template-columns:24px repeat(7,1fr)!important}
   /* セルを極小に */
   .wg-cell{min-height:20px!important;font-size:10px!important}
