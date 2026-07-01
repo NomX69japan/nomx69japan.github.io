@@ -879,8 +879,8 @@ function storeName(id){ return STORES[id] ? STORES[id].name : ''; }
 //   1=Lavender(薄紫) 2=Sage(薄緑) 3=Grape(紫) 4=Flamingo(ピンク) 5=Banana(黄)
 //   6=Tangerine(橙) 7=Peacock(青) 8=Graphite(グレー) 9=Blueberry(濃青)
 //   10=Basil(濃緑) 11=Tomato(赤)
-//   ※ macumba の colorId 未設定（null）は「四条烏丸のデフォルト勤務」として扱う。
-//   ※ nomura の colorId 未設定（null）は「店舗外＝両店舗ブロック」として扱う。
+//   ※ colorId 未設定（null）は nomura・macumba とも「四条烏丸のデフォルト」として扱う。
+//   ※ 御池セッションには必ず 紫(colorId=3) を付けること。
 //
 // resultの意味：
 //   { store:'shijo' }      → その店舗の予約として使う（＝他店舗はこの時間でも予約可）
@@ -909,8 +909,6 @@ const STORE_COLOR_MAP = {
 // 予定1件の店舗/ブロック判定を返す。
 // 戻り値：{ store:'oike'|'shijo' } か { block:'old'|'busy' }
 function classifyEvent(e){
-  // source は syncGcal 時に付与（'nomura' | 'macumba'）
-  // サンプルデータにも source が入っているのでそのまま使える
   const cal = e.source || 'nomura';
   const cid = (e.colorId === undefined || e.colorId === null || e.colorId === '') ? null : String(e.colorId);
 
@@ -918,19 +916,14 @@ function classifyEvent(e){
   if(cid !== null){
     const hit = STORE_COLOR_MAP[cal + ':' + cid];
     if(hit) return hit;
-    // マップ外の colorId
-    // macumba の未知色 → デフォルトで四条扱い
-    if(cal === 'macumba') return { store:'shijo' };
-    // nomura の未知色 → 両店舗ブロック
-    return { block:'busy' };
+    // マップ外の colorId → 四条デフォルト（未知色=デフォルト色扱い）
+    return { store:'shijo' };
   }
 
-  // [Step2] colorId なし → source で判定
-  // macumba の色なし = 四条烏丸のデフォルト勤務
-  if(cal === 'macumba') return { store:'shijo' };
-
-  // nomura の色なし = 店舗不明 → 両店舗ブロック（安全側）
-  return { block:'busy' };
+  // [Step2] colorId なし（イベント個別色未設定 = カレンダーのデフォルト色）
+  // nomura・macumba とも四条烏丸がデフォルト勤務地
+  // 御池セッションは必ず紫(colorId=3)を付けるルール
+  return { store:'shijo' };
 }
 
 // この予定が「指定店舗の予約可否」に影響するか判定。
