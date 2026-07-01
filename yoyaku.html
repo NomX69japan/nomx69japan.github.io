@@ -1258,7 +1258,13 @@ async function renderWeek(){
   // ラッパを置く
   g.innerHTML = '<div class="week-grid-inner" id="wg-inner"></div>';
   const inner = document.getElementById('wg-inner');
-  if(isMobile) inner.style.gridTemplateColumns = '38px repeat(3,1fr)';
+  // モバイルでも7列: JS側でインラインスタイルを直接設定（CSS @media より確実）
+  const timeColW = isMobile ? '32px' : '36px';
+  inner.style.gridTemplateColumns = timeColW + ' repeat(7,1fr)';
+  inner.style.width = isMobile ? '100vw' : '100%';
+  if(isMobile){
+    inner.style.marginLeft = '-8px'; // page padding を打ち消す
+  }
 
   let html = '';
 
