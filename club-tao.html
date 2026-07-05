@@ -2808,9 +2808,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.16b';
+const APP_VERSION = '2026.06.16c';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.16c',
+    date: '2026-06-16',
+    title: '並び替えが他端末との同期で元に戻るバグを修正',
+    items: [
+      '重要な修正：スタッフやキャストの並び替えが、他端末との同期のタイミングによって元に戻ってしまう不具合を修正しました。',
+      '原因：サーバーへの保存前に行う同期処理が、キャストとスタッフのデータだけ更新日時を比較せずに扱っていたため、古いデータを持つ端末が新しい並び順を上書きすることがありました。',
+      '対策：他のデータ（顧客・予約など）と同じく、更新日時を比較して新しい方を優先する方式に統一しました。',
+      '名前変更・削除などの操作にも更新日時を正しく記録するようにしました。',
+    ],
+  },
   {
     version: '2026.06.16b',
     date: '2026-06-16',
@@ -10531,13 +10542,14 @@ function setCastBirthday(id, val) {
 }
 function renameCast(id, name) {
   const c = state.casts.find(x => x.id === id);
-  if (c) { c.name = name.trim() || c.name; persistSave(); }
+  if (c) { c.name = name.trim() || c.name; c._updated = Date.now(); persistSave(); }
 }
 function toggleTrial(id, val) {
   const c = state.casts.find(x => x.id === id);
   if (c) {
     c.trial = val;
     if (!val) c.trialCount = 0;
+    c._updated = Date.now();
     persistSave();
     renderCastListUI();
   }
@@ -10557,6 +10569,7 @@ function removeCast(id) {
   if (!c) return;
   if (!confirm(`${c.name}を削除しますか？\n（シフト履歴は残ります）`)) return;
   c.removed = true;
+  c._updated = Date.now();
   persistSave();
   renderCastListUI();
 }
@@ -10565,7 +10578,8 @@ function removeCast(id) {
 function addStaff() {
   const name = document.getElementById('newStaffName').value.trim();
   if (!name) { alert('スタッフ名を入力'); return; }
-  state.staff.push({ id: genId('staff'), name, removed:false });
+  const now = Date.now();
+  state.staff.push({ id: genId('staff'), name, removed:false, _created: now, _updated: now });
   document.getElementById('newStaffName').value = '';
   persistSave();
   renderStaffListUI();
@@ -10724,13 +10738,14 @@ function renderEventListUI() {
 }
 function renameStaff(id, name) {
   const s = state.staff.find(x => x.id === id);
-  if (s) { s.name = name.trim() || s.name; persistSave(); }
+  if (s) { s.name = name.trim() || s.name; s._updated = Date.now(); persistSave(); }
 }
 function removeStaff(id) {
   const s = state.staff.find(x => x.id === id);
   if (!s) return;
   if (!confirm(`${s.name}を削除しますか？`)) return;
   s.removed = true;
+  s._updated = Date.now();
   persistSave();
   renderStaffListUI();
 }
@@ -11041,15 +11056,17 @@ function applyServerData(payload) {
   if (Array.isArray(payload.casts)) {
     payload.casts.forEach(rc => {
       const idx = state.casts.findIndex(c => c.id === rc.id);
-      if (idx >= 0) state.casts[idx] = rc;
-      else state.casts.push(rc);
+      if (idx >= 0) {
+        if ((rc._updated || 0) >= (state.casts[idx]._updated || 0)) state.casts[idx] = rc;
+      } else state.casts.push(rc);
     });
   }
   if (Array.isArray(payload.staff)) {
     payload.staff.forEach(rs => {
       const idx = state.staff.findIndex(s => s.id === rs.id);
-      if (idx >= 0) state.staff[idx] = rs;
-      else state.staff.push(rs);
+      if (idx >= 0) {
+        if ((rs._updated || 0) >= (state.staff[idx]._updated || 0)) state.staff[idx] = rs;
+      } else state.staff.push(rs);
     });
   }
   if (Array.isArray(payload.customers)) {
@@ -11319,6 +11336,24 @@ function mergeServerPayload(payload) {
   if (!payload || typeof payload !== 'object') return;
   // 退店済みセッション台帳を先にマージ（テーブルマージで使う）
   mergeClosedSessions(payload.closedSessions);
+  // キャスト・スタッフ：_updated 比較（並び順・体験フラグ等の巻き戻り防止）
+  // ※これが抜けていると、並び替え後に別端末の古いデータで上書きされ、並び順が元に戻ってしまう
+  if (Array.isArray(payload.casts)) {
+    payload.casts.forEach(rc => {
+      const idx = state.casts.findIndex(c => c.id === rc.id);
+      if (idx >= 0) {
+        if ((rc._updated || 0) >= (state.casts[idx]._updated || 0)) state.casts[idx] = rc;
+      } else state.casts.push(rc);
+    });
+  }
+  if (Array.isArray(payload.staff)) {
+    payload.staff.forEach(rs => {
+      const idx = state.staff.findIndex(s => s.id === rs.id);
+      if (idx >= 0) {
+        if ((rs._updated || 0) >= (state.staff[idx]._updated || 0)) state.staff[idx] = rs;
+      } else state.staff.push(rs);
+    });
+  }
   // テーブル：_updated が新しい方を採用（退店済みセッションの入店中は拒否）
   if (payload.tables && typeof payload.tables === 'object') {
     Object.keys(payload.tables).forEach(tid => {
