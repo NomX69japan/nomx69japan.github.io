@@ -828,7 +828,7 @@
     background: #f5e8c5 !important;
     color: #8a6d2a;
   }
-  /* スタッフ行：ブルー系で区別 */
+  /* スタッフ行：役割ごとに色分け（ホール＝青系／ドライバー＝黄系／清掃＝緑系） */
   table.shift tr.staff-row td {
     background: #e8eef5 !important;
   }
@@ -836,11 +836,32 @@
     background: #d4dde8 !important;
     color: #2a4068;
     font-weight: 500;
+    border-left: 4px solid #5b8def;
   }
   table.shift tr.staff-row td.shift-cell.on {
     background: #c4d8e8 !important;
     color: #1a3a68;
   }
+  table.shift tr.staff-row[data-staff-role="driver"] td { background: #fbf1de !important; }
+  table.shift tr.staff-row[data-staff-role="driver"] td.cast-col { background: #f3e2bc !important; color: #6b4d10; border-left-color: #e0a12a; }
+  table.shift tr.staff-row[data-staff-role="driver"] td.shift-cell.on { background: #f0dcac !important; color: #6b4d10; }
+  table.shift tr.staff-row[data-staff-role="cleaning"] td { background: #e9f3e9 !important; }
+  table.shift tr.staff-row[data-staff-role="cleaning"] td.cast-col { background: #d6e9d6 !important; color: #2e5a2e; border-left-color: #5a9c5a; }
+  table.shift tr.staff-row[data-staff-role="cleaning"] td.shift-cell.on { background: #c8e3c8 !important; color: #2e5a2e; }
+  /* 役割グループの先頭に太い区切り線＋見出し */
+  table.shift tr.staff-role-header td {
+    font-size: 11px;
+    font-weight: bold;
+    text-align: left;
+    padding: 4px 10px;
+    cursor: default;
+  }
+  table.shift tr.staff-role-header:not(:first-of-type) td {
+    border-top: 3px solid #999;
+  }
+  table.shift tr.staff-role-header[data-staff-role="hall"] td { background: #eaf2fb !important; color: #2a5cb8; }
+  table.shift tr.staff-role-header[data-staff-role="driver"] td { background: #fdf3e3 !important; color: #a3730f; border-top-color: #e0a12a; }
+  table.shift tr.staff-role-header[data-staff-role="cleaning"] td { background: #eef7ee !important; color: #3d7a3d; border-top-color: #5a9c5a; }
   /* スタッフセクションの仕切り見出し行 */
   table.shift tr.section-header td {
     background: #d6cfc1 !important;
@@ -1820,6 +1841,10 @@
     width: 110px; padding: 4px 6px; font-size: 11px;
     flex-shrink: 0;
   }
+  .staff-list-item .staff-role-select {
+    flex-shrink: 0;
+    width: 108px;
+  }
   .cast-list-item .cast-memo-input {
     width: 100%;
     padding: 5px 8px;
@@ -2249,7 +2274,8 @@
         セルを長押しすると、勤務時間（21-1 など）を入力できます。<br>
         予約マーカーがある日は ◯ や ① ② ③ を省略しマーカーだけ表示。<br>
         ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ◯ ）。<br>
-        ◯ のみが出勤扱いとしてカウントされます（△ × − はカウント外）。
+        ◯ のみが出勤扱いとしてカウントされます（△ × − はカウント外）。<br>
+        スタッフは役割ごとに色分け・太線区切りで表示されます（設定 → スタッフで役割を選べます）。
       </p>
     </section>
 
@@ -2828,9 +2854,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.17b';
+const APP_VERSION = '2026.06.18';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.18',
+    date: '2026-06-18',
+    title: '👔 スタッフを役割別に色分け表示',
+    items: [
+      '設定のスタッフ一覧で、各スタッフに「ホール／ドライバー／清掃」を選べるようになりました。',
+      'シフト表では役割ごとに自動でグループ分けされ、色分け（ホール=青／ドライバー=黄／清掃=緑）と太い区切り線で表示されます。',
+      '見出し行（🏠ホール／🚗ドライバー／🧹清掃）も自動で入るので、一目でどこからどこまでか分かります。',
+      '並び替え（▲▼）は同じ役割の中で使えます。役割を変えると自動的にそのグループへ移動します。',
+      '既存のスタッフは全員「ホール」として扱われるので、ドライバー・清掃の方だけ設定で変更してください。',
+    ],
+  },
   {
     version: '2026.06.17b',
     date: '2026-06-17',
@@ -7925,7 +7963,11 @@ function renderShift() {
     if (sa !== sb) return sa - sb;
     return (a._created || 0) - (b._created || 0);
   });
+  const STAFF_ROLE_ORDER = { hall: 0, driver: 1, cleaning: 2 };
   const activeStaff = state.staff.filter(s => !s.removed).slice().sort((a, b) => {
+    const ra = STAFF_ROLE_ORDER[a.role || 'hall'];
+    const rb = STAFF_ROLE_ORDER[b.role || 'hall'];
+    if (ra !== rb) return ra - rb;
     const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
     const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
     if (sa !== sb) return sa - sb;
@@ -8009,11 +8051,19 @@ function renderShift() {
         html += '</tr>';
       });
     }
-    // スタッフ行（区切り線付き、ブルー系背景）
+    // スタッフ行（役割ごとに色分け・区切り線付き）
     if (activeStaff.length > 0) {
       html += `<tr class="section-header"><td colspan="7">👔 スタッフ</td></tr>`;
+      let prevRole = null;
       activeStaff.forEach(s => {
-        html += `<tr class="staff-row">`;
+        const role = s.role || 'hall';
+        const roleInfo = STAFF_ROLE_COLORS[role] || STAFF_ROLE_COLORS.hall;
+        // 役割グループの先頭にラベル行を挿入（前の人と役割が変わった時）
+        if (role !== prevRole) {
+          html += `<tr class="staff-role-header" data-staff-role="${role}"><td colspan="7">${roleInfo.label}</td></tr>`;
+          prevRole = role;
+        }
+        html += `<tr class="staff-row" data-staff-role="${role}">`;
         html += `<td class="cast-col">👔 ${escapeHtml(s.name)}</td>`;
         days.forEach(d => {
           const dStr = localDateStr(d);
@@ -10795,7 +10845,7 @@ function addStaff() {
   const name = document.getElementById('newStaffName').value.trim();
   if (!name) { alert('スタッフ名を入力'); return; }
   const now = Date.now();
-  state.staff.push({ id: genId('staff'), name, removed:false, _created: now, _updated: now });
+  state.staff.push({ id: genId('staff'), name, removed:false, role:'hall', _created: now, _updated: now });
   document.getElementById('newStaffName').value = '';
   persistSave();
   renderStaffListUI();
@@ -10813,17 +10863,40 @@ function renderStaffListUI() {
     root.innerHTML = '<p style="color:#888; font-size:12px;">スタッフ未登録</p>';
     return;
   }
-  root.innerHTML = list.map((s, idx) => `
+  root.innerHTML = list.map((s, idx) => {
+    const role = s.role || 'hall';
+    return `
     <div class="staff-list-item">
       <div style="display:flex; flex-direction:column; gap:1px; flex-shrink:0;">
         <button type="button" class="btn-sub btn-sm staff-move-btn" onclick="moveStaffUp('${s.id}')" ${idx===0?'disabled':''} style="padding:0 6px; font-size:10px; line-height:1.4;">▲</button>
         <button type="button" class="btn-sub btn-sm staff-move-btn" onclick="moveStaffDown('${s.id}')" ${idx===list.length-1?'disabled':''} style="padding:0 6px; font-size:10px; line-height:1.4;">▼</button>
       </div>
       <input type="text" class="rename" value="${escapeHtml(s.name)}" onchange="renameStaff('${s.id}', this.value)">
+      <select class="staff-role-select" onchange="setStaffRole('${s.id}', this.value)" style="padding:6px 4px; font-size:12px; border-radius:6px; border:1px solid #ddd; background:${STAFF_ROLE_COLORS[role]?.bg || '#fff'};">
+        <option value="hall" ${role==='hall'?'selected':''}>🏠 ホール</option>
+        <option value="driver" ${role==='driver'?'selected':''}>🚗 ドライバー</option>
+        <option value="cleaning" ${role==='cleaning'?'selected':''}>🧹 清掃</option>
+      </select>
       <input type="text" class="bday-input" placeholder="🎂 例: 04-15" value="${escapeHtml(s.birthday||'')}" onchange="setStaffBirthday('${s.id}', this.value)" title="誕生日（MM-DD または YYYY-MM-DD）">
       <button class="btn-danger btn-sm" onclick="removeStaff('${s.id}')">削除</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+// 役割ごとの表示色（設定・シフト表で共通使用）
+const STAFF_ROLE_COLORS = {
+  hall:     { bg: '#eaf2fb', bar: '#5b8def', label: '🏠 ホール' },
+  driver:   { bg: '#fdf3e3', bar: '#e0a12a', label: '🚗 ドライバー' },
+  cleaning: { bg: '#eef7ee', bar: '#5a9c5a', label: '🧹 清掃' },
+};
+function setStaffRole(id, role) {
+  const s = state.staff.find(x => x.id === id);
+  if (!s) return;
+  s.role = role;
+  s._updated = Date.now();
+  persistSave();
+  renderStaffListUI();
+  if (document.getElementById('page-shift')?.classList.contains('active')) renderShift();
 }
 
 // スタッフの並び替え（上へ）
