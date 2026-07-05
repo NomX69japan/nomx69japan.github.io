@@ -2808,9 +2808,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.16c';
+const APP_VERSION = '2026.06.16d';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.16d',
+    date: '2026-06-16',
+    title: '新バージョンの自動検知機能を追加',
+    items: [
+      'これまで「修正しても反映されない」を繰り返していた原因のひとつとして、新しいファイルに差し替えても、PWAのキャッシュによって古い画面が表示され続ける問題が考えられます。',
+      '今回、新しいバージョンを検知したら画面下に「新しいバージョンがあります／今すぐ更新」のバナーを表示する機能を追加しました。',
+      'タップすると最新版に更新されます。今後はこのバナーが出れば、確実に最新版に切り替わったと判断できます。',
+      '画面に復帰した時にも自動で新バージョンがないか確認するようにしました。',
+    ],
+  },
   {
     version: '2026.06.16c',
     date: '2026-06-16',
@@ -10125,11 +10136,56 @@ async function registerServiceWorker() {
   }
   try {
     const reg = await navigator.serviceWorker.register('./sw.js');
+    // 新しいバージョンのSWが見つかったら、インストール完了時に更新バナーを表示
+    // （PWAはキャッシュのため、ファイルを差し替えただけでは古い画面が表示され続けることがある）
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateBanner();
+        }
+      });
+    });
+    // 起動時・画面復帰時に明示的に更新確認（ブラウザ任せにしない）
+    try { reg.update(); } catch(e) {}
+    // 新しいSWが有効化されたら自動でリロード（多重リロード防止フラグ付き）
+    let _swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swReloaded) return;
+      _swReloaded = true;
+      window.location.reload();
+    });
     return reg;
   } catch(e) {
     console.error('SW register failed', e);
     return null;
   }
+}
+
+// 新バージョン検出時のバナー表示：タップで即更新（キャッシュ起因の「直らない」問題への対策）
+function showUpdateBanner() {
+  if (document.getElementById('swUpdateBanner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'swUpdateBanner';
+  bar.style.cssText = 'position:fixed; left:0; right:0; bottom:0; z-index:5000; background:#2a2a2a; color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; font-size:13px; box-shadow:0 -2px 8px rgba(0,0,0,0.3);';
+  bar.innerHTML = `
+    <span style="flex:1;">🆕 新しいバージョンがあります</span>
+    <button type="button" id="swUpdateBtn" style="background:#d4af37; color:#2a2a2a; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; font-size:13px;">今すぐ更新</button>
+  `;
+  document.body.appendChild(bar);
+  document.getElementById('swUpdateBtn').addEventListener('click', async () => {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        window.location.reload();
+      }
+    } catch(e) {
+      window.location.reload();
+    }
+  });
 }
 
 // Web Push 購読開始
@@ -11564,6 +11620,10 @@ window.addEventListener('visibilitychange', () => {
     try { clearStaleNotifications(); } catch(e) {}
     // Push購読の生存を確認（営業中の購読切れに対応）
     try { ensurePushSubscription(); } catch(e) {}
+    // 画面復帰のたびに新バージョンが無いか確認（キャッシュ起因で反映されない問題への対策）
+    try {
+      navigator.serviceWorker?.getRegistration().then(reg => { if (reg) reg.update(); });
+    } catch(e) {}
     // フロアタブ表示中なら画面も再描画
     const onFloor = document.getElementById('page-floor')?.classList.contains('active');
     if (onFloor) renderFloor();
