@@ -868,6 +868,23 @@
     letter-spacing: 0;
     vertical-align: middle;
   }
+  /* 時刻ラベルがある時だけ縦積み表示にする（無い時は従来通り横中央1行） */
+  table.shift td.shift-cell:has(.shift-time-label) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+  }
+  .shift-time-label {
+    display: block;
+    font-size: 9px;
+    font-weight: normal;
+    letter-spacing: 0;
+    color: inherit;
+    opacity: 0.75;
+    line-height: 1;
+  }
   table.shift td.shift-cell.on {
     background: var(--on-bg) !important;
     color: #2a6a2a;
@@ -2227,6 +2244,7 @@
       </div>
       <p style="color:#888; font-size:11px; margin-top:6px;">
         セルをタップで切替：− (未回答) → ◯ (出勤) → △ (未定) → × (休み) → − (未回答)<br>
+        セルを長押しすると、勤務時間（21-1 など）を入力できます。<br>
         予約マーカーがある日は ◯ や ① ② ③ を省略しマーカーだけ表示。<br>
         ① ② ③ は体験キャストの実績出勤回数（今日以前のみカウント、未来の予定は ◯ ）。<br>
         ◯ のみが出勤扱いとしてカウントされます（△ × − はカウント外）。
@@ -2808,9 +2826,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.16d';
+const APP_VERSION = '2026.06.17';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.17',
+    date: '2026-06-17',
+    title: '⏰ シフトに勤務時間を入力できるように',
+    items: [
+      'キャスト・スタッフどちらのシフト欄も、セルを長押しすると勤務時間を入力できるようになりました。',
+      '例：21時〜1時なら「21」「1」と入力すると、◯の下に小さく「21-1」と表示されます。',
+      '通常のタップ（○×△切替）はそのままなので、これまでの操作感は変わりません。時間を入れていないセルは今まで通りシンプルな表示です。',
+      '時間はクリアボタンで消せます。未定(△)に切り替えても時間は保持されます。',
+    ],
+  },
   {
     version: '2026.06.16d',
     date: '2026-06-16',
@@ -3644,7 +3673,38 @@ function setShift(dateStr, castId, val) {
   if (val === true) newVal = 'on';
   else if (val === 'pending') newVal = 'pending';
   else if (val === 'off') newVal = 'off';
-  state.shiftData[k] = { v: newVal, _u: Date.now() };
+  // 既存の勤務時間（t）は状態が変わっても維持する（休みに一旦して戻す等での消失防止）
+  const prev = state.shiftData[k];
+  const prevTime = (prev && typeof prev === 'object' && prev.t) ? prev.t : undefined;
+  const entry = { v: newVal, _u: Date.now() };
+  if (prevTime) entry.t = prevTime;
+  state.shiftData[k] = entry;
+}
+// 勤務時間（開始-終了）を設定。時刻未指定（''）ならクリア
+function setShiftTime(dateStr, castId, startStr, endStr) {
+  const k = shiftKey(dateStr, castId);
+  const prev = state.shiftData[k];
+  const v = _shiftVal(prev);
+  const entry = { v: v || 'on', _u: Date.now() };
+  const s = (startStr || '').trim();
+  const e = (endStr || '').trim();
+  if (s || e) entry.t = { s, e };
+  state.shiftData[k] = entry;
+}
+// 勤務時間を取得 {s, e} または null
+function getShiftTime(dateStr, castId) {
+  const entry = state.shiftData[shiftKey(dateStr, castId)];
+  if (entry && typeof entry === 'object' && entry.t && (entry.t.s || entry.t.e)) return entry.t;
+  return null;
+}
+// セルに添える時刻ラベルのHTML文字列（例: "21-1" "22-" "-1"）。無ければ空文字
+function buildShiftTimeLabel(dateStr, castId) {
+  const t = getShiftTime(dateStr, castId);
+  if (!t) return '';
+  const s = (t.s || '').trim();
+  const e = (t.e || '').trim();
+  if (!s && !e) return '';
+  return `${escapeHtml(s)}-${escapeHtml(e)}`;
 }
 
 // ---------- ID generators ----------
@@ -7929,7 +7989,10 @@ function renderShift() {
             cellContent = '−';
             cellClass = 'unanswered';
           }
-          html += `<td class="shift-cell ${cellClass}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
+          // 勤務時間（出勤・未定の時のみ、設定されていれば小さく添える）
+          const timeLabel = (status === 'on' || status === 'pending') ? buildShiftTimeLabel(dStr, c.id) : '';
+          if (timeLabel) cellContent = `${cellContent}<span class="shift-time-label">${timeLabel}</span>`;
+          html += `<td class="shift-cell ${cellClass}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" data-cast-name="${escapeHtml(c.name)}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
         });
         html += '</tr>';
       });
@@ -7948,7 +8011,9 @@ function renderShift() {
           else if (status === 'pending') { mark = '△'; cls = 'pending'; }
           else if (status === 'off') { mark = '×'; cls = 'off-x'; }
           else { mark = '−'; cls = 'unanswered'; }
-          html += `<td class="shift-cell ${cls}" data-date="${dStr}" data-cast="${s.id}" onclick="toggleShift('${dStr}','${s.id}')">${mark}</td>`;
+          const timeLabel = (status === 'on' || status === 'pending') ? buildShiftTimeLabel(dStr, s.id) : '';
+          const cellContentS = timeLabel ? `${mark}<span class="shift-time-label">${timeLabel}</span>` : mark;
+          html += `<td class="shift-cell ${cls}" data-date="${dStr}" data-cast="${s.id}" data-cast-name="${escapeHtml(s.name)}" onclick="toggleShift('${dStr}','${s.id}')">${cellContentS}</td>`;
         });
         html += '</tr>';
       });
@@ -7957,6 +8022,89 @@ function renderShift() {
 
   html += '</tbody>';
   document.getElementById('shiftTable').innerHTML = html;
+  bindShiftCellLongPress();
+}
+
+// シフトセルの長押し検出：長押しで勤務時間の入力ミニモーダルを開く
+// （タップ＝○×△切替は従来通り。長押しだけ別動作にすることでボタンを増やさない）
+let _shiftPressTimer = null;
+let _shiftPressFired = false;
+function bindShiftCellLongPress() {
+  const table = document.getElementById('shiftTable');
+  if (!table || table._longPressBound) return;
+  table._longPressBound = true;
+  const LONG_PRESS_MS = 480;
+  const start = (e) => {
+    const td = e.target.closest('.shift-cell');
+    if (!td) return;
+    _shiftPressFired = false;
+    _shiftPressTimer = setTimeout(() => {
+      _shiftPressFired = true;
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch(ex) {} }
+      openShiftTimeEditor(td.dataset.date, td.dataset.cast, td.dataset.castName);
+    }, LONG_PRESS_MS);
+  };
+  const cancel = () => { if (_shiftPressTimer) { clearTimeout(_shiftPressTimer); _shiftPressTimer = null; } };
+  table.addEventListener('touchstart', start, { passive: true });
+  table.addEventListener('touchend', cancel);
+  table.addEventListener('touchmove', cancel);
+  table.addEventListener('mousedown', start);
+  table.addEventListener('mouseup', cancel);
+  table.addEventListener('mouseleave', cancel);
+  // 長押し発火時は直後のクリック（toggleShift）を1回だけ無効化
+  table.addEventListener('click', (e) => {
+    if (_shiftPressFired) {
+      e.stopPropagation();
+      e.preventDefault();
+      _shiftPressFired = false;
+    }
+  }, true);
+}
+
+// 勤務時間の入力ミニモーダル
+function openShiftTimeEditor(dateStr, castId, castName) {
+  const existing = getShiftTime(dateStr, castId) || { s: '', e: '' };
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 2100;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:320px;">
+      <h3 style="margin-top:0; font-size:15px;">⏰ 勤務時間</h3>
+      <p style="font-size:13px; color:var(--text-sub); margin:0 0 12px;">
+        <b>${escapeHtml(castName || '')}</b>　${escapeHtml(dateStr)}
+      </p>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+        <input type="text" id="shiftTimeStart" value="${escapeHtml(existing.s||'')}" placeholder="21" style="width:70px; text-align:center; padding:8px; font-size:15px;" inputmode="numeric">
+        <span style="color:var(--text-sub);">時 〜</span>
+        <input type="text" id="shiftTimeEnd" value="${escapeHtml(existing.e||'')}" placeholder="1" style="width:70px; text-align:center; padding:8px; font-size:15px;" inputmode="numeric">
+        <span style="color:var(--text-sub);">時</span>
+      </div>
+      <p style="font-size:11px; color:#999; margin:0 0 14px;">通し・未定の場合は空欄のままでOKです。数字だけ（例: 21 / 1）でも「21:00」等でも入力できます。</p>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-sub btn-sm" data-clear-time style="flex:1;">クリア</button>
+        <button type="button" class="btn-sub btn-sm" data-cancel-time style="flex:1;">キャンセル</button>
+        <button type="button" class="btn btn-sm" data-save-time style="flex:1;">保存</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  bg.querySelector('[data-cancel-time]').addEventListener('click', close);
+  bg.querySelector('[data-clear-time]').addEventListener('click', () => {
+    setShiftTime(dateStr, castId, '', '');
+    persistSave();
+    renderShift();
+    close();
+  });
+  bg.querySelector('[data-save-time]').addEventListener('click', () => {
+    const s = document.getElementById('shiftTimeStart').value;
+    const e = document.getElementById('shiftTimeEnd').value;
+    setShiftTime(dateStr, castId, s, e);
+    persistSave();
+    renderShift();
+    close();
+  });
 }
 
 // 指定週の予約をキャスト×日付でインデックス化
