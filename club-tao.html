@@ -2854,9 +2854,18 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.18';
+const APP_VERSION = '2026.06.18b';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.18b',
+    date: '2026-06-18',
+    title: '領収書の備考欄を改善',
+    items: [
+      '領収書の備考欄が全部見えない問題を修正しました。複数行入力できるようにして、長い宛名でも折り返して全文表示されます。',
+      'コピーボタンを追加しました。タップすると備考欄の内容をそのままコピーできます。',
+    ],
+  },
   {
     version: '2026.06.18',
     date: '2026-06-18',
@@ -9020,10 +9029,13 @@ function rebuildCustomerModalBody(cust) {
         <input type="checkbox" id="cstReceiptNeeded" ${cust.receiptNeeded ? 'checked' : ''} onchange="toggleReceiptNoteVisibility()" style="width:auto; margin:0;">
         <span class="lab" style="margin:0;">🧾 領収書が必要</span>
       </label>
-      <label class="field" id="cstReceiptNoteWrap" style="display:${cust.receiptNeeded ? 'flex' : 'none'};">
-        <span class="lab">領収書の備考（宛名など）</span>
-        <input type="text" id="cstReceiptNote" value="${escapeHtml(cust.receiptNote||'')}" placeholder="例: 株式会社◯◯ 上様">
-      </label>
+      <div class="field" id="cstReceiptNoteWrap" style="display:${cust.receiptNeeded ? 'flex' : 'none'};">
+        <span class="lab" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          領収書の備考（宛名など）
+          <button type="button" class="btn-sub btn-sm" onclick="copyFieldText('cstReceiptNote')" style="padding:2px 10px; font-size:11px;">📋 コピー</button>
+        </span>
+        <textarea id="cstReceiptNote" rows="2" style="width:100%; resize:vertical;" placeholder="例: 株式会社◯◯ 上様">${escapeHtml(cust.receiptNote||'')}</textarea>
+      </div>
       <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
         <input type="checkbox" id="cstSmoker" ${cust.smoker ? 'checked' : ''} onchange="toggleSmokerBrandVisibility()" style="width:auto; margin:0;">
         <span class="lab" style="margin:0;">🚬 タバコを吸う</span>
@@ -9095,6 +9107,27 @@ function toggleReceiptNoteVisibility() {
   const wrap = document.getElementById('cstReceiptNoteWrap');
   const cb = document.getElementById('cstReceiptNeeded');
   if (wrap && cb) wrap.style.display = cb.checked ? 'flex' : 'none';
+}
+// 指定した入力欄（input/textarea）の内容をクリップボードにコピー
+async function copyFieldText(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const text = el.value || '';
+  if (!text.trim()) { showToast('コピーする内容がありません', 'info'); return; }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // クリップボードAPIが使えない環境向けフォールバック
+      el.select();
+      document.execCommand('copy');
+    }
+    showToast('コピーしました', 'normal');
+  } catch(e) {
+    // フォールバック：選択状態にして手動コピーを促す
+    try { el.select(); } catch(e2) {}
+    showToast('コピーできませんでした。選択してコピーしてください', 'info');
+  }
 }
 function toggleSmokerBrandVisibility() {
   const wrap = document.getElementById('cstSmokerBrandWrap');
