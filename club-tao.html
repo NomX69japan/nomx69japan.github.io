@@ -2854,9 +2854,18 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.18c';
+const APP_VERSION = '2026.06.18d';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.18d',
+    date: '2026-06-18',
+    title: '領収書・喫煙欄の横並び崩れを修正',
+    items: [
+      'ラベルと入力欄が横並びになり、コピーボタンが文字に重なっていた不具合を修正しました。',
+      'ラベルが上、入力欄が下（横幅いっぱい）、コピーボタンは入力欄の下に独立して並ぶようにしました。',
+    ],
+  },
   {
     version: '2026.06.18c',
     date: '2026-06-18',
@@ -9038,18 +9047,18 @@ function rebuildCustomerModalBody(cust) {
         <input type="checkbox" id="cstReceiptNeeded" ${cust.receiptNeeded ? 'checked' : ''} onchange="toggleReceiptNoteVisibility()" style="width:auto; margin:0;">
         <span class="lab" style="margin:0;">🧾 領収書が必要</span>
       </label>
-      <div class="field" id="cstReceiptNoteWrap" style="display:${cust.receiptNeeded ? 'flex' : 'none'};">
-        <span class="lab">領収書の備考（宛名など）</span>
-        <div style="position:relative;">
-          <textarea id="cstReceiptNote" rows="3" style="width:100%; resize:vertical; padding-right:64px;" placeholder="例: 株式会社◯◯ 上様">${escapeHtml(cust.receiptNote||'')}</textarea>
-          <button type="button" class="btn-sub btn-sm" onclick="copyFieldText('cstReceiptNote')" style="position:absolute; top:6px; right:6px; padding:4px 8px; font-size:11px; white-space:nowrap;">📋 コピー</button>
+      <div class="field" id="cstReceiptNoteWrap" style="display:${cust.receiptNeeded ? 'flex' : 'none'}; flex-direction:column;">
+        <span class="lab" style="display:block; margin-bottom:4px;">領収書の備考（宛名など）</span>
+        <div style="position:relative; width:100%;">
+          <textarea id="cstReceiptNote" rows="3" style="width:100%; resize:vertical; padding-right:8px; box-sizing:border-box; display:block;" placeholder="例: 株式会社◯◯ 上様">${escapeHtml(cust.receiptNote||'')}</textarea>
+          <button type="button" class="btn-sub btn-sm" onclick="copyFieldText('cstReceiptNote')" style="margin-top:6px; padding:4px 10px; font-size:11px;">📋 コピー</button>
         </div>
       </div>
       <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
         <input type="checkbox" id="cstSmoker" ${cust.smoker ? 'checked' : ''} onchange="toggleSmokerBrandVisibility()" style="width:auto; margin:0;">
         <span class="lab" style="margin:0;">🚬 タバコを吸う</span>
       </label>
-      <label class="field" id="cstSmokerBrandWrap" style="display:${cust.smoker ? 'flex' : 'none'};">
+      <label class="field" id="cstSmokerBrandWrap" style="display:${cust.smoker ? 'flex' : 'none'}; flex-direction:column;">
         <span class="lab">銘柄</span>
         <input type="text" id="cstSmokerBrand" value="${escapeHtml(cust.smokerBrand||'')}" placeholder="例: マールボロ">
       </label>
