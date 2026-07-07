@@ -906,6 +906,88 @@
     color: var(--muted);
     letter-spacing: 0.05em;
   }
+
+  /* 効果タグ */
+  .face-effects {
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: rgba(200,169,110,0.05);
+    border: 1px solid rgba(200,169,110,0.2);
+  }
+  .face-effects-label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    color: var(--accent-dark);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  .face-effects-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+  .face-effects-tags span {
+    font-size: 0.88rem;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 0.5rem 1.1rem;
+    border-radius: 100px;
+  }
+
+  /* 使用フロー補足 */
+  .face-note {
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.9;
+    margin-bottom: 3rem;
+    max-width: 720px;
+  }
+
+  /* 品質ブロック */
+  .face-quality {
+    margin-bottom: 2.5rem;
+    padding: 1.8rem 2rem;
+    border-left: 2px solid var(--accent);
+    background: rgba(14,13,11,0.015);
+  }
+  .face-quality-label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    color: var(--accent-dark);
+    text-transform: uppercase;
+    margin-bottom: 0.7rem;
+  }
+  .face-quality p {
+    font-size: 0.86rem;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+
+  /* 外部リンク */
+  .face-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+    margin: 2rem 0;
+  }
+  .face-link-item {
+    font-size: 0.85rem;
+    color: var(--accent-dark);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(139,111,58,0.3);
+    padding-bottom: 2px;
+    transition: color 0.3s, border-color 0.3s;
+  }
+  .face-link-item:hover {
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+
   .face-disclaimer {
     font-size: 0.84rem;
     line-height: 1.9;
@@ -1030,6 +1112,74 @@
     z-index: 1000;
     width: 0%;
     transition: width 0.1s ease-out;
+  }
+
+  /* ── FABLE 5: SCROLL-DRIVEN ANIMATIONS (ネイティブ・JS不要) ── */
+  @supports (animation-timeline: scroll()) {
+    /* 進捗バーをネイティブ化（60fps保証） */
+    .scroll-progress {
+      width: 100%;
+      transform-origin: left;
+      transform: scaleX(0);
+      animation: nativeProgress linear forwards;
+      animation-timeline: scroll(root);
+      transition: none;
+    }
+    @keyframes nativeProgress {
+      to { transform: scaleX(1); }
+    }
+
+    /* ヒーロー写真：スクロールで沈み込むパララックス */
+    .hero-image-area img {
+      animation: fadeIn 1.5s 1s forwards, kenBurns 28s ease-in-out 2s infinite,
+                 heroSink linear both !important;
+      animation-timeline: auto, auto, scroll(root);
+      animation-range: normal, normal, 0vh 100vh;
+    }
+    @keyframes heroSink {
+      to { translate: 0 12%; scale: 1.06; }
+    }
+
+    /* 区切り線：ビューに入ると左から伸びる */
+    .rule {
+      transform-origin: left;
+      animation: ruleGrow linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+    @keyframes ruleGrow {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+
+    /* マニフェスト：スクロールに応じてゴールドに染まる */
+    .manifesto-text .manifesto-line:last-child {
+      opacity: 1 !important;
+      transform: none !important;
+      background: linear-gradient(90deg, var(--accent-dark) 50%, rgba(14,13,11,0.25) 50%);
+      background-size: 200% 100%;
+      background-position: 100% 0;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: inkFill linear both;
+      animation-timeline: view();
+      animation-range: entry 20% cover 55%;
+    }
+    @keyframes inkFill {
+      to { background-position: 0% 0; }
+    }
+
+    /* Fee価格：ビューに入るとふわっと浮かぶ */
+    .fee-price {
+      animation: priceFloat linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+    @keyframes priceFloat {
+      from { opacity: 0; translate: 0 14px; }
+      to { opacity: 1; translate: 0 0; }
+    }
   }
 
   /* ── KEYFRAMES ── */
@@ -1540,6 +1690,8 @@
     .face-grid { grid-template-columns: 1fr; }
     .face-method { grid-template-columns: 1fr; gap: 1.5rem; }
     .face-cta-row { flex-direction: column; align-items: flex-start; }
+    .face-effects { padding: 1.5rem; }
+    .face-links { flex-direction: column; gap: 0.8rem; }
   }
 
   @media (max-width: 480px) {
@@ -1704,7 +1856,9 @@
         <br><br>
         取り扱うのは、<strong>さつま式小顔マウスピース</strong>。
         薩摩宗治先生（さつま骨格矯正鍼灸整骨院 総院長）が監修した、
-        表情筋と顎関節に働きかけるトレーニング器具です。
+        表情筋と顎関節に働きかけるフェイシャルアライナーです。
+        顔の歪みは人の恒常性維持（ホメオスタシス）によって元に戻ろうとしますが、
+        継続して装着することで骨格の再生（リモデリング）を促し、整えた状態を定着させます。
       </p>
     </div>
     <div class="face-illust reveal reveal-mask">
@@ -1718,21 +1872,35 @@
     </div>
   </div>
 
+  <!-- 効果一覧 -->
+  <div class="face-effects reveal">
+    <span class="face-effects-label">期待できる効果</span>
+    <div class="face-effects-tags">
+      <span>面長改善</span>
+      <span>小顔効果</span>
+      <span>整顔効果</span>
+      <span>エラはりの改善</span>
+      <span>食いしばり改善</span>
+      <span>顎関節症の改善</span>
+      <span>施術効果の維持</span>
+    </div>
+  </div>
+
   <div class="face-grid">
     <div class="face-card reveal">
-      <div class="face-card-tag">黒 / Hard</div>
+      <div class="face-card-tag">黒 / イニシャルアライナー（初期）</div>
       <h3 class="face-card-title">はじめての一本</h3>
-      <p class="face-card-desc">最も硬く、食いしばりがある方・35歳以上の方・しっかり変化を出したい方へ。顎関節と表情のクセを整える、最初のステップに。</p>
+      <p class="face-card-desc">程よい矯正力で、これまでのお顔のクセを正し骨格を整えます。3種を併用する場合は朝〜昼にご使用ください。</p>
     </div>
     <div class="face-card reveal">
-      <div class="face-card-tag">白 / Soft</div>
+      <div class="face-card-tag">白 / ベーシックアライナー（基礎）</div>
       <h3 class="face-card-title">次のステップ</h3>
-      <p class="face-card-desc">黒よりやわらかく、エクササイズ効果が高いタイプ。噛む力が弱めの方や、顎のクセが整った次の段階におすすめ。</p>
+      <p class="face-card-desc">柔軟性があり高い小顔効果。後戻りを防ぐ役割も。イニシャルに慣れたら、第二段階として昼〜夕方に。</p>
     </div>
     <div class="face-card reveal">
-      <div class="face-card-tag">橙 / Advance</div>
+      <div class="face-card-tag">橙 / エステティックアライナー（審美）</div>
       <h3 class="face-card-title">上級者へ</h3>
-      <p class="face-card-desc">最もやわらかく、小顔トレーニング効果が高い上級者向け。顎関節と表情のクセが整った状態でのご使用を。</p>
+      <p class="face-card-desc">見た目に大きな変化が現れる段階。ベーシックに慣れたら、第三段階として夕方〜夜にご使用ください。</p>
     </div>
   </div>
 
@@ -1746,14 +1914,36 @@
       <span class="face-method-label">1日の目安（朝・昼・晩）</span>
     </div>
     <div class="face-method-item">
-      <span class="face-method-num">4-6<span class="face-method-unit">ヶ月</span></span>
-      <span class="face-method-label">変化を感じる目安</span>
+      <span class="face-method-num">8<span class="face-method-unit">ヶ月</span></span>
+      <span class="face-method-label">お気に入りの1本に絞る目安</span>
     </div>
+  </div>
+
+  <p class="face-note reveal">
+    はじめの8ヶ月ほどは3種を段階的に併用し、それ以降は最もフィットする1本を1日3回（朝・昼・晩）各90秒ご使用いただく流れです。
+  </p>
+
+  <!-- 品質・製造情報 -->
+  <div class="face-quality reveal">
+    <span class="face-quality-label">品質について</span>
+    <p>
+      さつま式小顔マウスピースは日本国内で製造。日本（JCIIセンターポリ衛協型確認証明書、国内ポジティブリスト）、
+      アメリカ（FDA 21CFR）、ヨーロッパ（PIM）の検査基準をクリアした素材を使用した自社開発品です。
+    </p>
   </div>
 
   <div class="face-cta-row reveal">
     <a href="#contact" class="face-cta-btn">マウスピースについて相談する</a>
     <span class="face-cta-note">1個からご購入いただけます。購入導線は準備中です。</span>
+  </div>
+
+  <div class="face-links reveal">
+    <a href="https://www.instagram.com/satsuma_official/" target="_blank" rel="noopener" class="face-link-item">
+      監修元 公式Instagram（@satsuma_official）を見る ↗
+    </a>
+    <a href="https://kogao-trainer.hp.peraichi.com/" target="_blank" rel="noopener" class="face-link-item">
+      さつま式小顔マウスピース 公式サイト ↗
+    </a>
   </div>
 
   <p class="face-disclaimer reveal">
@@ -2042,9 +2232,12 @@
   }, { threshold: 0.12 });
   reveals.forEach(el => io.observe(el));
 
-  // Hero image parallax (subtle)
+  // ネイティブのscroll-driven animationが使えるかどうか
+  const hasScrollTimeline = CSS.supports('animation-timeline: scroll()');
+
+  // Hero image parallax (subtle) — ネイティブ対応ブラウザではCSS側に任せる
   const heroImg = document.getElementById('hero-img');
-  if (heroImg) {
+  if (heroImg && !hasScrollTimeline) {
     window.addEventListener('scroll', () => {
       const scrolled = window.scrollY;
       if (scrolled < window.innerHeight) {
@@ -2103,9 +2296,9 @@
     }, { passive: true });
   }
 
-  // Scroll progress bar
+  // Scroll progress bar — ネイティブ対応ブラウザではCSS側に任せる
   const progress = document.getElementById('scrollProgress');
-  if (progress) {
+  if (progress && !hasScrollTimeline) {
     window.addEventListener('scroll', () => {
       const h = document.documentElement;
       const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
