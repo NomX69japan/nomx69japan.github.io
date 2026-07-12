@@ -2854,9 +2854,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.18d';
+const APP_VERSION = '2026.06.19';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.19',
+    date: '2026-06-19',
+    title: '📋 来店履歴に領収書・喫煙情報を表示／🔒 退店の同期漏れを再修正',
+    items: [
+      '【来店履歴】履歴の詳細画面に、そのお客様の「領収書必要」「喫煙」情報を表示するようにしました（設定していない場合は表示されません）。',
+      '【重要】退店したのに他端末に反映されないことがある問題の、さらに深い原因を修正しました。',
+      '原因：自動延長中の端末では、退店していない古いデータの更新時刻がどんどん新しくなっていきます。同期の際「更新時刻が新しい方を優先する」ルールのせいで、この新しく見える古いデータが、他端末の正しい退店情報より優先されてしまうことがありました。',
+      '対策：更新時刻の比較に頼らず、退店済みと分かっているセッションは同期のたびに問答無用でクリアするようにしました。タイミングによって発生・非発生が分かれていた間欠的な不具合なので、今回の修正でより確実になります。',
+    ],
+  },
   {
     version: '2026.06.18d',
     date: '2026-06-18',
@@ -4640,6 +4651,34 @@ function showVisitDetail(logId) {
             }).join('');
             const totalQty = orders.reduce((s,o)=>s+(o.qty||1),0);
             return `<tr><td style="color:#888; vertical-align:top;">オーダー</td><td><div style="font-size:12px;"><b style="color:#8b6914;">📦 ${orders.length}品 / ${totalQty}点</b></div><div class="visit-orders-block">${ordersHtml}</div></td></tr>`;
+          })()}
+          ${(() => {
+            // この来店に関わる顧客（複数顧客対応）の喫煙・領収書情報をまとめて表示
+            const relatedCustIds = [];
+            if (Array.isArray(log.guestList) && log.guestList.length > 0) {
+              log.guestList.forEach(g => { if (g.customerId) relatedCustIds.push(g.customerId); });
+            } else if (log.customerId) {
+              relatedCustIds.push(log.customerId);
+            }
+            const relatedCusts = relatedCustIds
+              .map(id => state.customers.find(c => c.id === id))
+              .filter(Boolean);
+            if (relatedCusts.length === 0) return '';
+            const rows = relatedCusts.map(c => {
+              const dn = withSan(displayName(c));
+              const parts = [];
+              if (c.receiptNeeded) {
+                parts.push(`<span style="background:#e3f2fd; color:#1565c0; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">🧾 領収書必要${c.receiptNote ? '：'+escapeHtml(c.receiptNote) : ''}</span>`);
+              }
+              if (c.smoker) {
+                parts.push(`<span style="background:#f3e5f5; color:#6a1b9a; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">🚬 喫煙${c.smokerBrand ? '：'+escapeHtml(c.smokerBrand) : ''}</span>`);
+              }
+              if (parts.length === 0) return '';
+              const nameTag = relatedCusts.length > 1 ? `<span style="font-size:11px; color:#999; margin-right:4px;">${escapeHtml(dn)}</span>` : '';
+              return `<div style="margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">${nameTag}${parts.join(' ')}</div>`;
+            }).filter(Boolean).join('');
+            if (!rows) return '';
+            return `<tr><td style="color:#888; vertical-align:top;">お客様情報</td><td>${rows}</td></tr>`;
           })()}
           ${log.memo ? `<tr><td style="color:#888; vertical-align:top;">メモ</td><td style="white-space:pre-wrap;">${escapeHtml(log.memo)}</td></tr>` : ''}
         </table>
@@ -11327,6 +11366,14 @@ function applyServerData(payload) {
   if (payload.pin) state.pin = payload.pin;
   // 退店済みセッション台帳を先にマージ（後続のテーブルマージで使うため）
   mergeClosedSessions(payload.closedSessions);
+  // ★ローカル側の自己修復：台帳マージ直後、ローカルの「入店中」テーブルのうち
+  // 既に退店済みと分かっているセッションがあれば即座にクリアする（詳細はmergeServerPayload参照）。
+  Object.keys(state.tables || {}).forEach(tid => {
+    const td = state.tables[tid];
+    if (td && td.occupied && td.startedAt && isSessionClosed(tid, td.startedAt)) {
+      state.tables[tid] = emptyTableData();
+    }
+  });
   // テーブル：オブジェクト単位でマージ（_updated タイムスタンプで判定）
   if (payload.tables && typeof payload.tables === 'object') {
     Object.keys(payload.tables).forEach(tid => {
@@ -11676,6 +11723,17 @@ function mergeServerPayload(payload) {
   if (!payload || typeof payload !== 'object') return;
   // 退店済みセッション台帳を先にマージ（テーブルマージで使う）
   mergeClosedSessions(payload.closedSessions);
+  // ★ローカル側の自己修復：台帳マージ直後、ローカルの「入店中」テーブルの中に
+  // 既に退店済みと分かっているセッションがあれば、この場で即座にクリアする。
+  // これをしないと、自動延長で _updated が新しくなり続けているローカルの古い占有データが
+  // 「新しい方が勝つ」比較でサーバーの正しい退店データより優先されてしまい、
+  // そのままサーバーへ書き戻されて退店が巻き戻る（タイミング次第で発生する間欠的バグ）。
+  Object.keys(state.tables || {}).forEach(tid => {
+    const td = state.tables[tid];
+    if (td && td.occupied && td.startedAt && isSessionClosed(tid, td.startedAt)) {
+      state.tables[tid] = emptyTableData();
+    }
+  });
   // キャスト・スタッフ：_updated 比較（並び順・体験フラグ等の巻き戻り防止）
   // ※これが抜けていると、並び替え後に別端末の古いデータで上書きされ、並び順が元に戻ってしまう
   if (Array.isArray(payload.casts)) {
