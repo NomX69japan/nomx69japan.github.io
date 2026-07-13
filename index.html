@@ -54,19 +54,19 @@
 
 <style>
   :root {
-    --bg: #0d0c0a;
-    --panel: #14120e;
+    --bg: #16140f;
+    --panel: #1d1a14;
     --cream: #f2ece1;
     --gold: #c8a96e;
     --gold-deep: #a07f45;
-    --dim: rgba(242,236,225,0.55);
-    --faint: rgba(242,236,225,0.28);
-    --hair: rgba(242,236,225,0.12);
+    --dim: rgba(242,236,225,0.92);
+    --faint: rgba(242,236,225,0.7);
+    --hair: rgba(242,236,225,0.22);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
+  html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; font-size: 108%; }
 
   body {
     background: var(--bg);
@@ -74,6 +74,7 @@
     font-family: 'Noto Serif JP', serif;
     font-weight: 300;
     letter-spacing: 0.03em;
+    line-height: 1.7;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -84,13 +85,7 @@
 
   ::selection { background: rgba(200,169,110,0.35); color: var(--cream); }
 
-  /* film grain */
-  body::before {
-    content: '';
-    position: fixed; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-    pointer-events: none; z-index: 999; opacity: 0.7;
-  }
+  /* film grain removed — caused rendering artifacts in some browsers */
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -149,7 +144,7 @@
   nav ul { list-style: none; display: flex; gap: 2.6rem; }
   nav ul a {
     font-family: 'Space Mono', monospace;
-    font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase;
+    font-size: 1rem; letter-spacing: 0.25em; text-transform: uppercase;
     color: var(--dim); text-decoration: none;
     position: relative; transition: color 0.3s;
   }
@@ -184,7 +179,7 @@
   }
   .drawer a:hover { color: var(--gold); }
   .drawer .d-num {
-    font-family: 'Space Mono', monospace; font-size: 0.7rem;
+    font-family: 'Space Mono', monospace; font-size: 0.98rem;
     color: var(--gold); margin-right: 0.9rem; letter-spacing: 0.1em;
   }
 
@@ -231,7 +226,7 @@
   .hero-eyebrow {
     display: flex; align-items: center; gap: 1rem;
     font-family: 'Space Mono', monospace;
-    font-size: 0.72rem; letter-spacing: 0.4em; text-transform: uppercase;
+    font-size: 1rem; letter-spacing: 0.4em; text-transform: uppercase;
     color: var(--gold);
     margin-bottom: 2.2rem;
     opacity: 0; animation: rise 1.1s 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
@@ -246,13 +241,9 @@
   }
   .hero-title em {
     font-style: italic;
-    background: linear-gradient(115deg, var(--gold) 25%, #ecd6a8 50%, var(--gold) 75%);
-    background-size: 200% 100%;
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: goldFlow 5s ease-in-out infinite;
+    color: var(--gold);
+    text-shadow: 0 0 40px rgba(200,169,110,0.35);
   }
-  @keyframes goldFlow { 0%,100% { background-position: 180% 0; } 50% { background-position: 0% 0; } }
   .hero-sub {
     margin-top: 2.6rem;
     display: flex; flex-wrap: wrap; align-items: flex-end; gap: 2.5rem;
@@ -267,13 +258,13 @@
   .hero-copy .thin { color: var(--dim); font-size: 0.9em; }
   .hero-name {
     font-family: 'Space Mono', monospace;
-    font-size: 0.72rem; letter-spacing: 0.22em; color: var(--faint);
+    font-size: 1rem; letter-spacing: 0.22em; color: var(--faint);
   }
   .hero-cta {
     margin-top: 2.8rem;
     display: inline-flex; align-items: center; gap: 1.1rem;
     font-family: 'Space Mono', monospace;
-    font-size: 0.75rem; letter-spacing: 0.22em; text-transform: uppercase;
+    font-size: 1.05rem; letter-spacing: 0.22em; text-transform: uppercase;
     color: var(--cream); text-decoration: none;
     opacity: 0; animation: rise 1.1s 1.25s cubic-bezier(0.22,1,0.36,1) forwards;
     transition: color 0.3s, gap 0.3s;
@@ -336,17 +327,20 @@
   }
 
   /* ── MANIFESTO ── */
-  .manifesto { text-align: center; padding: 10rem 0; }
+  .manifesto { text-align: center; padding: 10rem 1.5rem; }
   .manifesto-text {
     font-family: 'Shippori Mincho', serif;
-    font-size: clamp(2rem, 5.4vw, 4.6rem);
-    font-weight: 500; line-height: 1.5; letter-spacing: 0.06em;
+    font-size: clamp(1.8rem, 4.6vw, 3.9rem);
+    font-weight: 500; line-height: 1.6; letter-spacing: 0.05em;
     color: var(--cream);
   }
-  .manifesto-text .line { display: block; }
+  .manifesto-text .line { display: block; white-space: nowrap; }
   .manifesto-text .gold-line {
     font-style: normal;
     color: var(--gold);
+  }
+  @media (max-width: 700px) {
+    .manifesto-text .line { white-space: normal; }
   }
   .manifesto-sub {
     margin-top: 2.6rem;
@@ -390,7 +384,7 @@
     margin-bottom: 1rem;
   }
   .ph-desc {
-    font-size: 0.98rem; line-height: 2.1; color: var(--dim);
+    font-size: 1.12rem; line-height: 2.1; color: var(--dim);
   }
 
   /* ── FACE ── */
@@ -423,7 +417,7 @@
 
   .fx-tags { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-bottom: 4.5rem; }
   .fx-tags span {
-    font-size: 0.88rem; letter-spacing: 0.06em;
+    font-size: 1.02rem; letter-spacing: 0.06em;
     color: var(--cream);
     border: 1px solid rgba(200,169,110,0.45);
     padding: 0.55rem 1.3rem; border-radius: 100px;
@@ -432,7 +426,7 @@
   .fx-tags span:hover { background: var(--gold); color: var(--bg); }
   .fx-label {
     display: block;
-    font-family: 'Space Mono', monospace; font-size: 0.7rem;
+    font-family: 'Space Mono', monospace; font-size: 0.98rem;
     letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
     margin-bottom: 1.2rem;
   }
@@ -455,7 +449,7 @@
   .aligner:hover .aligner-img { transform: translateY(-6px) rotate(-1.5deg); }
   .aligner-img img { width: 100%; max-width: 170px; }
   .aligner-tag {
-    font-family: 'Space Mono', monospace; font-size: 0.72rem;
+    font-family: 'Space Mono', monospace; font-size: 1rem;
     letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold);
     margin-bottom: 0.7rem;
   }
@@ -464,7 +458,7 @@
     font-size: 1.55rem; font-weight: 500; letter-spacing: 0.06em;
     color: var(--cream); margin-bottom: 0.9rem;
   }
-  .aligner-desc { font-size: 0.98rem; line-height: 2; color: var(--dim); max-width: 620px; }
+  .aligner-desc { font-size: 1.12rem; line-height: 2; color: var(--dim); max-width: 620px; }
 
   .method { display: grid; grid-template-columns: repeat(3,1fr); gap: 2rem; margin-bottom: 3rem; text-align: center; }
   .method-num {
@@ -474,47 +468,47 @@
     margin-bottom: 0.7rem;
   }
   .method-unit { font-family: 'Shippori Mincho', serif; font-style: normal; font-size: 1.1rem; color: var(--dim); margin-left: 0.15rem; }
-  .method-label { font-size: 0.92rem; color: var(--dim); letter-spacing: 0.05em; }
+  .method-label { font-size: 1.08rem; color: var(--dim); letter-spacing: 0.05em; }
 
-  .face-note { font-size: 0.92rem; line-height: 2; color: var(--faint); max-width: 720px; margin-bottom: 4rem; }
+  .face-note { font-size: 1.08rem; line-height: 2; color: var(--faint); max-width: 720px; margin-bottom: 4rem; }
 
   .supervisor { border-radius: 8px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,0.5); margin-bottom: 3rem; }
   .supervisor img { display: block; width: 100%; }
 
   .quality {
     border-left: 2px solid var(--gold);
-    padding: 1.6rem 2rem;
-    background: rgba(242,236,225,0.03);
+    padding: 1.7rem 2rem;
+    background: rgba(242,236,225,0.05);
     margin-bottom: 3rem;
   }
-  .quality p { font-size: 0.9rem; line-height: 2; color: var(--dim); }
+  .quality p { font-size: 1.05rem; line-height: 2; color: var(--dim); }
 
   .face-cta { display: flex; align-items: center; gap: 1.6rem; flex-wrap: wrap; margin-bottom: 2.5rem; }
   .btn-gold {
     display: inline-flex; align-items: center; gap: 0.8rem;
     background: var(--gold); color: var(--bg);
     font-family: 'Space Mono', monospace;
-    font-size: 0.8rem; letter-spacing: 0.14em;
+    font-size: 0.95rem; letter-spacing: 0.14em;
     padding: 1.1rem 2.4rem; border-radius: 2px;
     text-decoration: none;
     transition: transform 0.3s, box-shadow 0.3s, background 0.3s;
   }
   .btn-gold:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(200,169,110,0.35); background: #d8bc84; }
-  .face-cta-note { font-size: 0.92rem; color: var(--dim); }
+  .face-cta-note { font-size: 1.08rem; color: var(--dim); }
 
   .ext-links { display: flex; flex-wrap: wrap; gap: 1.6rem; margin-bottom: 2.5rem; }
   .ext-links a {
-    font-size: 0.88rem; color: var(--gold); text-decoration: none;
+    font-size: 1.02rem; color: var(--gold); text-decoration: none;
     border-bottom: 1px solid rgba(200,169,110,0.4); padding-bottom: 2px;
     transition: color 0.3s, border-color 0.3s;
   }
   .ext-links a:hover { color: var(--cream); border-color: var(--cream); }
 
   .disclaimer {
-    font-size: 0.82rem; line-height: 2; color: var(--faint);
-    padding: 1.4rem 1.6rem;
-    background: rgba(242,236,225,0.02);
-    border-left: 2px solid var(--hair);
+    font-size: 1.12rem; line-height: 2.1; color: rgba(242,236,225,0.62);
+    padding: 1.5rem 1.7rem;
+    background: rgba(242,236,225,0.04);
+    border-left: 2px solid rgba(200,169,110,0.35);
   }
 
   /* ── ABOUT ── */
@@ -535,7 +529,7 @@
     margin-bottom: 0.5rem;
   }
   .stat-v .u { font-family: 'Shippori Mincho', serif; font-size: 1rem; color: var(--dim); margin-left: 0.15rem; }
-  .stat-l { font-family: 'Space Mono', monospace; font-size: 0.66rem; letter-spacing: 0.22em; color: var(--faint); text-transform: uppercase; }
+  .stat-l { font-family: 'Space Mono', monospace; font-size: 0.95rem; letter-spacing: 0.22em; color: var(--faint); text-transform: uppercase; }
 
   /* ── FEE: price list ── */
   .fee-list { border-top: 1px solid var(--hair); }
@@ -559,7 +553,7 @@
   .fee-row:hover::before { transform: scaleX(1); }
   .fee-row:hover { padding-left: 1.4rem; }
   .fee-tag {
-    font-family: 'Space Mono', monospace; font-size: 0.66rem;
+    font-family: 'Space Mono', monospace; font-size: 0.95rem;
     letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold);
   }
   .fee-name {
@@ -568,21 +562,21 @@
   }
   .fee-name .rec {
     display: inline-block; margin-left: 0.9rem; vertical-align: middle;
-    font-family: 'Space Mono', monospace; font-size: 0.58rem; letter-spacing: 0.16em;
+    font-family: 'Space Mono', monospace; font-size: 1rem; letter-spacing: 0.16em;
     background: var(--gold); color: var(--bg);
     padding: 0.28rem 0.65rem; border-radius: 2px;
   }
-  .fee-dur { font-size: 0.9rem; color: var(--dim); }
+  .fee-dur { font-size: 1.05rem; color: var(--dim); }
   .fee-price {
     font-family: 'Cormorant Garamond', serif;
     font-size: 2rem; font-weight: 300; color: var(--cream);
     text-align: right; letter-spacing: -0.01em;
   }
-  .fee-price .sub { display: block; font-family: 'Space Mono', monospace; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--gold); margin-top: 0.25rem; }
+  .fee-price .sub { display: block; font-family: 'Space Mono', monospace; font-size: 0.76rem; letter-spacing: 0.1em; color: var(--gold); margin-top: 0.25rem; }
   .fee-arr { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; color: var(--gold); opacity: 0; transform: translateX(-6px); transition: opacity 0.35s, transform 0.35s; text-align: right; }
   .fee-row:hover .fee-arr { opacity: 1; transform: translateX(0); }
-  .fee-policy { margin-top: 2.4rem; font-size: 0.92rem; color: var(--faint); display: flex; gap: 1.4rem; align-items: baseline; flex-wrap: wrap; }
-  .fee-policy b { font-family: 'Space Mono', monospace; font-weight: 400; font-size: 0.66rem; letter-spacing: 0.22em; color: var(--gold); text-transform: uppercase; }
+  .fee-policy { margin-top: 2.4rem; font-size: 1.08rem; color: var(--faint); display: flex; gap: 1.4rem; align-items: baseline; flex-wrap: wrap; }
+  .fee-policy b { font-family: 'Space Mono', monospace; font-weight: 400; font-size: 0.95rem; letter-spacing: 0.22em; color: var(--gold); text-transform: uppercase; }
 
   /* ── CONTACT ── */
   .contact { background: var(--panel); border-top: 1px solid var(--hair); overflow: hidden; }
@@ -606,12 +600,12 @@
     display: flex; justify-content: space-between; align-items: center;
     padding: 1.35rem 0; border-bottom: 1px solid var(--hair); gap: 1.5rem;
   }
-  .c-label { font-family: 'Space Mono', monospace; font-size: 0.64rem; letter-spacing: 0.26em; color: var(--faint); text-transform: uppercase; flex-shrink: 0; }
-  .c-value { font-size: 0.95rem; color: var(--dim); text-align: right; }
+  .c-label { font-family: 'Space Mono', monospace; font-size: 0.92rem; letter-spacing: 0.26em; color: var(--faint); text-transform: uppercase; flex-shrink: 0; }
+  .c-value { font-size: 1.1rem; color: var(--dim); text-align: right; }
   .sns-btn {
     display: inline-flex; align-items: center; gap: 0.55rem;
     text-decoration: none;
-    font-family: 'Space Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
+    font-family: 'Space Mono', monospace; font-size: 0.98rem; letter-spacing: 0.1em;
     padding: 0.6rem 1.15rem; border-radius: 3px; color: #fff;
     transition: transform 0.25s, opacity 0.25s;
   }
@@ -627,14 +621,14 @@
     padding: 4.5rem 0;
   }
   .cross-in { display: flex; align-items: center; justify-content: space-between; gap: 2.5rem; flex-wrap: wrap; }
-  .cross-label { font-family: 'Space Mono', monospace; font-size: 0.64rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); display: block; margin-bottom: 1rem; }
+  .cross-label { font-family: 'Space Mono', monospace; font-size: 0.92rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); display: block; margin-bottom: 1rem; }
   .cross-title { font-family: 'Shippori Mincho', serif; font-size: 1.7rem; font-weight: 500; letter-spacing: 0.05em; color: var(--cream); margin-bottom: 0.6rem; }
-  .cross-desc { font-size: 0.92rem; color: var(--dim); line-height: 1.9; }
+  .cross-desc { font-size: 1.08rem; color: var(--dim); line-height: 1.9; }
   .cross-btn {
     flex-shrink: 0;
     display: inline-flex; align-items: center; gap: 0.9rem;
     border: 1px solid var(--gold); color: var(--gold);
-    font-family: 'Space Mono', monospace; font-size: 0.74rem; letter-spacing: 0.12em;
+    font-family: 'Space Mono', monospace; font-size: 1.02rem; letter-spacing: 0.12em;
     padding: 1.05rem 2rem; border-radius: 2px; text-decoration: none;
     transition: background 0.35s, color 0.35s, transform 0.3s;
   }
@@ -645,16 +639,16 @@
   .f-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; flex-wrap: wrap; margin-bottom: 2.5rem; }
   .f-logo { font-family: 'Space Mono', monospace; font-size: 1.3rem; color: var(--cream); margin-bottom: 0.6rem; }
   .f-logo em { font-style: normal; color: var(--gold); }
-  .f-tag { font-size: 0.85rem; color: var(--faint); letter-spacing: 0.04em; }
+  .f-tag { font-size: 1rem; color: var(--faint); letter-spacing: 0.04em; }
   .f-nav { display: flex; gap: 1.9rem; flex-wrap: wrap; }
   .f-nav a {
-    font-family: 'Space Mono', monospace; font-size: 0.66rem; letter-spacing: 0.18em;
+    font-family: 'Space Mono', monospace; font-size: 0.95rem; letter-spacing: 0.18em;
     text-transform: uppercase; color: var(--faint); text-decoration: none;
     transition: color 0.3s;
   }
   .f-nav a:hover { color: var(--gold); }
   .f-btm { display: flex; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; padding-top: 1.6rem; border-top: 1px solid var(--hair); }
-  .f-btm p { font-family: 'Space Mono', monospace; font-size: 0.58rem; letter-spacing: 0.2em; color: rgba(242,236,225,0.22); }
+  .f-btm p { font-family: 'Space Mono', monospace; font-size: 1rem; letter-spacing: 0.2em; color: rgba(242,236,225,0.22); }
 
   /* ── REVEAL ── */
   .rv { opacity: 0; transform: translateY(34px); transition: opacity 1.1s cubic-bezier(0.22,1,0.36,1), transform 1.1s cubic-bezier(0.22,1,0.36,1); }
@@ -671,17 +665,6 @@
       animation-range: normal, normal, 0vh 100vh;
     }
     @keyframes sink { to { translate: 0 10%; scale: 1.08; } }
-
-    .manifesto-text .gold-line {
-      background: linear-gradient(90deg, var(--gold) 50%, rgba(242,236,225,0.16) 50%);
-      background-size: 200% 100%; background-position: 100% 0;
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: ink linear both;
-      animation-timeline: view();
-      animation-range: entry 15% cover 52%;
-    }
-    @keyframes ink { to { background-position: 0% 0; } }
 
     .chap-line {
       transform: scaleX(0); transform-origin: left;
@@ -710,7 +693,7 @@
     section { padding: 5rem 0; }
     .hero { padding: 0 1.4rem 5.5rem; }
     .hero-watermark { top: 4.5rem; right: -1rem; }
-    .hero-tategaki { right: 1.1rem; font-size: 0.85rem; letter-spacing: 0.4em; }
+    .hero-tategaki { right: 1.1rem; font-size: 1rem; letter-spacing: 0.4em; }
     .hero-sub { gap: 1.4rem; }
     .manifesto { padding: 6.5rem 0; }
     .chap { flex-wrap: wrap; gap: 1rem; margin-bottom: 3rem; }
