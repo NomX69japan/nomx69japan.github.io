@@ -1449,6 +1449,29 @@
   }
   .bav-addbtn { margin-top: 4px; align-self: flex-start; }
 
+  /* 在庫管理タブ切替 */
+  .inv-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .inv-tab-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 13px;
+    border: 1px solid #e0d6bd;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-sub);
+    cursor: pointer;
+  }
+  .inv-tab-btn.active {
+    background: #8b6914;
+    color: #fff;
+    border-color: #8b6914;
+    font-weight: 600;
+  }
+
   /* ====== ボトル管理タブ ====== */
   .bottle-view-bar {
     display: flex;
@@ -2213,6 +2236,7 @@
       <button class="nav-btn" data-page="reservations">📖 予約</button>
       <button class="nav-btn" data-page="customers">👤 顧客</button>
       <button class="nav-btn" data-page="bottles">🍾 ボトル</button>
+      <button class="nav-btn" data-page="inventory">📦 在庫</button>
       <button class="nav-btn" data-page="today">📅 履歴</button>
       <button class="nav-btn" data-page="settings">⚙️ 設定</button>
     </nav>
@@ -2349,9 +2373,58 @@
       <div id="bottleList" class="bottle-keep-list"></div>
     </section>
 
+    <!-- ===== INVENTORY PAGE ===== -->
+    <section class="page" id="page-inventory">
+      <h2 class="page-title">📦 在庫管理</h2>
+
+      <div class="inv-tabs">
+        <button type="button" class="inv-tab-btn active" data-inv-tab="items" onclick="switchInvTab('items')">📦 品目一覧</button>
+        <button type="button" class="inv-tab-btn" data-inv-tab="stocktake" onclick="switchInvTab('stocktake')">📋 棚卸し</button>
+      </div>
+
+      <!-- 品目一覧タブ -->
+      <div id="invTabItems">
+        <datalist id="invCategoryList"></datalist>
+        <div class="cust-toolbar">
+          <input type="text" class="search" id="invSearch" placeholder="🔍 品目名・カテゴリで検索…" oninput="renderInventoryList()">
+        </div>
+        <div id="invStats" class="bottle-stats"></div>
+        <div id="invList" class="bottle-keep-list"></div>
+
+        <div class="bottle-add-v2" style="margin-top:14px;">
+          <div style="font-weight:600; font-size:13px; margin-bottom:4px; color:#8b6914;">＋ 品目を追加</div>
+          <label class="bav-row">
+            <span class="bav-lab">📦 品目名</span>
+            <input type="text" id="newInvName" placeholder="例: 太シャン">
+          </label>
+          <label class="bav-row">
+            <span class="bav-lab">🏷 カテゴリ</span>
+            <input type="text" id="newInvCategory" list="invCategoryList" placeholder="例: シャングラ / グラス・ピッチャー / ワイングラス">
+          </label>
+          <label class="bav-row">
+            <span class="bav-lab">🔢 数量</span>
+            <input type="number" id="newInvQty" value="0" min="0" style="max-width:120px;">
+          </label>
+          <button class="btn btn-sm bav-addbtn" onclick="addInventoryItem()">＋ 品目を追加</button>
+        </div>
+      </div>
+
+      <!-- 棚卸しタブ -->
+      <div id="invTabStocktake" style="display:none;">
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button class="btn btn-sm" onclick="openStocktakeEditor()" style="flex:1;">📋 棚卸しを記録</button>
+        </div>
+        <div id="stocktakeList"></div>
+      </div>
+    </section>
+
     <!-- ===== HISTORY (CALENDAR) PAGE ===== -->
     <section class="page" id="page-today">
       <h2 class="page-title">📅 履歴</h2>
+      <div class="cust-toolbar" style="margin-bottom:8px;">
+        <input type="text" class="search" id="histSearch" placeholder="🔍 名前・キャスト・卓・人数・日付・メモで検索…" oninput="onHistSearchInput()">
+      </div>
+      <div id="histSearchResults" style="display:none;"></div>
       <div id="calendarContainer"></div>
     </section>
 
@@ -2621,6 +2694,8 @@ function buildPersistData() {
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
     closedSessions: state.closedSessions || {},
+    inventoryItems: state.inventoryItems || [],
+    stocktakes: state.stocktakes || [],
     _updatedAt: Date.now()
   };
 }
@@ -2834,6 +2909,8 @@ function persistLoad() {
     if (Array.isArray(data.menuItems)) state.menuItems = data.menuItems;
     if (Array.isArray(data.menuCategories)) state.menuCategories = data.menuCategories;
     if (data.closedSessions && typeof data.closedSessions === 'object') state.closedSessions = data.closedSessions;
+    if (Array.isArray(data.inventoryItems)) state.inventoryItems = data.inventoryItems;
+    if (Array.isArray(data.stocktakes)) state.stocktakes = data.stocktakes;
   } catch(e) {
     console.error('persistLoad failed', e);
   }
@@ -2854,9 +2931,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.19';
+const APP_VERSION = '2026.06.20';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.20',
+    date: '2026-06-20',
+    title: '🔍 履歴検索機能／📦 在庫管理ページを追加',
+    items: [
+      '【履歴検索】履歴タブに検索欄を追加しました。名前・フリガナ・ニックネーム・キャスト名・卓名・人数・日付・メモで横断検索できます。数字だけ入れると人数の完全一致、日付の一部（例:「07」で7月）でも絞り込めます。',
+      '検索結果はタップすると来店詳細が開きます。検索欄を空にするといつものカレンダー表示に戻ります。',
+      '【在庫管理】新しく「📦 在庫」タブを追加しました。グラス・ピッチャー等の品目を追加・編集・削除でき、カテゴリごとにグループ表示されます。',
+      '数量は＋−ボタンでその場で増減できます。',
+      '【棚卸し】「📋 棚卸し」タブから、その時点の全品目の数量をまとめて記録できます。記録は日付ごとに一覧表示され、タップすると詳細と前回との差分（増減）が見られます。月次の棚卸しなどにお使いください。',
+    ],
+  },
   {
     version: '2026.06.19',
     date: '2026-06-19',
@@ -3514,6 +3603,8 @@ const state = {
   menuItems: [], // オーダー商品マスタ {id, name, category, sortOrder, removed}
   menuCategories: [], // カテゴリマスタ {id, name, sortOrder, removed}
   closedSessions: {}, // 退店済みセッション台帳 { "tableId_startedAt": 退店時刻 }。同期の巻き戻り防止
+  inventoryItems: [], // 在庫品目 {id, name, category, qty, sortOrder, _created, _updated, removed}
+  stocktakes: [],      // 棚卸し記録 {id, date, note, items:[{itemId,name,category,qty}], _created, _updated, removed}
   weekOffset: 0,
 };
 
@@ -4040,6 +4131,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (target === 'reservations') renderReservations();
     if (target === 'customers') renderCustomerList();
     if (target === 'bottles') renderBottleList();
+    if (target === 'inventory') renderInventoryPage();
     if (target === 'today') renderTodaySummary();
     if (target === 'settings') renderSettings();
   });
@@ -5680,6 +5772,407 @@ function getDateSummary(dateStr) {
 }
 
 // メインのカレンダー描画
+// ===== 在庫管理 =====
+let invActiveTab = 'items';
+function switchInvTab(tab) {
+  invActiveTab = tab;
+  document.querySelectorAll('.inv-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.invTab === tab));
+  document.getElementById('invTabItems').style.display = tab === 'items' ? '' : 'none';
+  document.getElementById('invTabStocktake').style.display = tab === 'stocktake' ? '' : 'none';
+  if (tab === 'items') renderInventoryList();
+  if (tab === 'stocktake') renderStocktakeList();
+}
+function renderInventoryPage() {
+  switchInvTab(invActiveTab);
+}
+
+function getActiveInventoryItems() {
+  return (state.inventoryItems || []).filter(i => !i.removed).slice().sort((a, b) => {
+    const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
+    const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
+    if (sa !== sb) return sa - sb;
+    return (a._created || 0) - (b._created || 0);
+  });
+}
+
+function renderInventoryList() {
+  const listEl = document.getElementById('invList');
+  const statsEl = document.getElementById('invStats');
+  if (!listEl) return;
+  const q = (document.getElementById('invSearch')?.value || '').toLowerCase().trim();
+  let items = getActiveInventoryItems();
+
+  // カテゴリ候補（datalist用）
+  const allCats = new Set();
+  items.forEach(i => { if (i.category) allCats.add(i.category); });
+  const catListEl = document.getElementById('invCategoryList');
+  if (catListEl) catListEl.innerHTML = Array.from(allCats).map(c => `<option value="${escapeHtml(c)}">`).join('');
+
+  if (statsEl) {
+    const totalQty = items.reduce((s, i) => s + (i.qty || 0), 0);
+    statsEl.innerHTML = `
+      <span class="bottle-stat-chip">品目数 <b>${items.length}</b></span>
+      <span class="bottle-stat-chip">総数量 <b>${totalQty}</b></span>
+    `;
+  }
+
+  if (q) {
+    items = items.filter(i =>
+      (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (items.length === 0) {
+    listEl.innerHTML = `<div class="bk-empty">${q ? '該当する品目がありません' : '在庫品目がまだありません。下のフォームから追加してください。'}</div>`;
+    return;
+  }
+
+  // カテゴリごとにグループ化
+  const groups = {};
+  items.forEach(i => {
+    const key = i.category || '（カテゴリ未設定）';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i);
+  });
+
+  listEl.innerHTML = Object.keys(groups).map(cat => {
+    const groupItems = groups[cat];
+    const rows = groupItems.map(i => `
+      <div class="bk-item" style="cursor:default;">
+        <div class="bk-item-top">
+          <span class="bk-item-name">${escapeHtml(i.name)}</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button class="btn-sub btn-sm" onclick="adjustInvQty('${i.id}', -1)" style="padding:2px 10px; min-width:32px; font-size:14px;">−</button>
+            <span style="min-width:32px; text-align:center; font-weight:600;">${i.qty || 0}</span>
+            <button class="btn-sub btn-sm" onclick="adjustInvQty('${i.id}', 1)" style="padding:2px 10px; min-width:32px; font-size:14px;">＋</button>
+          </div>
+        </div>
+        <div class="bk-item-meta">
+          <button class="btn-sub btn-sm" onclick="editInvItem('${i.id}')" style="padding:2px 8px; font-size:11px;">✏ 編集</button>
+          <button class="btn-danger btn-sm" onclick="removeInvItem('${i.id}')" style="padding:2px 8px; font-size:11px;">🗑 削除</button>
+        </div>
+      </div>
+    `).join('');
+    return `<div class="bk-group">
+      <div class="bk-group-head">🏷 ${escapeHtml(cat)}<span class="bk-group-count">${groupItems.length}品目</span></div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function addInventoryItem() {
+  const name = document.getElementById('newInvName').value.trim();
+  if (!name) { alert('品目名を入力してください'); return; }
+  const category = document.getElementById('newInvCategory').value.trim();
+  const qty = parseInt(document.getElementById('newInvQty').value, 10) || 0;
+  const now = Date.now();
+  if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
+  state.inventoryItems.push({
+    id: genId('inv'), name, category, qty,
+    sortOrder: state.inventoryItems.length,
+    _created: now, _updated: now, removed: false,
+  });
+  document.getElementById('newInvName').value = '';
+  document.getElementById('newInvQty').value = '0';
+  persistSave();
+  renderInventoryList();
+  showToast(`「${name}」を追加しました`, 'normal');
+}
+
+function adjustInvQty(id, delta) {
+  const item = (state.inventoryItems || []).find(i => i.id === id);
+  if (!item) return;
+  item.qty = Math.max(0, (item.qty || 0) + delta);
+  item._updated = Date.now();
+  persistSave();
+  renderInventoryList();
+}
+
+function editInvItem(id) {
+  const item = (state.inventoryItems || []).find(i => i.id === id);
+  if (!item) return;
+  const newName = prompt('品目名', item.name);
+  if (newName === null) return;
+  const newCategory = prompt('カテゴリ', item.category || '');
+  if (newCategory === null) return;
+  const newQtyStr = prompt('数量', String(item.qty || 0));
+  if (newQtyStr === null) return;
+  item.name = newName.trim() || item.name;
+  item.category = newCategory.trim();
+  const newQty = parseInt(newQtyStr, 10);
+  item.qty = isNaN(newQty) ? item.qty : Math.max(0, newQty);
+  item._updated = Date.now();
+  persistSave();
+  renderInventoryList();
+}
+
+function removeInvItem(id) {
+  const item = (state.inventoryItems || []).find(i => i.id === id);
+  if (!item) return;
+  if (!confirm(`「${item.name}」を削除しますか？`)) return;
+  item.removed = true;
+  item._updated = Date.now();
+  persistSave();
+  renderInventoryList();
+}
+
+// ----- 棚卸し -----
+function renderStocktakeList() {
+  const cont = document.getElementById('stocktakeList');
+  if (!cont) return;
+  const list = (state.stocktakes || []).filter(s => !s.removed).slice()
+    .sort((a, b) => (b._created || 0) - (a._created || 0));
+  if (list.length === 0) {
+    cont.innerHTML = '<div class="bk-empty">棚卸し記録はまだありません。上のボタンから記録してください。</div>';
+    return;
+  }
+  cont.innerHTML = list.map(st => {
+    const totalQty = (st.items || []).reduce((s, i) => s + (i.qty || 0), 0);
+    return `<div class="bk-item" onclick="showStocktakeDetail('${st.id}')">
+      <div class="bk-item-top">
+        <span class="bk-item-name">📋 ${escapeHtml(st.date)}</span>
+      </div>
+      <div class="bk-item-meta">
+        <span class="bk-item-meta-chip">品目 ${(st.items||[]).length}件</span>
+        <span class="bk-item-meta-chip">合計 ${totalQty}個</span>
+        ${st.note ? `<span class="bk-item-meta-chip">📝 ${escapeHtml(st.note)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 棚卸し記録：現在の全品目の数量をスナップショットとして保存
+function openStocktakeEditor() {
+  const items = getActiveInventoryItems();
+  if (items.length === 0) {
+    alert('在庫品目がまだありません。先に「品目一覧」タブで品目を追加してください。');
+    return;
+  }
+  const todayStr = businessDateStr();
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 2100;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px; max-height:85vh; display:flex; flex-direction:column;">
+      <h3 style="margin-top:0;">📋 棚卸しを記録</h3>
+      <label class="field">
+        <span class="lab">実施日</span>
+        <input type="date" id="stkDate" value="${todayStr}">
+      </label>
+      <label class="field">
+        <span class="lab">メモ（任意）</span>
+        <input type="text" id="stkNote" placeholder="例: 月次棚卸し">
+      </label>
+      <p style="font-size:11px; color:#888; margin:4px 0 8px;">現在の品目一覧の数量をそのまま記録します。数量を直してから記録したい場合は、先に品目一覧で±調整してください。</p>
+      <div style="overflow-y:auto; flex:1; border:1px solid #eee; border-radius:8px; padding:8px; margin-bottom:12px;">
+        ${items.map(i => `<div style="display:flex; justify-content:space-between; padding:4px 2px; font-size:13px; border-bottom:1px solid #f5f5f5;">
+          <span>${escapeHtml(i.category ? i.category+' / ' : '')}${escapeHtml(i.name)}</span>
+          <b>${i.qty || 0}</b>
+        </div>`).join('')}
+      </div>
+      <div class="row-buttons">
+        <button class="btn-sub" data-cancel style="flex:1;">キャンセル</button>
+        <button class="btn" data-save style="flex:1;">記録する</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  bg.querySelector('[data-cancel]').addEventListener('click', close);
+  bg.querySelector('[data-save]').addEventListener('click', () => {
+    const date = document.getElementById('stkDate').value || todayStr;
+    const note = document.getElementById('stkNote').value.trim();
+    const now = Date.now();
+    const snapshot = items.map(i => ({ itemId: i.id, name: i.name, category: i.category || '', qty: i.qty || 0 }));
+    if (!Array.isArray(state.stocktakes)) state.stocktakes = [];
+    state.stocktakes.push({
+      id: genId('stk'), date, note, items: snapshot,
+      _created: now, _updated: now, removed: false,
+    });
+    persistSave();
+    renderStocktakeList();
+    close();
+    showToast('棚卸しを記録しました', 'normal');
+  });
+}
+
+function showStocktakeDetail(id) {
+  const st = (state.stocktakes || []).find(x => x.id === id && !x.removed);
+  if (!st) return;
+  // 直前の棚卸しとの比較（あれば）
+  const allSorted = (state.stocktakes || []).filter(s => !s.removed).slice().sort((a,b)=>(a._created||0)-(b._created||0));
+  const idx = allSorted.findIndex(s => s.id === id);
+  const prev = idx > 0 ? allSorted[idx - 1] : null;
+  const prevMap = {};
+  if (prev) prev.items.forEach(i => { prevMap[i.itemId] = i.qty; });
+
+  const rows = (st.items || []).map(i => {
+    const diff = prev ? (i.qty - (prevMap[i.itemId] ?? i.qty)) : null;
+    const diffHtml = (diff === null) ? ''
+      : diff === 0 ? '<span style="color:#aaa; font-size:11px;">±0</span>'
+      : diff > 0 ? `<span style="color:#2e7d32; font-size:11px;">+${diff}</span>`
+      : `<span style="color:#c62828; font-size:11px;">${diff}</span>`;
+    return `<tr>
+      <td style="padding:4px 6px; font-size:13px;">${escapeHtml(i.category ? i.category+' / ' : '')}${escapeHtml(i.name)}</td>
+      <td style="padding:4px 6px; text-align:right; font-weight:600;">${i.qty}</td>
+      <td style="padding:4px 6px; text-align:right; width:50px;">${diffHtml}</td>
+    </tr>`;
+  }).join('');
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg active';
+  bg.style.zIndex = 1700;
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px; max-height:85vh; display:flex; flex-direction:column;">
+      <h3 style="margin-top:0;">📋 ${escapeHtml(st.date)} 棚卸し詳細</h3>
+      ${st.note ? `<p style="font-size:12px; color:#888; margin:0 0 8px;">📝 ${escapeHtml(st.note)}</p>` : ''}
+      ${prev ? `<p style="font-size:11px; color:#999; margin:0 0 8px;">前回（${escapeHtml(prev.date)}）との差分を表示しています</p>` : ''}
+      <div style="overflow-y:auto; flex:1;">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead><tr style="border-bottom:2px solid #eee;"><th style="text-align:left; padding:4px 6px; font-size:11px; color:#888;">品目</th><th style="text-align:right; padding:4px 6px; font-size:11px; color:#888;">数量</th><th style="text-align:right; padding:4px 6px; font-size:11px; color:#888;">前回比</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="row-buttons" style="margin-top:12px;">
+        <button class="btn-sub" data-close style="flex:1;">閉じる</button>
+        <button class="btn-danger" data-delete style="flex:1;">🗑 この記録を削除</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  bg.querySelector('[data-close]').addEventListener('click', close);
+  bg.querySelector('[data-delete]').addEventListener('click', () => {
+    if (!confirm(`${st.date} の棚卸し記録を削除しますか？`)) return;
+    st.removed = true;
+    st._updated = Date.now();
+    persistSave();
+    renderStocktakeList();
+    close();
+  });
+}
+
+// ===== 履歴検索 =====
+// 名前・フリガナ・キャスト名・卓名・人数・日付・メモを横断検索
+function onHistSearchInput() {
+  const q = (document.getElementById('histSearch')?.value || '').trim();
+  const calCont = document.getElementById('calendarContainer');
+  const resultsCont = document.getElementById('histSearchResults');
+  if (!q) {
+    // 検索欄が空ならカレンダー表示に戻す
+    resultsCont.style.display = 'none';
+    resultsCont.innerHTML = '';
+    calCont.style.display = '';
+    return;
+  }
+  calCont.style.display = 'none';
+  resultsCont.style.display = '';
+  renderHistSearchResults(q);
+}
+
+function renderHistSearchResults(q) {
+  const resultsCont = document.getElementById('histSearchResults');
+  if (!resultsCont) return;
+  const qLower = q.toLowerCase();
+  // 数字のみの検索語は人数の完全一致としても扱う
+  const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : null;
+
+  const logs = (state.visitLog || []).filter(log => {
+    if (log.removed) return false;
+    // 日付（YYYY-MM-DD）は部分一致でOK（"07" で7月、"2026-07-13" で当日など）
+    if (log.date && log.date.includes(q)) return true;
+    // 人数（完全一致）
+    if (qNum !== null && (log.guests || 0) === qNum) return true;
+    // 顧客名（複数顧客対応・フリガナも）
+    const custNames = [];
+    if (Array.isArray(log.guestList) && log.guestList.length > 0) {
+      log.guestList.forEach(g => {
+        if (g.customerId) {
+          const c = state.customers.find(x => x.id === g.customerId);
+          if (c) { custNames.push(c.name||''); custNames.push(c.kana||''); custNames.push(c.nickname||''); }
+        } else if (g.customerName) custNames.push(g.customerName);
+      });
+    } else {
+      if (log.customerId) {
+        const c = state.customers.find(x => x.id === log.customerId);
+        if (c) { custNames.push(c.name||''); custNames.push(c.kana||''); custNames.push(c.nickname||''); }
+      }
+      if (log.customerName) custNames.push(log.customerName);
+    }
+    if (custNames.some(n => n.toLowerCase().includes(qLower))) return true;
+    // キャスト名（担当・同伴すべて）
+    const castNames = (log.castIds || []).map(cid => {
+      const c = state.casts.find(x => x.id === cid);
+      return c ? c.name : '';
+    });
+    if (Array.isArray(log.guestList)) {
+      log.guestList.forEach(g => {
+        (g.castIds || []).forEach(cid => {
+          const c = state.casts.find(x => x.id === cid);
+          if (c) castNames.push(c.name);
+        });
+      });
+    }
+    if (log.castFree) castNames.push(log.castFree);
+    if (castNames.some(n => n && n.toLowerCase().includes(qLower))) return true;
+    // 卓名
+    if (log.tableName && log.tableName.toLowerCase().includes(qLower)) return true;
+    // メモ
+    if (log.memo && log.memo.toLowerCase().includes(qLower)) return true;
+    return false;
+  });
+
+  // 新しい順（開始日時の降順）
+  logs.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+
+  if (logs.length === 0) {
+    resultsCont.innerHTML = `<div class="bk-empty">「${escapeHtml(q)}」に一致する来店記録はありません</div>`;
+    return;
+  }
+
+  const MAX_SHOW = 100;
+  const shown = logs.slice(0, MAX_SHOW);
+  const itemHtml = (log) => {
+    const custLabel = (() => {
+      if (Array.isArray(log.guestList) && log.guestList.length > 1) {
+        return log.guestList.map(g => {
+          if (g.customerId) {
+            const c = state.customers.find(x => x.id === g.customerId);
+            return c ? withSan(displayName(c)) : '';
+          }
+          return withSan(g.customerName || '');
+        }).filter(Boolean).join('・');
+      }
+      if (log.customerId) {
+        const c = state.customers.find(x => x.id === log.customerId);
+        if (c) return withSan(displayName(c));
+      }
+      return withSan(log.customerName || '') || '（記録なし）';
+    })();
+    const castLabel = buildCastDisplay(log, true) || '—';
+    return `<div class="bk-item" onclick="showVisitDetail('${log.id}')">
+      <div class="bk-item-top">
+        <span class="bk-item-name">${escapeHtml(log.date || '')}　${escapeHtml(custLabel)}</span>
+      </div>
+      <div class="bk-item-meta">
+        <span class="bk-item-meta-chip">📍 ${escapeHtml(log.tableName || log.tableId || '')}</span>
+        <span class="bk-item-meta-chip">👥 ${log.guests || 0}名</span>
+        <span class="bk-item-meta-chip">💃 ${escapeHtml(castLabel)}</span>
+      </div>
+    </div>`;
+  };
+
+  resultsCont.innerHTML = `
+    <div class="bk-group">
+      <div class="bk-group-head">🔍 検索結果<span class="bk-group-count">${logs.length}件</span></div>
+      ${shown.map(itemHtml).join('')}
+    </div>
+    ${logs.length > MAX_SHOW ? `<div class="bk-empty">他 ${logs.length - MAX_SHOW} 件あります。絞り込んでください。</div>` : ''}
+  `;
+}
+
 function renderTodaySummary() {
   const cont = document.getElementById('calendarContainer');
   if (!cont) return;
@@ -11144,6 +11637,8 @@ function exportBackup() {
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
     closedSessions: state.closedSessions || {},
+    inventoryItems: state.inventoryItems || [],
+    stocktakes: state.stocktakes || [],
     _exportedAt: Date.now()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -11175,6 +11670,8 @@ function importBackup(e) {
       if (Array.isArray(data.menuItems)) state.menuItems = data.menuItems;
       if (Array.isArray(data.menuCategories)) state.menuCategories = data.menuCategories;
     if (data.closedSessions && typeof data.closedSessions === 'object') state.closedSessions = data.closedSessions;
+    if (Array.isArray(data.inventoryItems)) state.inventoryItems = data.inventoryItems;
+    if (Array.isArray(data.stocktakes)) state.stocktakes = data.stocktakes;
       persistSave();
       alert('復元しました');
       location.reload();
@@ -11550,6 +12047,26 @@ function applyServerData(payload) {
       }
     });
   }
+  // 在庫品目：_updated 比較（削除復活も考慮）
+  if (Array.isArray(payload.inventoryItems)) {
+    if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
+    payload.inventoryItems.forEach(ri => {
+      const idx = state.inventoryItems.findIndex(x => x.id === ri.id);
+      if (idx >= 0) {
+        if ((ri._updated || 0) >= (state.inventoryItems[idx]._updated || 0)) state.inventoryItems[idx] = ri;
+      } else state.inventoryItems.push(ri);
+    });
+  }
+  // 棚卸し記録：IDベース（基本追記のみ、削除はremovedフラグで判定）
+  if (Array.isArray(payload.stocktakes)) {
+    if (!Array.isArray(state.stocktakes)) state.stocktakes = [];
+    payload.stocktakes.forEach(rs => {
+      const idx = state.stocktakes.findIndex(x => x.id === rs.id);
+      if (idx >= 0) {
+        if ((rs._updated || 0) >= (state.stocktakes[idx]._updated || 0)) state.stocktakes[idx] = rs;
+      } else state.stocktakes.push(rs);
+    });
+  }
   // サーバーから受信したデータに対しても、重複統合を即座に適用（skipSeed=true で新規シードはしない）
   let cleanupChanged = false;
   if (typeof cleanupAndSeedOrderMaster === 'function') {
@@ -11689,6 +12206,8 @@ function buildSaveData() {
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
     closedSessions: state.closedSessions || {},
+    inventoryItems: state.inventoryItems || [],
+    stocktakes: state.stocktakes || [],
     _updatedAt: Date.now(),
     _lastWriter: getDeviceLabel(),       // 最後に書き込んだ端末の表示名
     _lastWriterVersion: APP_VERSION,     // その端末のバージョン
@@ -11845,6 +12364,25 @@ function mergeServerPayload(payload) {
         if (local.removed && !rc.removed) rc = { ...rc, removed: true, _updated: Math.max(local._updated||0, rc._updated||0) };
         if ((rc._updated || 0) >= (local._updated || 0)) state.menuCategories[idx] = rc;
       } else state.menuCategories.push(rc);
+    });
+  }
+  // 在庫品目・棚卸し記録
+  if (Array.isArray(payload.inventoryItems)) {
+    if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
+    payload.inventoryItems.forEach(ri => {
+      const idx = state.inventoryItems.findIndex(x => x.id === ri.id);
+      if (idx >= 0) {
+        if ((ri._updated || 0) >= (state.inventoryItems[idx]._updated || 0)) state.inventoryItems[idx] = ri;
+      } else state.inventoryItems.push(ri);
+    });
+  }
+  if (Array.isArray(payload.stocktakes)) {
+    if (!Array.isArray(state.stocktakes)) state.stocktakes = [];
+    payload.stocktakes.forEach(rs => {
+      const idx = state.stocktakes.findIndex(x => x.id === rs.id);
+      if (idx >= 0) {
+        if ((rs._updated || 0) >= (state.stocktakes[idx]._updated || 0)) state.stocktakes[idx] = rs;
+      } else state.stocktakes.push(rs);
     });
   }
 }
@@ -12215,6 +12753,8 @@ try {
     menuItems: state.menuItems,
     menuCategories: state.menuCategories,
     closedSessions: state.closedSessions || {},
+    inventoryItems: state.inventoryItems || [],
+    stocktakes: state.stocktakes || [],
     _updatedAt: Date.now()
   }));
 } catch(e) {}
