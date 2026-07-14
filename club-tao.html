@@ -2778,6 +2778,16 @@ function purgeRemovedData() {
     state.events = state.events.filter(e => !e.removed);
     count += before - state.events.length;
   }
+  if (Array.isArray(state.inventoryItems)) {
+    const before = state.inventoryItems.length;
+    state.inventoryItems = state.inventoryItems.filter(i => !i.removed);
+    count += before - state.inventoryItems.length;
+  }
+  if (Array.isArray(state.stocktakes)) {
+    const before = state.stocktakes.length;
+    state.stocktakes = state.stocktakes.filter(s => !s.removed);
+    count += before - state.stocktakes.length;
+  }
   // 顧客・キャスト・商品マスタは removed でも参照される可能性があるので残す
   return count;
 }
@@ -2931,9 +2941,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.20';
+const APP_VERSION = '2026.06.21';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.06.21',
+    date: '2026-06-21',
+    title: '🔍 履歴検索の対応パターンを大幅強化＋定期メンテナンス',
+    items: [
+      '【検索強化】「1名」「3名」のように数字＋単位でも人数検索できるようになりました（全角数字「３名」もOK）。',
+      '「7月」「07月」で月指定検索ができるようになりました（その月の来店すべてがヒット）。',
+      '「領収書」で検索すると、領収書が必要なお客様の来店記録がヒットします。',
+      '「喫煙」「タバコ」で検索すると、喫煙のお客様の来店記録がヒットします。',
+      '検索結果に🧾領収書・🚬喫煙のバッジを表示するようにしました。',
+      '【定期メンテナンス】同期処理・データ保存・容量整理・重複コード・危険なコード実行の有無を全体点検しました。在庫データも削除済み分を容量整理の対象に追加。目立った問題は見つかりませんでした。',
+    ],
+  },
   {
     version: '2026.06.20',
     date: '2026-06-20',
@@ -6072,36 +6095,68 @@ function onHistSearchInput() {
   renderHistSearchResults(q);
 }
 
+// 検索語を解析し、様々な検索パターンに対応する構造化クエリを作る
+// 対応パターン：全角/半角数字、「3名」「３名」（人数）、「7月」（月指定）、
+// 「領収書」「喫煙/タバコ」（お客様属性キーワード）、それ以外は通常の部分一致
+function parseHistQuery(raw) {
+  // 全角数字→半角に正規化
+  const q = raw.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim();
+  const result = { raw: q, lower: q.toLowerCase(), guestCount: null, month: null, keyword: null };
+  // 「3名」「3人」「3」→ 人数の完全一致
+  let m = q.match(/^(\d+)\s*(?:名|人)?$/);
+  if (m) result.guestCount = parseInt(m[1], 10);
+  // 「7月」「07月」→ 月の完全一致（1〜12）
+  m = q.match(/^(\d{1,2})\s*月$/);
+  if (m) {
+    const mm = parseInt(m[1], 10);
+    if (mm >= 1 && mm <= 12) result.month = mm;
+  }
+  // お客様属性キーワード
+  if (/領収書/.test(q)) result.keyword = 'receipt';
+  else if (/喫煙|たばこ|タバコ/.test(q)) result.keyword = 'smoker';
+  return result;
+}
+
 function renderHistSearchResults(q) {
   const resultsCont = document.getElementById('histSearchResults');
   if (!resultsCont) return;
-  const qLower = q.toLowerCase();
-  // 数字のみの検索語は人数の完全一致としても扱う
-  const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : null;
+  const query = parseHistQuery(q);
+  const qLower = query.lower;
 
   const logs = (state.visitLog || []).filter(log => {
     if (log.removed) return false;
-    // 日付（YYYY-MM-DD）は部分一致でOK（"07" で7月、"2026-07-13" で当日など）
-    if (log.date && log.date.includes(q)) return true;
-    // 人数（完全一致）
-    if (qNum !== null && (log.guests || 0) === qNum) return true;
-    // 顧客名（複数顧客対応・フリガナも）
-    const custNames = [];
+    // 月指定（「7月」）：日付の月部分と一致
+    if (query.month !== null) {
+      const mm = parseInt((log.date || '').split('-')[1], 10);
+      if (mm === query.month) return true;
+    }
+    // 日付（YYYY-MM-DD）は部分一致でOK（"2026-07-13" で当日など）
+    if (log.date && log.date.includes(query.raw)) return true;
+    // 人数（「3名」「3」などの完全一致）
+    if (query.guestCount !== null && (log.guests || 0) === query.guestCount) return true;
+    // このログに関わる顧客（複数対応）
+    const relatedCusts = [];
     if (Array.isArray(log.guestList) && log.guestList.length > 0) {
       log.guestList.forEach(g => {
         if (g.customerId) {
           const c = state.customers.find(x => x.id === g.customerId);
-          if (c) { custNames.push(c.name||''); custNames.push(c.kana||''); custNames.push(c.nickname||''); }
-        } else if (g.customerName) custNames.push(g.customerName);
+          if (c) relatedCusts.push(c);
+        }
       });
-    } else {
-      if (log.customerId) {
-        const c = state.customers.find(x => x.id === log.customerId);
-        if (c) { custNames.push(c.name||''); custNames.push(c.kana||''); custNames.push(c.nickname||''); }
-      }
-      if (log.customerName) custNames.push(log.customerName);
+    } else if (log.customerId) {
+      const c = state.customers.find(x => x.id === log.customerId);
+      if (c) relatedCusts.push(c);
     }
-    if (custNames.some(n => n.toLowerCase().includes(qLower))) return true;
+    // お客様属性キーワード（領収書／喫煙）
+    if (query.keyword === 'receipt' && relatedCusts.some(c => c.receiptNeeded)) return true;
+    if (query.keyword === 'smoker' && relatedCusts.some(c => c.smoker)) return true;
+    // 顧客名・フリガナ・ニックネーム（複数顧客対応）
+    const custNames = [];
+    relatedCusts.forEach(c => { custNames.push(c.name||'', c.kana||'', c.nickname||'', c.receiptNote||'', c.smokerBrand||''); });
+    if (Array.isArray(log.guestList) && log.guestList.length > 0) {
+      log.guestList.forEach(g => { if (!g.customerId && g.customerName) custNames.push(g.customerName); });
+    } else if (log.customerName) custNames.push(log.customerName);
+    if (custNames.some(n => n && n.toLowerCase().includes(qLower))) return true;
     // キャスト名（担当・同伴すべて）
     const castNames = (log.castIds || []).map(cid => {
       const c = state.casts.find(x => x.id === cid);
@@ -6152,6 +6207,20 @@ function renderHistSearchResults(q) {
       return withSan(log.customerName || '') || '（記録なし）';
     })();
     const castLabel = buildCastDisplay(log, true) || '—';
+    // この来店に関わる顧客の属性バッジ（領収書・喫煙）
+    const attrBadges = (() => {
+      const relatedCusts = [];
+      if (Array.isArray(log.guestList) && log.guestList.length > 0) {
+        log.guestList.forEach(g => { if (g.customerId) { const c = state.customers.find(x=>x.id===g.customerId); if (c) relatedCusts.push(c); } });
+      } else if (log.customerId) {
+        const c = state.customers.find(x => x.id === log.customerId);
+        if (c) relatedCusts.push(c);
+      }
+      const parts = [];
+      if (relatedCusts.some(c => c.receiptNeeded)) parts.push('<span class="bk-item-meta-chip">🧾 領収書</span>');
+      if (relatedCusts.some(c => c.smoker)) parts.push('<span class="bk-item-meta-chip">🚬 喫煙</span>');
+      return parts.join('');
+    })();
     return `<div class="bk-item" onclick="showVisitDetail('${log.id}')">
       <div class="bk-item-top">
         <span class="bk-item-name">${escapeHtml(log.date || '')}　${escapeHtml(custLabel)}</span>
@@ -6160,6 +6229,7 @@ function renderHistSearchResults(q) {
         <span class="bk-item-meta-chip">📍 ${escapeHtml(log.tableName || log.tableId || '')}</span>
         <span class="bk-item-meta-chip">👥 ${log.guests || 0}名</span>
         <span class="bk-item-meta-chip">💃 ${escapeHtml(castLabel)}</span>
+        ${attrBadges}
       </div>
     </div>`;
   };
