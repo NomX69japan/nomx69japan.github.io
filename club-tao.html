@@ -355,6 +355,95 @@
     border-top: 1px dashed var(--border); padding-top: 4px; margin-top: 4px;
     max-height: 38px; overflow: hidden;
   }
+  /* ===== 稼働卓タブ ===== */
+  .active-tables-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  .active-empty {
+    text-align: center; color: var(--text-muted);
+    padding: 48px 16px; font-size: 16px;
+  }
+  .active-card {
+    background: var(--surface);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .active-card:hover { box-shadow: 0 0 0 3px rgba(184,134,11,0.25); }
+  .active-card.warn { border-color: var(--warn-border); background: var(--warn-bg); }
+  .active-card.critical {
+    border-color: var(--critical-border); background: var(--critical-bg);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .active-card .ac-head {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  }
+  .active-card .ac-tname {
+    font-size: 20px; font-weight: bold; color: var(--accent);
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .active-card .ac-timer {
+    font-size: 20px; font-weight: bold; color: var(--text);
+    font-variant-numeric: tabular-nums; letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  .active-card .ac-timer.warn { color: #b8860b; }
+  .active-card .ac-timer.critical,
+  .active-card .ac-timer.expired { color: var(--danger); }
+  .active-card .ac-cust {
+    font-size: 18px; font-weight: bold; color: var(--text);
+  }
+  .active-card .ac-cust .ac-guests {
+    font-size: 15px; font-weight: normal; color: var(--text-sub);
+    margin-left: 8px;
+  }
+  .active-card .ac-cast {
+    font-size: 15px; color: var(--text); line-height: 1.5;
+  }
+  .active-card .ac-cast .ac-lbl,
+  .active-card .ac-orders .ac-lbl {
+    color: var(--text-muted); font-size: 13px; margin-right: 4px;
+  }
+  .active-card .ac-orders {
+    border-top: 1px dashed var(--border); padding-top: 8px;
+  }
+  .active-card .ac-orders ul {
+    list-style: none; margin: 4px 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .active-card .ac-orders li {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 8px; font-size: 16px; color: var(--text);
+    border-bottom: 1px dotted var(--border); padding-bottom: 2px;
+  }
+  .active-card .ac-orders li .ac-oq {
+    font-weight: bold; white-space: nowrap; color: var(--accent);
+  }
+  .active-card .ac-orders .ac-ototal {
+    text-align: right; font-size: 14px; color: var(--text-sub);
+    margin-top: 4px;
+  }
+  .active-card .ac-noorder {
+    font-size: 14px; color: var(--text-muted); margin-top: 4px;
+  }
+  .active-card .ac-memo {
+    font-size: 14px; color: var(--text-sub); white-space: pre-wrap;
+    background: var(--surface-alt); border-radius: 6px;
+    padding: 6px 8px; line-height: 1.4;
+  }
+  .active-card .ac-badges {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .active-card .ac-badges .set-badge { font-size: 12px; padding: 2px 7px; }
+
   .table-card .quick-row {
     display: flex; gap: 6px; margin-top: 4px;
     flex-wrap: wrap;
@@ -2115,6 +2204,14 @@
       display: none;
     }
 
+    /* 稼働卓タブ：スマホは1列 */
+    .active-tables-list { grid-template-columns: 1fr; gap: 10px; }
+    .active-card { padding: 12px 14px; }
+    .active-card .ac-tname { font-size: 18px; }
+    .active-card .ac-timer { font-size: 18px; }
+    .active-card .ac-cust { font-size: 16px; }
+    .active-card .ac-orders li { font-size: 15px; }
+
     /* 他のページ用：通常レイアウト */
     .page:not(#page-floor) h2.page-title { font-size: 16px; }
     .page:not(#page-floor) .table-grid {
@@ -2232,6 +2329,7 @@
     </div>
     <nav>
       <button class="nav-btn active" data-page="floor">🪑 フロア</button>
+      <button class="nav-btn" data-page="active">🔥 稼働卓</button>
       <button class="nav-btn" data-page="shift">📅 シフト</button>
       <button class="nav-btn" data-page="reservations">📖 予約</button>
       <button class="nav-btn" data-page="customers">👤 顧客</button>
@@ -2267,6 +2365,15 @@
           <div class="table-grid private" id="tablesPrivate"></div>
         </div>
       </div>
+    </section>
+
+    <section class="page" id="page-active">
+      <h2 class="page-title">🔥 稼働卓</h2>
+      <div class="floor-toolbar">
+        <button class="btn-sub btn-sm" onclick="renderActiveTables()">🔄 更新</button>
+        <span style="color:#888; font-size:12px;" id="activeSummary"></span>
+      </div>
+      <div id="activeTablesList" class="active-tables-list"></div>
     </section>
 
     <!-- ===== SHIFT PAGE ===== -->
@@ -2941,9 +3048,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.06.21';
+const APP_VERSION = '2026.07.16';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.16',
+    date: '2026-07-16',
+    title: '🔥 稼働卓タブを新設',
+    items: [
+      '使用中の卓だけを一覧できる「稼働卓」タブを追加',
+      'オーダー明細・指名キャスト・来店人数・メモをワンタップ不要でひと目で確認',
+      '残り時間の少ない順に自動で並び替え（超過卓が先頭、自動延長卓は末尾）',
+      '残り15分で黄色・10分以下と超過で赤色に色分け、タイマーは1秒ごとに自動更新',
+      '入店・退店・オーダー追加はフロアタブと即時連動',
+    ],
+  },
   {
     version: '2026.06.21',
     date: '2026-06-21',
@@ -4150,6 +4269,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     const target = btn.getAttribute('data-page');
     document.getElementById('page-' + target).classList.add('active');
     if (target === 'floor') renderFloor();
+    if (target === 'active') renderActiveTables();
     if (target === 'shift') renderShift();
     if (target === 'reservations') renderReservations();
     if (target === 'customers') renderCustomerList();
@@ -4242,7 +4362,8 @@ function initApp() {
   if (_mainTickTimer) clearInterval(_mainTickTimer);
   _mainTickTimer = setInterval(() => {
     const onFloor = document.getElementById('page-floor').classList.contains('active');
-    updateTableTimers(onFloor);
+    const onActive = document.getElementById('page-active').classList.contains('active');
+    updateTableTimers(onFloor || onActive);
   }, 1000);
   // 1分ごとに時計
   if (_clockTimer) clearInterval(_clockTimer);
@@ -4289,6 +4410,14 @@ function renderFloor() {
     if (t.type === 'private') priv.appendChild(card);
     else normal.appendChild(card);
   });
+  // 稼働卓タブが表示中なら、そちらも同時に更新する
+  // （renderFloor はデータ変更後のあらゆる箇所から呼ばれるため、ここで連動させておくと
+  //   入店・退店・オーダー追加などの変更が稼働卓タブにも即反映される）
+  try {
+    if (document.getElementById('page-active')?.classList.contains('active')) {
+      renderActiveTables();
+    }
+  } catch(e) {}
 }
 
 function buildTableCard(t, tdata) {
@@ -4410,6 +4539,135 @@ function buildTableCard(t, tdata) {
     </div>
     ${tdata.memo ? `<div class="memo-pre">${escapeHtml(tdata.memo)}</div>` : ''}
     ${timerHtml}
+  `;
+  card.addEventListener('click', () => openTableModal(t.id));
+  return card;
+}
+
+// ===== 稼働卓タブ：使用中の卓だけを詳細展開して一覧 =====
+function renderActiveTables() {
+  updateTodayShiftCount();
+  try { updateTableTimers(false); } catch(e) {}
+  const root = document.getElementById('activeTablesList');
+  if (!root) return;
+
+  const active = DEFAULT_TABLES
+    .map(t => ({ t, tdata: state.tables[t.id] }))
+    .filter(x => x.tdata && x.tdata.occupied);
+
+  const summary = document.getElementById('activeSummary');
+  if (summary) {
+    const totalGuests = active.reduce((s, x) => s + (x.tdata.guests || 0), 0);
+    summary.textContent = active.length
+      ? `稼働 ${active.length}卓 / 来店 ${totalGuests}名`
+      : '';
+  }
+
+  if (active.length === 0) {
+    root.innerHTML = '<div class="active-empty">現在、稼働中の卓はありません</div>';
+    return;
+  }
+
+  // 残り時間が少ない順（超過→残り少→自動延長は最後）に並べる
+  active.sort((a, b) => {
+    const ra = a.tdata.autoExtend ? Infinity : (a.tdata.endsAt || Infinity);
+    const rb = b.tdata.autoExtend ? Infinity : (b.tdata.endsAt || Infinity);
+    return ra - rb;
+  });
+
+  root.innerHTML = '';
+  active.forEach(({ t, tdata }) => {
+    root.appendChild(buildActiveCard(t, tdata));
+  });
+}
+
+function buildActiveCard(t, tdata) {
+  const card = document.createElement('div');
+  let cls = 'active-card';
+
+  // タイマー状態
+  let timerHtml = '';
+  let timerCls = 'ac-timer';
+  let timerTxt = '';
+  if (tdata.autoExtend) {
+    const elapsedMs = Date.now() - (tdata.startedAt || Date.now());
+    const eh = Math.floor(elapsedMs / 3600000);
+    const em = Math.floor((elapsedMs % 3600000) / 60000);
+    timerTxt = `⏱ 経過 ${eh}:${String(em).padStart(2,'0')}`;
+  } else if (tdata.endsAt) {
+    const remainMs = tdata.endsAt - Date.now();
+    const remainMin = Math.ceil(remainMs / 60000);
+    if (remainMs <= 0) {
+      const overMin = Math.ceil(-remainMs / 60000);
+      timerCls += ' expired'; cls += ' critical';
+      timerTxt = `⚠ 超過 ${overMin}分`;
+    } else {
+      const m = Math.floor(remainMs / 60000);
+      const s = Math.floor((remainMs % 60000) / 1000);
+      timerTxt = `⏱ 残り ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      if (remainMin <= ALERT_10_MIN) { timerCls += ' critical'; cls += ' critical'; }
+      else if (remainMin <= ALERT_15_MIN) { timerCls += ' warn'; cls += ' warn'; }
+    }
+  }
+  if (timerTxt) {
+    timerHtml = `<span class="${timerCls}" data-timer="${t.id}">${timerTxt}</span>`;
+  }
+
+  card.className = cls;
+
+  // 顧客名（複数顧客対応）
+  let custName = '';
+  if (Array.isArray(tdata.guestList) && tdata.guestList.length > 0) {
+    const names = tdata.guestList.filter(g => !g.exited).map(g => {
+      const nm = g.customerId
+        ? (displayName(state.customers.find(c => c.id === g.customerId)) || '')
+        : (g.customerName || '');
+      return nm ? withSan(nm) : '';
+    }).filter(Boolean);
+    custName = names.join('、');
+    const exited = tdata.guestList.filter(g => g.exited).length;
+    if (exited > 0) custName += `（${exited}名退店済）`;
+  } else if (tdata.customerId) {
+    custName = withSan(displayName(state.customers.find(c => c.id === tdata.customerId)) || '');
+  } else if (tdata.customerName) {
+    custName = withSan(tdata.customerName);
+  }
+
+  const castDisp = buildCastDisplay(tdata, true);
+
+  const setNum = tdata.setCount || 1;
+  const badges = [];
+  if (setNum > 1) badges.push(`<span class="set-badge">${setNum}セット目</span>`);
+  if (tdata.autoExtend) badges.push(`<span class="set-badge" style="background:#fff8e7; color:#b8860b; border:1px solid #d4af37;">🔁自動延長</span>`);
+
+  // オーダー明細（品名 ×数量 を全部展開）
+  const orders = (tdata.orders || []).filter(o => !o.removed && (o.qty || 0) > 0);
+  let ordersHtml = '';
+  if (orders.length > 0) {
+    const totalQty = orders.reduce((s, o) => s + (o.qty || 1), 0);
+    const lis = orders.map(o =>
+      `<li><span>${escapeHtml(o.itemName || '')}</span><span class="ac-oq">×${o.qty || 1}</span></li>`
+    ).join('');
+    ordersHtml = `
+      <div class="ac-orders">
+        <span class="ac-lbl">📦 オーダー</span>
+        <ul>${lis}</ul>
+        <div class="ac-ototal">計 ${orders.length}品 / ${totalQty}点</div>
+      </div>`;
+  } else {
+    ordersHtml = `<div class="ac-orders"><span class="ac-noorder">📦 オーダーなし</span></div>`;
+  }
+
+  card.innerHTML = `
+    <div class="ac-head">
+      <span class="ac-tname">${escapeHtml(t.name)}</span>
+      ${timerHtml}
+    </div>
+    ${badges.length ? `<div class="ac-badges">${badges.join('')}</div>` : ''}
+    ${custName ? `<div class="ac-cust">${escapeHtml(custName)}${tdata.guests ? `<span class="ac-guests">👥 ${tdata.guests}名</span>` : ''}</div>` : (tdata.guests ? `<div class="ac-cust"><span class="ac-guests">👥 ${tdata.guests}名</span></div>` : '')}
+    ${castDisp ? `<div class="ac-cast"><span class="ac-lbl">🌹 指名</span>${escapeHtml(castDisp)}</div>` : ''}
+    ${ordersHtml}
+    ${tdata.memo ? `<div class="ac-memo">📝 ${escapeHtml(tdata.memo)}</div>` : ''}
   `;
   card.addEventListener('click', () => openTableModal(t.id));
   return card;
@@ -6746,7 +7004,7 @@ function updateTableTimers(renderUI) {
       txt = `⏱ 経過 ${eh}:${String(em).padStart(2,'0')}`;
       el.textContent = txt;
       // 警告クラスを全部外す（通常色固定）
-      const card = el.closest('.table-card');
+      const card = el.closest('.table-card, .active-card');
       if (card) {
         card.classList.remove('warn', 'critical');
         el.classList.remove('warn', 'critical', 'expired');
@@ -6765,7 +7023,7 @@ function updateTableTimers(renderUI) {
     el.textContent = txt;
 
     // ステージが変わったら親カードのクラスを書き換え
-    const card = el.closest('.table-card');
+    const card = el.closest('.table-card, .active-card');
     if (card) {
       const wasWarn = card.classList.contains('warn');
       const wasCritical = card.classList.contains('critical');
