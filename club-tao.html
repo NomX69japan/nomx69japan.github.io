@@ -3048,9 +3048,19 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.16';
+const APP_VERSION = '2026.07.17';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.17',
+    date: '2026-07-17',
+    title: '🔧 サーバー同期のキャッシュ回避修正',
+    items: [
+      '端末やネットワーク経路でのキャッシュにより、サーバーの最新データを取得できず古い状態が表示され続ける可能性がある問題を修正',
+      'サーバーへのデータ取得（/get）すべてにキャッシュ無効化（cache:no-store・毎回異なるURL）を追加',
+      '退店処理などの反映が特定端末だけ遅れる・反映されない症状の原因調査の一環',
+    ],
+  },
   {
     version: '2026.07.16',
     date: '2026-07-16',
@@ -12154,9 +12164,10 @@ function setSyncDot(state, msg) {
 }
 async function loadFromServer() {
   if (!server.url || !server.token) throw new Error('未設定');
-  const res = await fetch(server.url + '/get', {
+  const res = await fetch(server.url + '/get?_t=' + Date.now(), {
     method: 'GET',
-    headers: { 'X-Auth-Token': server.token }
+    cache: 'no-store',
+    headers: { 'X-Auth-Token': server.token, 'Cache-Control': 'no-cache' }
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
@@ -12721,9 +12732,10 @@ async function saveToServer() {
     // ★ read-modify-write：送信前に最新サーバーデータを取り込む
     // これをしないと、古いデータを持つ端末の送信で他端末の変更（退店・顧客変更等）が消える
     try {
-      const getRes = await fetch(server.url + '/get', {
+      const getRes = await fetch(server.url + '/get?_t=' + Date.now(), {
         method: 'GET',
-        headers: { 'X-Auth-Token': server.token }
+        cache: 'no-store',
+        headers: { 'X-Auth-Token': server.token, 'Cache-Control': 'no-cache' }
       });
       if (getRes.ok) {
         const sd = await getRes.json();
@@ -12799,9 +12811,10 @@ async function doPoll() {
     return;
   }
   try {
-    const res = await fetch(server.url + '/get', {
+    const res = await fetch(server.url + '/get?_t=' + Date.now(), {
       method: 'GET',
-      headers: { 'X-Auth-Token': server.token }
+      cache: 'no-store',
+      headers: { 'X-Auth-Token': server.token, 'Cache-Control': 'no-cache' }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
