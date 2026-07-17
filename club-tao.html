@@ -3064,9 +3064,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.18';
+const APP_VERSION = '2026.07.19';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.19',
+    date: '2026-07-19',
+    title: '🚪 退店確認をシンプルに修正',
+    items: [
+      '「3時間超過で他端末の退店済みかも」の紛らわしい確認ダイアログを廃止',
+      'OKで来店記録が消える／キャンセルで記録が残るという直感に反する挙動を修正',
+      '通常の退店は「退店扱いにしますか？→OK」のみのシンプルな確認に統一',
+      'ゾンビ卓の検出・掃除は起動時の自動修復（selfHealZombieTables・12時間ルール）に一本化',
+    ],
+  },
   {
     version: '2026.07.18',
     date: '2026-07-18',
@@ -8817,29 +8828,12 @@ function saveTableInternal(closeAfter) {
 function clearTable() {
   if (!editingTableId) return;
   const tname = getTableName(editingTableId);
-  const td = state.tables[editingTableId];
-  // 超過3時間以上の卓は、別端末で退店済みのゾンビの可能性が高い。
-  // 「記録せず空席に戻す」選択肢を出す（来店ログの二重記録を防ぐ）
-  const overMs = (td && td.occupied && td.endsAt) ? (Date.now() - td.endsAt) : 0;
-  if (overMs > 3 * 60 * 60 * 1000) {
-    const choice = confirm(
-      `${tname} は終了予定を${Math.floor(overMs/3600000)}時間以上超過しています。\n` +
-      `別の端末で退店済みの可能性があります。\n\n` +
-      `OK＝来店記録を残さずに空席へ戻す（推奨）\n` +
-      `キャンセル＝通常の退店処理（来店記録を作成）`
-    );
-    if (choice) {
-      // 記録なしクリア：台帳に登録して空席化（他端末にも伝搬し、復活しない）
-      if (td.startedAt) markSessionClosed(editingTableId, td.startedAt);
-      state.tables[editingTableId] = emptyTableData();
-      persistSave();
-      renderFloor();
-      closeTableModal();
-      showToast(`${tname} を空席に戻しました（記録なし）`, 'info');
-      return;
-    }
-    // キャンセル → 下の通常退店フローへ
-  }
+  // 以前はここで「3時間超過なら別端末の退店済みゾンビかもしれない」という
+  // 確認ダイアログ（OK＝記録なしで空席化／キャンセル＝通常退店）を出していたが、
+  // OK/キャンセルの意味が直感と逆で、通常の退店のつもりでOKを押すと
+  // 来店記録が残らず消えてしまう事故があったため廃止。
+  // ゾンビ卓の検出・掃除は起動時の selfHealZombieTables / 12時間ルールで
+  // 自動的に行われるため、通常の退店操作はシンプルな確認のみでよい。
   if (!confirm(`${tname} を退店扱いにしますか？`)) return;
   checkOut(editingTableId);
   closeTableModal();
