@@ -358,8 +358,8 @@
   /* ===== 稼働卓タブ ===== */
   .active-tables-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
     align-items: start;
   }
   .active-empty {
@@ -370,11 +370,12 @@
     background: var(--surface);
     border: 2px solid var(--accent);
     border-radius: 10px;
-    padding: 14px 16px;
+    padding: 0 14px 12px;
     cursor: pointer;
     box-shadow: var(--shadow);
     transition: border-color 0.15s, box-shadow 0.15s;
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column; gap: 6px;
+    overflow: hidden;
   }
   .active-card:hover { box-shadow: 0 0 0 3px rgba(184,134,11,0.25); }
   .active-card.warn { border-color: var(--warn-border); background: var(--warn-bg); }
@@ -382,67 +383,81 @@
     border-color: var(--critical-border); background: var(--critical-bg);
     animation: pulse 1.5s ease-in-out infinite;
   }
+  /* ヘッダー行（卓名・タイマー・バッジ）：カード上端に帯として固定表示し、
+     どんな状態でも一目で「どの卓か」「残り時間」が分かるようにする */
   .active-card .ac-head {
     display: flex; justify-content: space-between; align-items: center;
-    gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px;
+    flex-wrap: wrap; gap: 6px 10px;
+    margin: 0 -14px 4px; padding: 10px 14px;
+    background: var(--accent); color: var(--accent-text);
+    border-radius: 8px 8px 0 0;
+  }
+  .active-card.warn .ac-head { background: var(--warn-border); }
+  .active-card.critical .ac-head { background: var(--critical-border); }
+  .active-card .ac-head-main {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
   }
   .active-card .ac-tname {
-    font-size: 20px; font-weight: bold; color: var(--accent);
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font-size: 21px; font-weight: bold; color: inherit;
   }
   .active-card .ac-timer {
-    font-size: 20px; font-weight: bold; color: var(--text);
+    font-size: 19px; font-weight: bold; color: inherit;
     font-variant-numeric: tabular-nums; letter-spacing: 1px;
     white-space: nowrap;
   }
-  .active-card .ac-timer.warn { color: #b8860b; }
-  .active-card .ac-timer.critical,
-  .active-card .ac-timer.expired { color: var(--danger); }
+  .active-card .ac-badges {
+    display: flex; gap: 5px; flex-wrap: wrap;
+  }
+  .active-card .ac-badges .set-badge {
+    font-size: 11px; padding: 2px 6px;
+    background: rgba(255,255,255,0.25); color: inherit; border: none;
+  }
   .active-card .ac-cust {
-    font-size: 18px; font-weight: bold; color: var(--text);
+    font-size: 17px; font-weight: bold; color: var(--text);
+    line-height: 1.3;
   }
   .active-card .ac-cust .ac-guests {
-    font-size: 15px; font-weight: normal; color: var(--text-sub);
+    font-size: 14px; font-weight: normal; color: var(--text-sub);
     margin-left: 8px;
   }
   .active-card .ac-cast {
-    font-size: 15px; color: var(--text); line-height: 1.5;
+    font-size: 14px; color: var(--text); line-height: 1.3;
   }
   .active-card .ac-cast .ac-lbl,
   .active-card .ac-orders .ac-lbl {
-    color: var(--text-muted); font-size: 13px; margin-right: 4px;
+    color: var(--text-muted); font-size: 12px; margin-right: 4px;
   }
   .active-card .ac-orders {
-    border-top: 1px dashed var(--border); padding-top: 8px;
+    border-top: 1px dashed var(--border); padding-top: 6px;
   }
   .active-card .ac-orders ul {
-    list-style: none; margin: 4px 0 0; padding: 0;
-    display: flex; flex-direction: column; gap: 3px;
+    list-style: none; margin: 3px 0 0; padding: 0;
+    display: grid; grid-template-columns: 1fr auto; gap: 1px 10px;
   }
   .active-card .ac-orders li {
-    display: flex; justify-content: space-between; align-items: baseline;
-    gap: 8px; font-size: 16px; color: var(--text);
-    border-bottom: 1px dotted var(--border); padding-bottom: 2px;
+    display: contents;
+  }
+  .active-card .ac-orders li .ac-oname {
+    font-size: 15px; color: var(--text);
+    border-bottom: 1px dotted var(--border); padding: 2px 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .active-card .ac-orders li .ac-oq {
     font-weight: bold; white-space: nowrap; color: var(--accent);
+    font-size: 15px; border-bottom: 1px dotted var(--border); padding: 2px 0;
   }
   .active-card .ac-orders .ac-ototal {
-    text-align: right; font-size: 14px; color: var(--text-sub);
-    margin-top: 4px;
+    text-align: right; font-size: 13px; color: var(--text-sub);
+    margin-top: 3px;
   }
   .active-card .ac-noorder {
-    font-size: 14px; color: var(--text-muted); margin-top: 4px;
+    font-size: 13px; color: var(--text-muted); margin-top: 2px;
   }
   .active-card .ac-memo {
-    font-size: 14px; color: var(--text-sub); white-space: pre-wrap;
+    font-size: 13px; color: var(--text-sub); white-space: pre-wrap;
     background: var(--surface-alt); border-radius: 6px;
-    padding: 6px 8px; line-height: 1.4;
+    padding: 5px 8px; line-height: 1.3;
   }
-  .active-card .ac-badges {
-    display: flex; gap: 6px; flex-wrap: wrap;
-  }
-  .active-card .ac-badges .set-badge { font-size: 12px; padding: 2px 7px; }
 
   .table-card .quick-row {
     display: flex; gap: 6px; margin-top: 4px;
@@ -2206,11 +2221,12 @@
 
     /* 稼働卓タブ：スマホは1列 */
     .active-tables-list { grid-template-columns: 1fr; gap: 10px; }
-    .active-card { padding: 12px 14px; }
+    .active-card { padding: 0 12px 10px; }
     .active-card .ac-tname { font-size: 18px; }
-    .active-card .ac-timer { font-size: 18px; }
+    .active-card .ac-timer { font-size: 17px; }
     .active-card .ac-cust { font-size: 16px; }
-    .active-card .ac-orders li { font-size: 15px; }
+    .active-card .ac-orders li .ac-oname,
+    .active-card .ac-orders li .ac-oq { font-size: 15px; }
 
     /* 他のページ用：通常レイアウト */
     .page:not(#page-floor) h2.page-title { font-size: 16px; }
@@ -3048,9 +3064,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.17';
+const APP_VERSION = '2026.07.18';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.18',
+    date: '2026-07-18',
+    title: '🔥 稼働卓タブのレイアウト改善',
+    items: [
+      '卓名・タイマー・セット目バッジを1つの帯にまとめ、状態が一目で分かるよう強調',
+      '残り時間や超過状況に応じてヘッダー帯の色が変わるよう変更（通常/黄/赤）',
+      'オーダー明細を2列グリッド化し、縦の余白を詰めて一覧性を向上',
+      'カード全体の余白を調整し、スクロール量を削減',
+    ],
+  },
   {
     version: '2026.07.17',
     date: '2026-07-17',
@@ -4656,7 +4683,7 @@ function buildActiveCard(t, tdata) {
   if (orders.length > 0) {
     const totalQty = orders.reduce((s, o) => s + (o.qty || 1), 0);
     const lis = orders.map(o =>
-      `<li><span>${escapeHtml(o.itemName || '')}</span><span class="ac-oq">×${o.qty || 1}</span></li>`
+      `<li><span class="ac-oname">${escapeHtml(o.itemName || '')}</span><span class="ac-oq">×${o.qty || 1}</span></li>`
     ).join('');
     ordersHtml = `
       <div class="ac-orders">
@@ -4670,10 +4697,12 @@ function buildActiveCard(t, tdata) {
 
   card.innerHTML = `
     <div class="ac-head">
-      <span class="ac-tname">${escapeHtml(t.name)}</span>
+      <div class="ac-head-main">
+        <span class="ac-tname">${escapeHtml(t.name)}</span>
+        ${badges.length ? badges.join('') : ''}
+      </div>
       ${timerHtml}
     </div>
-    ${badges.length ? `<div class="ac-badges">${badges.join('')}</div>` : ''}
     ${custName ? `<div class="ac-cust">${escapeHtml(custName)}${tdata.guests ? `<span class="ac-guests">👥 ${tdata.guests}名</span>` : ''}</div>` : (tdata.guests ? `<div class="ac-cust"><span class="ac-guests">👥 ${tdata.guests}名</span></div>` : '')}
     ${castDisp ? `<div class="ac-cast"><span class="ac-lbl">🌹 指名</span>${escapeHtml(castDisp)}</div>` : ''}
     ${ordersHtml}
