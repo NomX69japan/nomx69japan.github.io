@@ -350,6 +350,13 @@
     margin-left: 0; font-weight: bold;
     white-space: nowrap;
   }
+  /* 自動延長バッジ：他のバッジと同じピル型に統一しつつ、金の縁取りだけで区別する */
+  .table-card .auto-ext-badge {
+    box-shadow: inset 0 0 0 1px rgba(212,175,55,0.7);
+  }
+  .active-card .ac-badges .auto-ext-badge {
+    box-shadow: inset 0 0 0 1px rgba(212,175,55,0.85);
+  }
   .table-card .memo-pre {
     font-size: 11px; color: var(--text-sub); white-space: pre-wrap;
     border-top: 1px dashed var(--border); padding-top: 4px; margin-top: 4px;
@@ -3064,9 +3071,19 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.19';
+const APP_VERSION = '2026.07.20';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.20',
+    date: '2026-07-20',
+    title: '🍾 ボトル自動登録＆バッジデザイン調整',
+    items: [
+      '「自動延長」バッジのデザインを、他のバッジ（セット目など）と統一した見た目に変更（浮いて見える配色を解消）',
+      '「ボトル」カテゴリの商品が新規オーダーされると、卓の代表顧客のボトル一覧に自動登録されるように',
+      '自動登録されたボトルの保存場所は空欄のままなので、顧客編集画面のボトル欄から後で入力できます',
+    ],
+  },
   {
     version: '2026.07.19',
     date: '2026-07-19',
@@ -4514,7 +4531,7 @@ function buildTableCard(t, tdata) {
   // 使用中カード
   const setNum = tdata.setCount || 1;
   const setBadge = setNum > 1 ? `<span class="set-badge">${setNum}セット目</span>` : '';
-  const autoExtBadge = tdata.autoExtend ? `<span class="set-badge" style="background:#fff8e7; color:#b8860b; border:1px solid #d4af37;">🔁自動延長</span>` : '';
+  const autoExtBadge = tdata.autoExtend ? `<span class="set-badge auto-ext-badge">🔁 自動延長</span>` : '';
 
   let timerHtml = '';
   let timerCls = 'timer';
@@ -4686,7 +4703,7 @@ function buildActiveCard(t, tdata) {
   const setNum = tdata.setCount || 1;
   const badges = [];
   if (setNum > 1) badges.push(`<span class="set-badge">${setNum}セット目</span>`);
-  if (tdata.autoExtend) badges.push(`<span class="set-badge" style="background:#fff8e7; color:#b8860b; border:1px solid #d4af37;">🔁自動延長</span>`);
+  if (tdata.autoExtend) badges.push(`<span class="set-badge auto-ext-badge">🔁 自動延長</span>`);
 
   // オーダー明細（品名 ×数量 を全部展開）
   const orders = (tdata.orders || []).filter(o => !o.removed && (o.qty || 0) > 0);
@@ -8191,6 +8208,7 @@ function addOrderToTable(tableId, itemId) {
   const existing = tdata.orders.find(o =>
     !o.removed && o.itemId === itemId && (o.byGuestId || '') === forGuestId
   );
+  const isNewOrder = !existing;
   if (existing) {
     existing.qty = (existing.qty || 1) + 1;
     existing._updated = Date.now();
@@ -8207,10 +8225,41 @@ function addOrderToTable(tableId, itemId) {
     });
   }
   tdata._updated = Date.now();
+  // 「ボトル」カテゴリの商品が新規オーダーされたら、卓の代表顧客のボトル一覧に自動追加する
+  // （保存場所などは空欄のままにしておき、後から顧客編集画面で入力してもらう）
+  if (isNewOrder && item.category === 'ボトル') {
+    addBottleFromOrder(tdata, item.name);
+  }
   persistSave();
   renderFloor();
   renderOrdersInModal();
   showToast(`${item.name} を追加`, 'normal');
+}
+
+// ボトルカテゴリのオーダーが入った際に、卓の代表顧客の顧客データへ
+// ボトルとして自動登録する。保存場所（location）は空のままにし、
+// あとから顧客編集画面の「ボトル」欄で入力してもらう想定。
+function addBottleFromOrder(tdata, bottleName) {
+  // 代表顧客の決定：卓に直接紐付いた顧客を優先し、無ければ合流客リストの先頭を見る
+  let customerId = tdata.customerId || '';
+  if (!customerId && Array.isArray(tdata.guestList)) {
+    const g = tdata.guestList.find(x => x.customerId && !x.exited) || tdata.guestList.find(x => x.customerId);
+    if (g) customerId = g.customerId;
+  }
+  if (!customerId) return; // 顧客データに紐付いていない（名前のみ等）場合は自動登録しない
+  const c = state.customers.find(x => x.id === customerId);
+  if (!c) return;
+  if (!Array.isArray(c.bottles)) c.bottles = [];
+  c.bottles.push({
+    name: bottleName,
+    tag: '',
+    location: '',
+    openedDate: todayBusinessDate(),
+    remain: 10,
+    _autoFromOrder: true,
+  });
+  c._updated = Date.now();
+  showToast(`🍾 ${withSan(displayName(c))} 様のボトルに「${bottleName}」を追加しました`, 'normal');
 }
 
 // モーダル内の現在のオーダー一覧描画
