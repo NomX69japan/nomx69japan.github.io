@@ -54,8 +54,8 @@
 
 <style>
   :root {
-    --bg: #16140f;
-    --panel: #1d1a14;
+    --bg: #2b2620;
+    --panel: #362f24;
     --cream: #f2ece1;
     --gold: #c8a96e;
     --gold-deep: #a07f45;
@@ -564,7 +564,7 @@
   .layer-card p { font-size: 0.98rem; line-height: 1.9; color: var(--dim); }
 
   .stone-grid { margin-bottom: 3.5rem; }
-  .stones { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.3rem; }
+  .stones { display: grid; grid-template-columns: repeat(5,1fr); gap: 1.2rem; }
   .stone-card {
     text-align: center;
     transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
@@ -760,6 +760,7 @@
   @media (max-width: 1000px) {
     .fee-row { grid-template-columns: 90px 1fr 150px 30px; }
     .fee-dur { display: none; }
+    .stones { grid-template-columns: repeat(3,1fr); }
   }
   @media (max-width: 900px) {
     nav, nav.scrolled { padding: 1.1rem 1.4rem; }
@@ -1049,9 +1050,14 @@
             <p class="stone-mean">純粋・浄化・清潔感</p>
           </div>
           <div class="stone-card">
-            <img src="images/activator-strawberry-sq.jpg" alt="ストロベリークォーツ" loading="lazy">
+            <img src="images/activator-rose.jpg" alt="ローズクォーツ" loading="lazy">
+            <p class="stone-name">ローズクォーツ</p>
+            <p class="stone-mean">愛情・癒し・デイリー向き</p>
+          </div>
+          <div class="stone-card">
+            <img src="images/activator-strawberry.jpg" alt="ストロベリークォーツ" loading="lazy">
             <p class="stone-name">ストロベリークォーツ</p>
-            <p class="stone-mean">愛情・癒し・美意識</p>
+            <p class="stone-mean">美意識・才能開花</p>
           </div>
           <div class="stone-card">
             <img src="images/activator-amethyst.jpg" alt="アメジスト" loading="lazy">
