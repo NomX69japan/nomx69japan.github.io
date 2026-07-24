@@ -511,6 +511,82 @@
     border-left: 2px solid rgba(200,169,110,0.35);
   }
 
+  /* ── SUB DIVIDER ── */
+  .sub-divider {
+    display: flex; align-items: center; gap: 1.4rem;
+    margin: 5.5rem 0 4rem;
+  }
+  .sub-divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(216,167,193,0.4), transparent); }
+  .sub-divider-label {
+    font-family: 'Space Mono', monospace; font-size: 0.86rem;
+    letter-spacing: 0.3em; text-transform: uppercase;
+    color: rgba(216,167,193,0.85);
+    white-space: nowrap;
+  }
+
+  /* ── ACTIVATOR (rose/amethyst accent) ── */
+  .activator { --rose: #d8a7c1; --lav: #b9a3d6; }
+  .act-eyebrow {
+    font-family: 'Space Mono', monospace; font-size: 0.86rem;
+    letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--rose); margin-bottom: 1.2rem;
+  }
+  .act-head { display: grid; grid-template-columns: 1.25fr 1fr; gap: 3.5rem; align-items: center; margin-bottom: 4.5rem; }
+  .activator .face-catch .g { color: var(--rose); }
+  .activator .face-lead strong { border-bottom-color: var(--rose); }
+  .act-hero-img {
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(216,167,193,0.15), 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .act-hero-img img { width: 100%; display: block; transition: transform 8s ease-out; }
+  .act-hero-img:hover img { transform: scale(1.04); }
+
+  .layer-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.4rem; margin-bottom: 4rem; }
+  .layer-card {
+    background: linear-gradient(155deg, rgba(216,167,193,0.08), rgba(185,163,214,0.05));
+    border: 1px solid rgba(216,167,193,0.22);
+    border-radius: 8px;
+    padding: 2rem 1.7rem;
+    transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), border-color 0.4s;
+  }
+  .layer-card:hover { transform: translateY(-5px); border-color: rgba(216,167,193,0.5); }
+  .layer-num {
+    display: block;
+    font-family: 'Cormorant Garamond', serif; font-style: italic;
+    font-size: 1.9rem; color: var(--rose); margin-bottom: 0.8rem;
+  }
+  .layer-card h4 {
+    font-family: 'Shippori Mincho', serif; font-weight: 500;
+    font-size: 1.15rem; letter-spacing: 0.04em; color: var(--cream);
+    margin-bottom: 0.8rem;
+  }
+  .layer-card h4 em { font-style: normal; color: var(--lav); font-size: 0.82em; margin-left: 0.4rem; }
+  .layer-card p { font-size: 0.98rem; line-height: 1.9; color: var(--dim); }
+
+  .stone-grid { margin-bottom: 3.5rem; }
+  .stones { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.3rem; }
+  .stone-card {
+    text-align: center;
+    transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
+  }
+  .stone-card:hover { transform: translateY(-6px); }
+  .stone-card img {
+    width: 100%; aspect-ratio: 1/1; object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid rgba(216,167,193,0.3);
+    margin-bottom: 1.1rem;
+    box-shadow: 0 14px 32px rgba(0,0,0,0.4);
+  }
+  .stone-name {
+    font-family: 'Shippori Mincho', serif; font-weight: 500;
+    font-size: 1.05rem; color: var(--cream); letter-spacing: 0.04em;
+    margin-bottom: 0.35rem;
+  }
+  .stone-mean { font-size: 0.85rem; color: var(--faint); letter-spacing: 0.03em; }
+
+  .activator .btn-gold { background: var(--rose); }
+  .activator .btn-gold:hover { background: #e6bdd3; box-shadow: 0 12px 32px rgba(216,167,193,0.35); }
+
   /* ── ABOUT ── */
   .about-grid { display: grid; grid-template-columns: 1fr 1.35fr; gap: 4.5rem; align-items: start; }
   .about-photo { position: sticky; top: 7rem; overflow: hidden; border-radius: 4px; }
@@ -705,6 +781,11 @@
     .aligner { grid-template-columns: 1fr; gap: 1.4rem; padding: 2.4rem 0; }
     .aligner-img { max-width: 250px; margin: 0 auto; }
     .method { grid-template-columns: 1fr; gap: 2rem; }
+    .act-head { grid-template-columns: 1fr; gap: 1.6rem; }
+    .layer-grid { grid-template-columns: 1fr; }
+    .stones { grid-template-columns: repeat(2,1fr); gap: 1.6rem; }
+    .sub-divider { margin: 4rem 0 3rem; }
+    .sub-divider-label { font-size: 0.72rem; letter-spacing: 0.18em; }
     .about-grid { grid-template-columns: 1fr; gap: 2.6rem; }
     .about-photo { position: static; }
     .fee-row { grid-template-columns: 1fr auto; row-gap: 0.5rem; padding: 1.7rem 0.3rem; }
@@ -908,6 +989,90 @@
     </div>
 
     <p class="disclaimer rv">※ さつま式小顔マウスピースは医療機器・歯列矯正器具ではありません。お顔の姿勢を整えるセルフトレーニング器具です。感じ方や変化には個人差があります。就寝中の使用はできません。監修：薩摩宗治（さつま骨格矯正鍼灸整骨院 総院長）／ 実用新案登録 第3253767号</p>
+
+    <!-- ── DIVIDER ── -->
+    <div class="sub-divider rv">
+      <span class="sub-divider-line"></span>
+      <span class="sub-divider-label">Also Available</span>
+      <span class="sub-divider-line"></span>
+    </div>
+
+    <!-- ── FACE EYE AIR (アクチベーター) ── -->
+    <div class="activator" id="activator">
+      <div class="act-head">
+        <div>
+          <p class="act-eyebrow rv">小顔アクチベーター</p>
+          <p class="face-catch rv">押す、流す、整える。<br><span class="g">天然石のタッピングケア。</span></p>
+          <p class="face-lead rv">
+            もう一つ取り扱うのが、<strong>小顔アクチベーター「Face Eye Air」</strong>（ゆがみラボ）。
+            骨膜や筋膜に最適な圧を届ける、天然石ヘッドのセルフケア美容器具です。
+            <br><br>
+            リズミカルなタッピング（律動的な機械的刺激）が、深さの異なる3つの層——筋膜・骨膜・骨内部——それぞれのセンサーに同時に届き、
+            膜のすべりをよくする、コラーゲンの土台をつくる、骨代謝を促す、という3つの反応が並行して起こると考えられています（メカノトランスダクション理論）。
+            特許庁 実用新案登録 申請中。
+          </p>
+        </div>
+        <div class="act-hero-img rv">
+          <img src="images/activator-lineup.jpg" alt="小顔アクチベーター Face Eye Air 全5種のラインナップ" loading="lazy">
+        </div>
+      </div>
+
+      <!-- 3層メカニズム -->
+      <div class="act-layers rv">
+        <span class="fx-label">タッピング刺激の3層メカニズム</span>
+        <div class="layer-grid">
+          <div class="layer-card">
+            <span class="layer-num">01</span>
+            <h4>筋膜層 <em>Fascia</em></h4>
+            <p>ヒアルロン酸の産生をうながし、膜どうしのすべりを回復。こわばりをゆるめる方向に働きます。</p>
+          </div>
+          <div class="layer-card">
+            <span class="layer-num">02</span>
+            <h4>骨膜層 <em>Periosteum</em></h4>
+            <p>コラーゲン合成をうながし、骨膜側の土台（ECM）づくりが進む方向に働きます。</p>
+          </div>
+          <div class="layer-card">
+            <span class="layer-num">03</span>
+            <h4>骨内部 <em>Bone</em></h4>
+            <p>骨代謝を調節するシグナルが動き出す方向に働くと考えられています。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 天然石ラインナップ -->
+      <div class="stone-grid rv">
+        <span class="fx-label">天然石ラインナップ</span>
+        <div class="stones">
+          <div class="stone-card">
+            <img src="images/activator-snow.jpg" alt="スノークォーツ" loading="lazy">
+            <p class="stone-name">スノークォーツ</p>
+            <p class="stone-mean">純粋・浄化・清潔感</p>
+          </div>
+          <div class="stone-card">
+            <img src="images/activator-strawberry-sq.jpg" alt="ストロベリークォーツ" loading="lazy">
+            <p class="stone-name">ストロベリークォーツ</p>
+            <p class="stone-mean">愛情・癒し・美意識</p>
+          </div>
+          <div class="stone-card">
+            <img src="images/activator-amethyst.jpg" alt="アメジスト" loading="lazy">
+            <p class="stone-name">アメジスト</p>
+            <p class="stone-mean">やさしい浄化・繊細さ</p>
+          </div>
+          <div class="stone-card">
+            <img src="images/activator-dream.jpg" alt="ドリームアメジスト" loading="lazy">
+            <p class="stone-name">ドリームアメジスト</p>
+            <p class="stone-mean">高級感・特別な1本</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="face-cta rv">
+        <a href="#contact" class="btn-gold">アクチベーターについて相談する</a>
+        <span class="face-cta-note">全5種。天然石のため、模様・色合いは1点ごとに異なります。</span>
+      </div>
+
+      <p class="disclaimer rv">※ 小顔アクチベーター（Face Eye Air）は医療機器ではありません。効果・効能を保証するものではなく、感じ方には個人差があります。天然石を使用しているため、色・模様には個体差があります。取扱：ゆがみラボ／特許庁 実用新案登録 申請中。</p>
+    </div>
   </div>
 </section>
 
