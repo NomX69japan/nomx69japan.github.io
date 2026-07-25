@@ -3082,9 +3082,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.26';
+const APP_VERSION = '2026.07.27';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.27',
+    date: '2026-07-27',
+    title: '💾 サーバーへの書き込み回数を大幅に削減',
+    items: [
+      '書き込みが HTTP 500 で失敗する原因として、サーバー（Cloudflare KV）の1日あたりの書き込み上限に達している可能性が高いことが分かりました。',
+      '操作のたびに書き込んでいた処理をまとめ、最低10秒の間隔を空けるようにしました。書き込み回数が大きく減ります。',
+      '退店時の再送信も、回数を減らし、書き込みが失敗している間は繰り返さないようにしました。',
+      '同期診断に「この端末の本日の書き込み回数」を追加しました。上限に近づいていないか確認できます。',
+      '書き込み失敗時の診断に、原因と対処の説明を表示するようにしました。',
+    ],
+  },
   {
     version: '2026.07.26',
     date: '2026-07-26',
@@ -11380,6 +11392,12 @@ async function renderSyncDiagnosis() {
       lines.push(`<b>書き込み</b>：<span style="color:#c0392b;">失敗（HTTP ${res.status}）</span>`);
       if (res.status === 401 || res.status === 403) lines.push('　└ 認証トークンが違う可能性があります。');
       else if (res.status === 413) lines.push('　└ データが大きすぎます。データ容量の整理をお試しください。');
+      else if (res.status >= 500) {
+        lines.push('　└ <b>サーバー側でエラーが起きています（アプリ側では直せません）。</b>');
+        lines.push('　　 考えられる原因：Cloudflare KV の1日あたりの書き込み上限に達している、');
+        lines.push('　　 またはデータが大きすぎて処理しきれていない。');
+        lines.push('　　 上限が原因の場合、毎日午前9時（日本時間）に自動で解除されます。');
+      }
     } else {
       lines.push('<b>書き込み</b>：<span style="color:#5a9c5a;">成功</span>');
       server.lastSaveError = '';
@@ -11400,6 +11418,7 @@ async function renderSyncDiagnosis() {
     lines.push('<b>直近の送信エラー</b>：<span style="color:#5a9c5a;">なし</span>');
   }
   lines.push(`<b>最後に受信できた時刻</b>：${server.lastRecvAt ? esc(new Date(server.lastRecvAt).toLocaleString('ja-JP')) : '<span style="color:#c0392b;">まだ受信していません</span>'}`);
+  lines.push(`<b>この端末の本日の書き込み回数</b>：${getServerWriteCount()} 回`);
 
   // --- 最後にサーバーを更新した端末 ---
   const w = (payload && payload._lastWriter) ? {
@@ -12504,7 +12523,30 @@ const server = {
   lastHash: '',
   connected: false,
   lastRecvAt: 0,   // 最後にサーバーから正常受信できた時刻（途絶検知用）
+  lastSaveAt: 0,   // 最後にサーバーへ書き込めた時刻（送信間引き用）
+  lastSaveError: '',
+  lastSaveErrorAt: 0,
 };
+
+// サーバーへの書き込み回数を日ごとに数える（KVの1日上限に達していないか確認するため）
+function countServerWrite() {
+  try {
+    const key = 'tao_write_count';
+    const today = localDateStr(new Date());
+    let rec = {};
+    try { rec = JSON.parse(localStorage.getItem(key) || '{}'); } catch(e) {}
+    if (rec.date !== today) rec = { date: today, n: 0 };
+    rec.n = (rec.n || 0) + 1;
+    localStorage.setItem(key, JSON.stringify(rec));
+  } catch(e) {}
+}
+function getServerWriteCount() {
+  try {
+    const rec = JSON.parse(localStorage.getItem('tao_write_count') || '{}');
+    const today = localDateStr(new Date());
+    return (rec.date === today) ? (rec.n || 0) : 0;
+  } catch(e) { return 0; }
+}
 function loadServerConfigUI() {
   try {
     const raw = localStorage.getItem(LS_SRV);
@@ -13203,6 +13245,8 @@ async function saveToServer() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     server.lastHash = simpleHash(JSON.stringify(payload));
     server.lastSaveError = '';
+    server.lastSaveAt = Date.now();
+    countServerWrite();
     setSyncDot(true, '同期OK ' + nowHHMM());
   } catch(e) {
     // エラーの中身を保持して診断で表示できるようにする
@@ -13221,10 +13265,12 @@ async function saveToServer() {
 // 反映されていなければ（他端末の古い上書きに負けた）、間隔を空けて再送する。
 async function saveToServerAssured(retries) {
   if (!server.url || !server.token) return;
-  const max = (typeof retries === 'number') ? retries : 4;
+  const max = (typeof retries === 'number') ? retries : 2;
   await saveToServer();
   for (let i = 0; i < max; i++) {
-    await new Promise(r => setTimeout(r, 2500 + i * 2500)); // 2.5s, 5s, 7.5s, 10s
+    // 書き込み自体が失敗している状態では、再送しても無駄に回数を消費するだけなので中断
+    if (server.lastSaveError) return;
+    await new Promise(r => setTimeout(r, 8000 + i * 8000)); // 8s, 16s
     let payload = null;
     try {
       const res = await fetch(server.url + '/get?_t=' + Date.now(), {
@@ -13244,12 +13290,22 @@ async function saveToServerAssured(retries) {
     await saveToServer();
   }
 }
+// ★送信回数の削減（v2026.07.27）
+// Cloudflare KV は「1日あたりの書き込み回数」に上限がある。
+// 複数端末が操作のたびに書き込むと、営業中に上限へ達して
+// 以後すべての書き込みが HTTP 500 で失敗し、同期が完全に止まる。
+// そこで、まとめ待ち時間を長くし、最低送信間隔も設けて書き込み回数を抑える。
+const SAVE_DEBOUNCE_MS = 4000;   // 操作が続く間はまとめる
+const SAVE_MIN_GAP_MS = 10000;   // 前回送信からこの時間は空ける
 function scheduleServerSave() {
   if (!server.url || !server.token) return;
   if (server.saveTimer) clearTimeout(server.saveTimer);
+  // 前回の送信からの経過を見て、必要なら待ち時間を延ばす
+  const since = Date.now() - (server.lastSaveAt || 0);
+  const wait = Math.max(SAVE_DEBOUNCE_MS, SAVE_MIN_GAP_MS - since);
   server.saveTimer = setTimeout(() => {
     saveToServer();
-  }, 800);
+  }, wait);
 }
 function forceSync() {
   if (!server.url || !server.token) { alert('サーバー未設定'); return; }
@@ -13283,7 +13339,9 @@ let _lastRegressionPushAt = 0;
 function handleServerRegression(payload) {
   if (!detectServerRegression(payload)) return false;
   const now = Date.now();
-  if (now - _lastRegressionPushAt < 8000) return true; // 直近に再送済みなら待つ
+  // 書き込みが失敗している間は再送しない（回数の無駄遣いを防ぐ）
+  if (server.lastSaveError) return true;
+  if (now - _lastRegressionPushAt < 120000) return true; // 直近2分以内に再送済みなら待つ
   _lastRegressionPushAt = now;
   console.warn('サーバー上で退店情報の巻き戻りを検知。ローカルの正しい状態を再送信します。');
   setSyncDot(null, '退店を再送信中…');
