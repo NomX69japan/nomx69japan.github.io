@@ -3071,9 +3071,20 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.22';
+const APP_VERSION = '2026.07.23';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.23',
+    date: '2026-07-23',
+    title: '👻 残ってしまった卓を安全に片付ける機能',
+    items: [
+      '他の端末で退店済みなのに残ってしまった卓を、来店記録を二重に作らずに空席へ戻せるボタンを追加しました。',
+      '卓をタップした画面の下部に「👻 記録を作らず空席へ」として表示されます（自動延長OFFで3時間以上超過している卓のみ）。',
+      '押すと、その端末に来店記録が届いているかどうかを表示します。届いていれば記録なしで空席に、届いていなければ通常の退店を促します。原因の切り分けにも使えます。',
+      '通常の営業では表示されないため、普段の退店操作はこれまで通りです。',
+    ],
+  },
   {
     version: '2026.07.22',
     date: '2026-07-22',
@@ -7842,6 +7853,22 @@ function buildTableModalFooter(isOccupied) {
 
   if (isOccupied) {
     // 使用中：閉じる・退店・保存
+    // ★大幅に超過している卓は、他端末で退店済みなのに同期の不具合で
+    //   残ってしまった「ゴースト卓」の可能性がある。
+    //   その場合に来店記録を二重に作らずに片付けられるボタンを出す。
+    //   （通常営業では出ないよう、自動延長OFFかつ3時間以上超過に限定）
+    const _td = state.tables[editingTableId];
+    const _overMs = (_td && _td.endsAt && !_td.autoExtend) ? (Date.now() - _td.endsAt) : 0;
+    if (_overMs > 3 * 60 * 60 * 1000) {
+      const ghostBtn = document.createElement('button');
+      ghostBtn.className = 'btn-sub btn-sm';
+      ghostBtn.type = 'button';
+      ghostBtn.style.cssText = 'background:#f3f0ea; border-color:#b8ad99; color:#6b5f50;';
+      ghostBtn.textContent = '👻 記録を作らず空席へ';
+      ghostBtn.addEventListener('click', clearTableAsGhost);
+      footer.appendChild(ghostBtn);
+    }
+
     const exitBtn = document.createElement('button');
     exitBtn.className = 'btn-danger btn-sm';
     exitBtn.type = 'button';
@@ -8960,6 +8987,35 @@ function saveTableInternal(closeAfter) {
   persistSave();
   if (closeAfter) closeTableModal();
   renderFloor();
+}
+
+// ゴースト卓（他端末で退店済みなのに残ってしまった卓）を、
+// 来店記録を作らずに空席へ戻す。二重記録を避けたい場合に使う。
+// 同時に、この端末に来店記録が届いているかどうかを表示して原因の切り分けにも使う。
+function clearTableAsGhost() {
+  if (!editingTableId) return;
+  const tname = getTableName(editingTableId);
+  const td = state.tables[editingTableId];
+  if (!td || !td.occupied) return;
+  // この卓・この入店時刻の来店記録がこの端末に届いているか
+  const log = (state.visitLog || []).find(v =>
+    !v.removed && v.tableId === editingTableId && v.startedAt === td.startedAt && v.endedAt
+  );
+  const logInfo = log
+    ? `この端末には、すでにこの卓の来店記録が届いています。\n（記録された退店時刻：${new Date(log.endedAt).toLocaleString('ja-JP')}）\n二重記録を避けるため、記録を作らずに空席へ戻すのが適切です。`
+    : `この端末には、この卓の来店記録がまだ届いていません。\n他の端末で退店処理済みなら記録はそちらにあります。\nどの端末にも記録が無い場合は、キャンセルして通常の「退店」を実行してください。`;
+  if (!confirm(
+    `${tname} を来店記録を作らずに空席へ戻します。\n\n${logInfo}\n\n実行しますか？`
+  )) return;
+  if (td.startedAt) markSessionClosed(editingTableId, td.startedAt);
+  state.tables[editingTableId] = emptyTableData();
+  pruneClosedSessions();
+  persistSave();
+  renderFloor();
+  closeTableModal();
+  showToast(`${tname} を空席に戻しました（記録なし）`, 'info');
+  // 他端末にも確実に伝えるため、検証付きで送信する
+  try { saveToServerAssured(); } catch(e) {}
 }
 
 function clearTable() {
