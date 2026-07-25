@@ -2136,8 +2136,19 @@
     .sidebar nav button.active {
       border-left-color: transparent; border-bottom-color: var(--accent-line);
     }
+    /* ★スマホでも同期状態を必ず見せる。
+       以前は display:none で完全に隠れており、同期エラーや未接続に
+       誰も気付けない状態だった（退店が反映されない障害の発見を大きく遅らせた原因）。
+       タップすると手動で強制同期できる。 */
     .sidebar .sync-status {
-      display: none;
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 5px 8px; font-size: 12px;
+      background: rgba(0,0,0,0.3);
+      border-top: 1px solid rgba(255,255,255,0.12);
+      cursor: pointer;
+    }
+    .sidebar .sync-status.is-error {
+      background: #c0392b; color: #fff; font-weight: bold; font-size: 13px;
     }
     main {
       padding: 8px;
@@ -2361,7 +2372,7 @@
       <button class="nav-btn" data-page="today">📅 履歴</button>
       <button class="nav-btn" data-page="settings">⚙️ 設定</button>
     </nav>
-    <div class="sync-status">
+    <div class="sync-status" onclick="forceSync()" title="タップで手動同期">
       <span class="dot" id="syncDot"></span>
       <span id="syncMsg">未接続</span>
     </div>
@@ -3071,9 +3082,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.23';
+const APP_VERSION = '2026.07.24';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.24',
+    date: '2026-07-24',
+    title: '🔎 スマホでも同期状態が見えるようになりました',
+    items: [
+      'スマホ表示では同期の状態が完全に隠れており、同期エラーや未接続に誰も気付けない状態でした。退店が反映されない不具合の発見が遅れた大きな原因です。',
+      '画面の左下（スマホでは上部メニューの下）に同期状態を常に表示するようにしました。',
+      'エラーや未接続のときは赤い帯で目立つように表示されます。',
+      '同期の表示をタップすると、その場で手動同期ができます。',
+      'サーバーからの受信が3分以上途絶えた場合も警告を出すようにしました。端末のスリープや通信断で同期が止まっている場合に気付けます。',
+    ],
+  },
   {
     version: '2026.07.23',
     date: '2026-07-23',
@@ -4525,6 +4548,15 @@ function initApp() {
     const onFloor = document.getElementById('page-floor').classList.contains('active');
     const onActive = document.getElementById('page-active').classList.contains('active');
     updateTableTimers(onFloor || onActive);
+    // ★同期の途絶検知：サーバー設定済みなのに3分以上受信できていないなら警告する。
+    // 通信断・設定不備・端末のスリープでポーリングが止まっている場合に気付けるようにする。
+    if (server.url && server.token) {
+      const since = server.lastRecvAt ? (Date.now() - server.lastRecvAt) : Infinity;
+      if (since > 180000) {
+        const mins = server.lastRecvAt ? Math.floor(since / 60000) + '分間' : '';
+        setSyncDot(false, `⚠ 同期が届いていません${mins ? '（' + mins + '）' : ''}／タップで再同期`);
+      }
+    }
   }, 1000);
   // 1分ごとに時計
   if (_clockTimer) clearInterval(_clockTimer);
@@ -12321,6 +12353,7 @@ const server = {
   saveTimer: null,
   lastHash: '',
   connected: false,
+  lastRecvAt: 0,   // 最後にサーバーから正常受信できた時刻（途絶検知用）
 };
 function loadServerConfigUI() {
   try {
@@ -12377,6 +12410,12 @@ function setSyncDot(state, msg) {
   if (state === true) dot.classList.add('ok');
   else if (state === false) dot.classList.add('err');
   m.textContent = msg;
+  // エラー・未接続はスマホでも一目で分かるよう赤帯にする
+  const box = dot.closest('.sync-status');
+  if (box) {
+    const bad = (state === false) || /未接続|未設定/.test(msg);
+    box.classList.toggle('is-error', !!bad);
+  }
 }
 async function loadFromServer() {
   if (!server.url || !server.token) throw new Error('未設定');
@@ -12387,6 +12426,7 @@ async function loadFromServer() {
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
+  server.lastRecvAt = Date.now();
   if (data && data.payload) {
     // 適用前に検査する（applyServerDataは台帳をマージしてしまうため、比較は必ず先に行う）
     const regressed = detectServerRegression(data.payload);
@@ -13109,6 +13149,7 @@ async function doPoll() {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+    server.lastRecvAt = Date.now();
     if (data && data.payload) {
       // 退店の巻き戻りが起きていれば、編集中かどうかに関わらず再送信する
       handleServerRegression(data.payload);
