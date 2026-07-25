@@ -3071,9 +3071,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.21';
+const APP_VERSION = '2026.07.22';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.22',
+    date: '2026-07-22',
+    title: '🚨 退店が反映されない問題：真の原因を修正',
+    items: [
+      '原因が特定できました。データを受け取る処理の中で、来店ログ（退店した証拠）を読み込む順番が、卓の入店中・空席を判定する処理より後になっていました。',
+      'そのため、受け取ったデータの中に退店の証拠が入っているのに、それを見ないまま「入店中」と判断し、さらにその状態をサーバーへ書き戻していました。退店した端末以外がずっと入店中のまま残る直接の原因です。',
+      '【修正1】受信したデータから来店ログの退店情報を最初に読み取り、退店記録を復元してから卓の判定を行うようになりました。',
+      '【修正2】サーバーへ送信する直前にも退店済みの卓が残っていないか最終確認するようになりました。これまでこの確認が抜けており、古い状態をサーバーへ書き戻していました。',
+      '【修正3】受信時に卓の修復が発生した場合、その結果をサーバーにも反映するようになりました。これまではその端末だけが直り、サーバーは古いままでした。',
+      'この修正により、退店の記録が万一サーバーから消えても、来店ログから自動的に復元されます。',
+    ],
+  },
   {
     version: '2026.07.21',
     date: '2026-07-21',
@@ -3876,6 +3889,30 @@ function mergeClosedSessions(remote) {
     if (typeof lv !== 'number' || Math.abs(rv) > Math.abs(lv)) {
       state.closedSessions[k] = rv;
     }
+  });
+}
+
+// ★受信ペイロードの「来店ログ」から退店の事実を先に吸い上げて台帳へ復元する（v2026.07.22）
+// 来店ログはIDベースの追加型マージなので、いったん誰かが記録すれば非常に失われにくい。
+// 一方 closedSessions（台帳）は上書き競合で消えることがある。
+// そこで受信のたびに来店ログ→台帳を復元し、退店判定を確実にする。
+// ※これを卓のマージより前に実行しないと、同じペイロードの中に退店の証拠があるのに
+//   それを見ないまま「入店中」を採用してしまい、退店が巻き戻る。
+function absorbCheckoutEvidence(payload) {
+  if (!payload || !Array.isArray(payload.visitLog)) return;
+  const RECENT_MS = 48 * 60 * 60 * 1000; // 直近48時間の退店のみ（台帳の肥大化防止）
+  const now = Date.now();
+  if (!state.closedSessions) state.closedSessions = {};
+  payload.visitLog.forEach(log => {
+    if (!log || log.removed) return;
+    if (!log.tableId || !log.startedAt || !log.endedAt) return;
+    if (now - log.endedAt > RECENT_MS) return;
+    const k = sessionKey(log.tableId, log.startedAt);
+    const cur = state.closedSessions[k];
+    // 退店取消（負値）の方が新しければ尊重する
+    if (typeof cur === 'number' && cur < 0 && Math.abs(cur) >= log.endedAt) return;
+    if (typeof cur === 'number' && cur > 0) return; // 既に記録済み
+    state.closedSessions[k] = log.endedAt;
   });
 }
 
@@ -12332,6 +12369,8 @@ function applyServerData(payload) {
   if (payload.pin) state.pin = payload.pin;
   // 退店済みセッション台帳を先にマージ（後続のテーブルマージで使うため）
   mergeClosedSessions(payload.closedSessions);
+  // ★来店ログから退店の事実を台帳へ復元する（台帳が競合で消えていても退店を守る）
+  absorbCheckoutEvidence(payload);
   // ★ローカル側の自己修復：台帳マージ直後、ローカルの「入店中」テーブルのうち
   // 既に退店済みと分かっているセッションがあれば即座にクリアする（詳細はmergeServerPayload参照）。
   Object.keys(state.tables || {}).forEach(tid => {
@@ -12543,7 +12582,14 @@ function applyServerData(payload) {
   }
   // 同期受信後にもゾンビ卓を自己修復（来店ログが先に届いた場合に対応）
   const healedAfterSync = selfHealZombieTables();
-  if (healedAfterSync > 0) cleanupChanged = true;
+  if (healedAfterSync > 0) {
+    cleanupChanged = true;
+    // ★修復した結果はサーバーにも反映させる。
+    // これをしないと、サーバー上は「入店中」のまま残り、
+    // 他の端末が何度でも古い状態を受け取り続けてしまう。
+    console.warn(`同期受信後に${healedAfterSync}卓のゾンビを修復。サーバーへ反映します。`);
+    setTimeout(() => { try { saveToServer(); } catch(e) {} }, 300);
+  }
   // ローカル保存（再帰呼び出し回避のためサーバー送信フラグなし）
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(buildPersistData()));
@@ -12711,6 +12757,12 @@ function mergeServerPayload(payload) {
   if (!payload || typeof payload !== 'object') return;
   // 退店済みセッション台帳を先にマージ（テーブルマージで使う）
   mergeClosedSessions(payload.closedSessions);
+  // ★来店ログから退店の事実を台帳へ復元する。
+  // これが無いと、同じペイロードに退店の証拠（来店ログ）が入っているのに
+  // 来店ログのマージが卓のマージより後だったため証拠を見ないまま
+  // ローカルの古い「入店中」を保持し、そのままサーバーへ書き戻していた
+  // ＝退店した端末以外がずっと入店中のままになる原因。
+  absorbCheckoutEvidence(payload);
   // ★ローカル側の自己修復：台帳マージ直後、ローカルの「入店中」テーブルの中に
   // 既に退店済みと分かっているセッションがあれば、この場で即座にクリアする。
   // これをしないと、自動延長で _updated が新しくなり続けているローカルの古い占有データが
@@ -12854,6 +12906,10 @@ function mergeServerPayload(payload) {
       } else state.stocktakes.push(rs);
     });
   }
+  // ★最終防衛：来店ログのマージが済んだこの時点でもう一度ゾンビ卓を掃除する。
+  // ここはサーバーへ送信する直前に必ず通る場所なので、
+  // 退店済みの卓を「入店中」のままサーバーへ書き戻してしまう事故を防ぐ。
+  try { selfHealZombieTables(); } catch(e) { console.warn('mergeServerPayload selfHeal failed', e); }
 }
 
 // 送信の多重実行防止。GET→PUT の途中に別の送信が割り込むと、
