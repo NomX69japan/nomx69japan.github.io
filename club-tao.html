@@ -3082,9 +3082,30 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.24';
+const APP_VERSION = '2026.07.26';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.26',
+    date: '2026-07-26',
+    title: '🔍 同期診断が実際に動くようになりました',
+    items: [
+      '「診断を実行」ボタンは以前から表示されていましたが、中身の処理が存在せず、押しても何も起きない状態でした。',
+      '読み込みと書き込みを個別にテストし、どちらが失敗しているかを表示するようになりました。',
+      '送信エラーの具体的な内容、最後に受信できた時刻、最後にサーバーを更新した端末とそのバージョン、サーバー上で入店中の卓の一覧を確認できます。',
+      '読み込みは成功するのに書き込みだけ失敗する場合、サーバー側の設定が原因である可能性を表示します。',
+    ],
+  },
+  {
+    version: '2026.07.25',
+    date: '2026-07-25',
+    title: '⚠ 古いバージョンの端末を自動で見つけて警告',
+    items: [
+      '古いバージョンのまま使われている端末があると、その端末が他の端末の退店記録をまとめて消してしまいます。これが退店が伝わらない最大の原因です。',
+      '古いバージョンの端末がサーバーを更新した場合、その端末名とバージョンを赤い帯で画面に表示するようになりました。',
+      '表示された端末を更新すれば、退店が正しく共有されるようになります。',
+    ],
+  },
   {
     version: '2026.07.24',
     date: '2026-07-24',
@@ -11302,6 +11323,111 @@ function refreshStorageUsage() {
   `;
 }
 
+// ★同期診断（v2026.07.26で実装）
+// これまでボタンだけあって中身の関数が存在せず、押しても何も起きなかった。
+// 読み込み（GET）と書き込み（POST）を個別に試し、どちらが失敗しているかを切り分ける。
+async function renderSyncDiagnosis() {
+  const out = document.getElementById('syncDiagnosisOut');
+  if (!out) return;
+  out.style.display = 'block';
+  out.innerHTML = '診断中…';
+  const lines = [];
+  const esc = (v) => escapeHtml(String(v == null ? '' : v));
+
+  lines.push(`<b>この端末</b>：${esc(getDeviceLabel())}`);
+  lines.push(`バージョン：${esc(APP_VERSION)}`);
+  lines.push(`接続先：${server.url ? esc(server.url) : '<span style="color:#c0392b;">未設定</span>'}`);
+  lines.push(`認証トークン：${server.token ? '設定済み' : '<span style="color:#c0392b;">未設定</span>'}`);
+  lines.push('<hr style="margin:8px 0; border:none; border-top:1px solid #e5ddc8;">');
+
+  if (!server.url || !server.token) {
+    lines.push('<span style="color:#c0392b;">サーバー同期が設定されていません。設定画面のサーバー同期から入力してください。</span>');
+    out.innerHTML = lines.join('<br>');
+    return;
+  }
+
+  // --- 読み込みテスト ---
+  let payload = null;
+  try {
+    const res = await fetch(server.url + '/get?_t=' + Date.now(), {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'X-Auth-Token': server.token, 'Cache-Control': 'no-cache' }
+    });
+    if (!res.ok) {
+      lines.push(`<b>読み込み</b>：<span style="color:#c0392b;">失敗（HTTP ${res.status}）</span>`);
+      if (res.status === 401 || res.status === 403) lines.push('　└ 認証トークンが違う可能性があります。');
+    } else {
+      const d = await res.json();
+      payload = d && d.payload;
+      lines.push('<b>読み込み</b>：<span style="color:#5a9c5a;">成功</span>');
+    }
+  } catch(e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    lines.push(`<b>読み込み</b>：<span style="color:#c0392b;">失敗（${esc(msg)}）</span>`);
+    lines.push('　└ 通信がブロックされています。CORS設定またはネットワークの問題です。');
+  }
+
+  // --- 書き込みテスト ---
+  try {
+    const testPayload = buildSaveData();
+    const res = await fetch(server.url + '/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': server.token },
+      body: JSON.stringify({ payload: testPayload })
+    });
+    if (!res.ok) {
+      lines.push(`<b>書き込み</b>：<span style="color:#c0392b;">失敗（HTTP ${res.status}）</span>`);
+      if (res.status === 401 || res.status === 403) lines.push('　└ 認証トークンが違う可能性があります。');
+      else if (res.status === 413) lines.push('　└ データが大きすぎます。データ容量の整理をお試しください。');
+    } else {
+      lines.push('<b>書き込み</b>：<span style="color:#5a9c5a;">成功</span>');
+      server.lastSaveError = '';
+    }
+  } catch(e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    lines.push(`<b>書き込み</b>：<span style="color:#c0392b;">失敗（${esc(msg)}）</span>`);
+    lines.push('　└ <b>読み込みは成功して書き込みだけ失敗する場合、サーバー側（Cloudflare Worker）が');
+    lines.push('　　 書き込み要求の事前確認（OPTIONS）に対応していない可能性が高いです。</b>');
+    lines.push('　　 この端末の退店・入店はサーバーに届かず、他の端末に反映されません。');
+  }
+
+  lines.push('<hr style="margin:8px 0; border:none; border-top:1px solid #e5ddc8;">');
+  if (server.lastSaveError) {
+    lines.push(`<b>直近の送信エラー</b>：<span style="color:#c0392b;">${esc(server.lastSaveError)}</span>`);
+    if (server.lastSaveErrorAt) lines.push(`　└ ${esc(new Date(server.lastSaveErrorAt).toLocaleString('ja-JP'))}`);
+  } else {
+    lines.push('<b>直近の送信エラー</b>：<span style="color:#5a9c5a;">なし</span>');
+  }
+  lines.push(`<b>最後に受信できた時刻</b>：${server.lastRecvAt ? esc(new Date(server.lastRecvAt).toLocaleString('ja-JP')) : '<span style="color:#c0392b;">まだ受信していません</span>'}`);
+
+  // --- 最後にサーバーを更新した端末 ---
+  const w = (payload && payload._lastWriter) ? {
+    device: payload._lastWriter,
+    version: payload._lastWriterVersion || '不明',
+    at: payload._lastWriterAt || payload._updatedAt || 0,
+  } : _lastServerWriter;
+  if (w) {
+    const same = String(w.version) === APP_VERSION;
+    lines.push(`<b>最後にサーバーを更新した端末</b>：${esc(w.device)}`);
+    lines.push(`　└ バージョン ${esc(w.version)} ${same ? '<span style="color:#5a9c5a;">✅ 一致</span>' : '<span style="color:#c0392b;">⚠ 古い／別バージョン（この端末が他端末の退店記録を消します）</span>'}`);
+    if (w.at) lines.push(`　└ ${esc(new Date(w.at).toLocaleString('ja-JP'))}`);
+  } else {
+    lines.push('<b>最後にサーバーを更新した端末</b>：不明');
+  }
+
+  // --- サーバー上の入店中の卓 ---
+  if (payload && payload.tables) {
+    const occ = Object.keys(payload.tables).filter(tid => {
+      const td = payload.tables[tid];
+      return td && td.occupied;
+    }).map(getTableName);
+    lines.push(`<b>サーバー上で入店中の卓</b>：${occ.length ? esc(occ.join('・')) : 'なし'}`);
+  }
+
+  out.innerHTML = lines.join('<br>');
+}
+
 function manualPurgeRemoved() {
   if (!confirm('画面に表示されない「削除済み」データを完全に消去します。\n（表示中のデータは消えません）\n\nバックアップは取りましたか？')) return;
   const n = purgeRemovedData();
@@ -11543,6 +11669,30 @@ async function registerServiceWorker() {
 }
 
 // 新バージョン検出時のバナー表示：タップで即更新（キャッシュ起因の「直らない」問題への対策）
+// ★古いバージョンの端末がサーバーを更新している場合の警告バナー（v2026.07.25）
+// 旧版の端末は「サーバーの内容を読んでから書く」処理を持たないため、
+// 他端末の変更（退店・来店記録・台帳など）をまとめて消してしまう。
+// これが「退店が他端末に伝わらない」最大の原因なので、犯人の端末名を出して警告する。
+function showOldDeviceWarning(device, version) {
+  const existing = document.getElementById('oldDeviceBanner');
+  if (existing) {
+    const t = document.getElementById('oldDeviceBannerText');
+    if (t) t.innerHTML = `⚠ 古いバージョンの端末が使われています<br><b>${escapeHtml(device)}</b>（バージョン ${escapeHtml(String(version))}）<br>この端末が他の端末の退店記録を消しています。至急その端末を更新してください。`;
+    return;
+  }
+  const bar = document.createElement('div');
+  bar.id = 'oldDeviceBanner';
+  bar.style.cssText = 'position:fixed; left:0; right:0; bottom:0; z-index:5001; background:#c0392b; color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; font-size:13px; line-height:1.5; box-shadow:0 -2px 8px rgba(0,0,0,0.35);';
+  bar.innerHTML = `
+    <span style="flex:1;" id="oldDeviceBannerText">⚠ 古いバージョンの端末が使われています<br><b>${escapeHtml(device)}</b>（バージョン ${escapeHtml(String(version))}）<br>この端末が他の端末の退店記録を消しています。至急その端末を更新してください。</span>
+    <button type="button" id="oldDeviceBannerClose" style="background:rgba(255,255,255,0.9); color:#c0392b; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:13px; white-space:nowrap;">閉じる</button>
+  `;
+  document.body.appendChild(bar);
+  document.getElementById('oldDeviceBannerClose').addEventListener('click', () => {
+    bar.remove();
+  });
+}
+
 function showUpdateBanner() {
   if (document.getElementById('swUpdateBanner')) return;
   const bar = document.createElement('div');
@@ -12458,6 +12608,9 @@ function applyServerData(payload) {
     if (payload._lastWriterVersion && payload._lastWriterVersion < APP_VERSION
         && payload._lastWriter !== getDeviceLabel()) {
       console.warn(`⚠ 古いバージョンの端末が書き込み中: ${payload._lastWriter} (v${payload._lastWriterVersion})`);
+      // ★画面にも警告を出す。旧版端末は他端末の退店記録を消すため、
+      //   気付かないまま営業を続けると毎晩同じ障害が起き続ける。
+      try { showOldDeviceWarning(payload._lastWriter, payload._lastWriterVersion); } catch(e) {}
     }
   }
 
@@ -13049,9 +13202,13 @@ async function saveToServer() {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     server.lastHash = simpleHash(JSON.stringify(payload));
+    server.lastSaveError = '';
     setSyncDot(true, '同期OK ' + nowHHMM());
   } catch(e) {
-    setSyncDot(false, '送信エラー');
+    // エラーの中身を保持して診断で表示できるようにする
+    server.lastSaveError = (e && e.message) ? e.message : String(e);
+    server.lastSaveErrorAt = Date.now();
+    setSyncDot(false, '送信エラー（診断で詳細確認）');
     console.error('saveToServer', e);
   } finally {
     _saveInFlight = false;
@@ -13151,6 +13308,11 @@ async function doPoll() {
     const data = await res.json();
     server.lastRecvAt = Date.now();
     if (data && data.payload) {
+      // 古いバージョンの端末が書き込んでいないか（編集中かどうかに関わらず確認）
+      if (data.payload._lastWriterVersion && data.payload._lastWriterVersion < APP_VERSION
+          && data.payload._lastWriter !== getDeviceLabel()) {
+        try { showOldDeviceWarning(data.payload._lastWriter, data.payload._lastWriterVersion); } catch(e) {}
+      }
       // 退店の巻き戻りが起きていれば、編集中かどうかに関わらず再送信する
       handleServerRegression(data.payload);
       if (editing) {
