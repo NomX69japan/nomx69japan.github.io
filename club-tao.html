@@ -2407,6 +2407,7 @@
         <button class="btn-sub btn-sm" onclick="renderActiveTables()">🔄 更新</button>
         <span style="color:#888; font-size:12px;" id="activeSummary"></span>
       </div>
+      <div id="activeCountBanner" class="today-count-banner"></div>
       <div id="activeTablesList" class="active-tables-list"></div>
     </section>
 
@@ -3082,9 +3083,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.27';
+const APP_VERSION = '2026.07.28';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.28',
+    date: '2026-07-28',
+    title: '📊 稼働卓タブに人数バナーを追加',
+    items: [
+      '稼働卓タブの上部に、キャスト数・入店中のお客様数・過不足を表示する帯を追加しました。',
+      '過不足は キャスト数 － お客様数 で計算し、プラスは緑、ちょうどは金色、マイナスは赤で表示します。',
+      'シフトで勤務時間（長押しで入力する「21-1」など）が入っているキャストは、その時刻を過ぎると自動で「上がり」として人数から外れます。',
+      '勤務時間が未入力のキャストは勤務中として数えます。上がりが発生する日は勤務時間を入れておくと正確になります。',
+      '深夜またぎの勤務時間（20-2など）にも対応しています。',
+    ],
+  },
   {
     version: '2026.07.27',
     date: '2026-07-27',
@@ -4581,6 +4594,10 @@ function initApp() {
     const onFloor = document.getElementById('page-floor').classList.contains('active');
     const onActive = document.getElementById('page-active').classList.contains('active');
     updateTableTimers(onFloor || onActive);
+    // 稼働卓タブ表示中は、時刻の経過でキャストが上がった分もバナーに反映する（1分ごと）
+    if (onActive && new Date().getSeconds() === 0) {
+      try { updateActiveCountBanner(); } catch(e) {}
+    }
     // ★同期の途絶検知：サーバー設定済みなのに3分以上受信できていないなら警告する。
     // 通信断・設定不備・端末のスリープでポーリングが止まっている場合に気付けるようにする。
     if (server.url && server.token) {
@@ -4770,9 +4787,88 @@ function buildTableCard(t, tdata) {
   return card;
 }
 
+// ★現在この時刻に勤務中のキャストかどうかを判定する（v2026.07.28）
+// シフトの勤務時間（長押しで入力する「21-1」など）が入っていれば、それを見て
+// 「もう上がったキャスト」を自動的に除外する。
+// 時間が未入力のキャストは、判断材料が無いので勤務中として数える。
+// 深夜またぎ（例：21時〜1時）にも対応する。
+function isCastWorkingNow(dateStr, castId, nowDate) {
+  if (!getShift(dateStr, castId)) return false; // そもそも出勤ではない
+  const t = getShiftTime(dateStr, castId);
+  if (!t) return true; // 勤務時間が未入力 → 勤務中として数える
+  const s = (t.s || '').trim();
+  const e = (t.e || '').trim();
+  const sn = s === '' ? NaN : Number(s);
+  const en = e === '' ? NaN : Number(e);
+  if (isNaN(sn) && isNaN(en)) return true;
+  const d = nowDate || new Date();
+  const h = d.getHours() + d.getMinutes() / 60;
+  // 開始のみ指定：その時刻以降なら勤務中
+  if (!isNaN(sn) && isNaN(en)) {
+    // 深夜帯（0〜5時）は前日からの延長とみなして勤務中扱い
+    return (h >= sn) || (h < 5 && sn >= 18);
+  }
+  // 終了のみ指定：その時刻より前なら勤務中
+  if (isNaN(sn) && !isNaN(en)) {
+    return (h < en) || (h >= 18);
+  }
+  // 両方指定
+  if (en <= sn) {
+    // 深夜またぎ（例：21→1）。21時以降 または 1時より前 なら勤務中
+    return (h >= sn) || (h < en);
+  }
+  return (h >= sn) && (h < en);
+}
+
+// 稼働卓タブの集計バナー（キャスト数・入店中のお客様数・過不足）
+function updateActiveCountBanner() {
+  const el = document.getElementById('activeCountBanner');
+  if (!el) return;
+  const dateStr = currentBusinessDate();
+  const casts = (state.casts || []).filter(c => !c.removed);
+  const now = new Date();
+
+  let onTotal = 0;      // 本日の出勤予定
+  let workingNow = 0;   // 現在勤務中
+  casts.forEach(c => {
+    if (!getShift(dateStr, c.id)) return;
+    onTotal++;
+    if (isCastWorkingNow(dateStr, c.id, now)) workingNow++;
+  });
+
+  // 入店中のお客様数と稼働卓数
+  let guests = 0, tables = 0;
+  DEFAULT_TABLES.forEach(t => {
+    const td = state.tables[t.id];
+    if (td && td.occupied) {
+      tables++;
+      guests += (td.guests || 0);
+    }
+  });
+
+  const diff = workingNow - guests;
+  const diffTxt = diff > 0 ? `+${diff}` : String(diff);
+  const diffColor = diff > 0 ? '#5a9c5a' : (diff === 0 ? '#8b6914' : '#c0392b');
+  const leftNum = onTotal - workingNow; // 既に上がったキャスト
+
+  let html = `<span class="banner-section">🌹 キャスト：<span class="count-main">${workingNow}名</span>`;
+  if (leftNum > 0) html += `<span class="count-trial">（出勤${onTotal}名 / 上がり${leftNum}名）</span>`;
+  else if (onTotal > 0) html += `<span class="count-trial">（出勤${onTotal}名）</span>`;
+  html += '</span>';
+
+  html += `<span class="banner-section"><span class="banner-sub">👥 お客様：<b>${guests}名</b></span>`;
+  html += `<span class="banner-sub">🪑 ${tables}卓</span></span>`;
+
+  html += `<span class="banner-section"><span class="banner-sub" style="color:${diffColor}; font-size:15px;">過不足：<b>${diffTxt}</b></span></span>`;
+
+  el.innerHTML = html;
+  el.className = 'today-count-banner';
+}
+
 // ===== 稼働卓タブ：使用中の卓だけを詳細展開して一覧 =====
 function renderActiveTables() {
   updateTodayShiftCount();
+  updateActiveCountBanner();
   try { updateTableTimers(false); } catch(e) {}
   const root = document.getElementById('activeTablesList');
   if (!root) return;
