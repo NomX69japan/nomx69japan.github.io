@@ -3084,9 +3084,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.29';
+const APP_VERSION = '2026.07.30';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.30',
+    date: '2026-07-30',
+    title: '📊 フロアタブの帯も稼働卓タブと同じに統一',
+    items: [
+      'スタッフからの要望により、フロアタブの帯を稼働卓タブと同じ内容にしました。',
+      'キャスト数（出勤数・上がり数）、入店中のお客様数、稼働卓数、プラマイが表示されます。',
+      'これまでの予約件数と連絡事項も引き続き表示され、タップで詳細が開きます。',
+      'フロアタブの帯でもキャスト部分をタップすると、上がりの記録画面が開きます。',
+      'シフトタブの帯は従来どおり「本日出勤」中心の表示のままです。',
+    ],
+  },
   {
     version: '2026.07.29',
     date: '2026-07-29',
@@ -4609,9 +4621,12 @@ function initApp() {
     const onFloor = document.getElementById('page-floor').classList.contains('active');
     const onActive = document.getElementById('page-active').classList.contains('active');
     updateTableTimers(onFloor || onActive);
-    // 稼働卓タブ表示中は、時刻の経過でキャストが上がった分もバナーに反映する（1分ごと）
-    if (onActive && new Date().getSeconds() === 0) {
-      try { updateActiveCountBanner(); } catch(e) {}
+    // 帯の内容（お客様数・プラマイ）を1分ごとに更新する
+    if ((onActive || onFloor) && new Date().getSeconds() === 0) {
+      try {
+        if (onActive) updateActiveCountBanner();
+        if (onFloor) updateTodayShiftCount();
+      } catch(e) {}
     }
     // ★同期の途絶検知：サーバー設定済みなのに3分以上受信できていないなら警告する。
     // 通信断・設定不備・端末のスリープでポーリングが止まっている場合に気付けるようにする。
@@ -4845,15 +4860,13 @@ function pruneCastOff() {
   });
 }
 
-// 稼働卓タブの集計バナー（キャスト数・入店中のお客様数・プラマイ）
-function updateActiveCountBanner() {
-  const el = document.getElementById('activeCountBanner');
-  if (!el) return;
+// ★キャスト数・お客様数・プラマイの帯を組み立てる共通処理（v2026.07.30）
+// フロアタブと稼働卓タブで同じ内容を表示するため、ここで一元管理する。
+// 体験入店のキャストも分けずに通常のキャスト数へ含める。
+function buildCountSectionsHtml() {
   const dateStr = currentBusinessDate();
   const casts = (state.casts || []).filter(c => !c.removed);
-  const now = new Date();
 
-  // 出勤しているキャストを数える（体験入店のキャストも分けずに同じように数える）
   let onTotal = 0;      // 本日の出勤
   let workingNow = 0;   // 現在勤務中（上がり記録が無い人）
   casts.forEach(c => {
@@ -4888,7 +4901,26 @@ function updateActiveCountBanner() {
 
   html += `<span class="banner-section"><span class="banner-sub" style="color:${diffColor}; font-size:15px;">プラマイ：<b>${diffTxt}</b></span></span>`;
 
-  el.innerHTML = html;
+  return html;
+}
+
+// 予約件数・連絡事項の部分（タップで詳細）
+function buildNoticeSectionsHtml() {
+  const resvCount = getTodayReservationCount();
+  const noticeCount = getTodayNotices().length;
+  if (resvCount === 0 && noticeCount === 0) return '';
+  let html = '<span class="banner-section banner-clickable" onclick="showTodayNoticesModal()">';
+  if (resvCount > 0) html += `<span class="banner-sub">📖 予約：<b>${resvCount}件</b></span>`;
+  if (noticeCount > 0) html += `<span class="banner-sub banner-notice">📌 連絡事項：<b>${noticeCount}件</b></span>`;
+  html += '</span>';
+  return html;
+}
+
+// 稼働卓タブの集計バナー（キャスト数・入店中のお客様数・プラマイ）
+function updateActiveCountBanner() {
+  const el = document.getElementById('activeCountBanner');
+  if (!el) return;
+  el.innerHTML = buildCountSectionsHtml();
   el.className = 'today-count-banner';
 }
 
@@ -4947,6 +4979,7 @@ function showCastOffModal() {
     pruneCastOff();
     persistSave();
     updateActiveCountBanner();
+    updateTodayShiftCount(); // フロアタブ・シフトタブの帯も更新
     close();
     showCastOffModal(); // 開き直して最新状態を表示
   });
@@ -9786,21 +9819,19 @@ function updateTodayShiftCount() {
     cls = 'today-count-banner';
   }
   // 予約件数・連絡事項を追加（区切り＋クリックで詳細）
-  if (resvCount > 0 || noticeCount > 0) {
-    html += '<span class="banner-section banner-clickable" onclick="showTodayNoticesModal()">';
-    if (resvCount > 0) {
-      html += `<span class="banner-sub">📖 予約：<b>${resvCount}件</b></span>`;
-    }
-    if (noticeCount > 0) {
-      html += `<span class="banner-sub banner-notice">📌 連絡事項：<b>${noticeCount}件</b></span>`;
-    }
-    html += '</span>';
-  }
-  // フロアタブとシフトタブの両方を更新
-  const fEl = document.getElementById('todayShiftCountFloor');
+  html += buildNoticeSectionsHtml();
+
+  // シフトタブは従来どおり「本日出勤」中心の表示
   const sEl = document.getElementById('todayShiftCountShift');
-  if (fEl) { fEl.innerHTML = html; fEl.className = cls; }
   if (sEl) { sEl.innerHTML = html; sEl.className = cls; }
+
+  // ★フロアタブは稼働卓タブと同じ帯にする（スタッフからの要望・v2026.07.30）
+  // キャスト数・お客様数・プラマイに加えて、予約と連絡事項も引き続き表示する。
+  const fEl = document.getElementById('todayShiftCountFloor');
+  if (fEl) {
+    fEl.innerHTML = buildCountSectionsHtml() + buildNoticeSectionsHtml();
+    fEl.className = 'today-count-banner';
+  }
 
   // 本日のお祝い・イベントバナー
   const bdays = getBirthdaysOnDate(todayStr);
