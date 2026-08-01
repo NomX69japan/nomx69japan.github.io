@@ -3084,9 +3084,22 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.30';
+const APP_VERSION = '2026.07.31';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.07.31',
+    date: '2026-07-31',
+    title: '👋 コンパニオンなど本日限りのヘルプをすぐ追加',
+    items: [
+      '「🌹 キャストの上がり」画面（キャスト部分をタップして開く画面）の上部に、名前を入力してすぐ本日の出勤に追加できる欄を追加しました。',
+      '体験入店の登録は通さず、名前だけですぐに今日のキャスト人数へ反映されます。',
+      '追加した人も同じ画面で「上がり」「戻す」を押せます。帰るときはワンタップです。',
+      '間違えて追加した場合は「✕」で削除できます。',
+      '本日限りの追加のため、設定のキャスト管理（恒久的な名簿）には表示されません。',
+      '追加から7日経つと自動的に整理されます。',
+    ],
+  },
   {
     version: '2026.07.30',
     date: '2026-07-30',
@@ -4924,6 +4937,47 @@ function updateActiveCountBanner() {
   el.className = 'today-count-banner';
 }
 
+// ===== 本日限りのヘルプ（コンパニオン等）追加（v2026.07.31） =====
+// 体験入店の登録フローを通さず、名前だけで今日の出勤扱いに素早く追加する。
+// helper:true を付けて通常のキャスト管理（設定画面）には出さず、
+// 「上がり」と同じ仕組みでオン/オフできるようにする。
+function addHelperCastToday(name) {
+  name = (name || '').trim();
+  if (!name) return null;
+  const dateStr = currentBusinessDate();
+  const maxOrder = (state.casts || []).reduce((m, c) => {
+    const so = (c.sortOrder == null) ? -1 : c.sortOrder;
+    return Math.max(m, so);
+  }, -1);
+  const cast = {
+    id: genId('cast'),
+    name: name,
+    trial: false,
+    helper: true,          // ★本日限りのヘルプであることを示すフラグ
+    helperDate: dateStr,   // 追加した営業日（掃除の判定に使う）
+    sortOrder: maxOrder + 1,
+    _created: Date.now(),
+    _updated: Date.now(),
+  };
+  if (!Array.isArray(state.casts)) state.casts = [];
+  state.casts.push(cast);
+  setShift(dateStr, cast.id, true); // 今日の出勤オンにする
+  persistSave();
+  return cast;
+}
+
+// 古いヘルプ記録を削除（7日以上前のものを自動的に消して肥大化を防ぐ）
+function pruneHelperCasts() {
+  if (!Array.isArray(state.casts)) return;
+  const limit = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  state.casts.forEach(c => {
+    if (c.helper && !c.removed && (c._created || 0) < limit) {
+      c.removed = true;
+      c._updated = Date.now();
+    }
+  });
+}
+
 // キャストの上がりをワンタップで記録するモーダル
 function showCastOffModal() {
   const dateStr = currentBusinessDate();
@@ -4944,14 +4998,15 @@ function showCastOffModal() {
       <div style="display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--border);">
         <div style="flex:1; min-width:0;">
           <div style="font-size:17px; font-weight:bold; color:${off ? 'var(--text-muted)' : 'var(--text)'};">
-            ${escapeHtml(c.name)}${off ? ' <span style="font-size:13px; font-weight:normal;">（上がり）</span>' : ''}
+            ${escapeHtml(c.name)}${c.helper ? ' <span style="font-size:11px; font-weight:normal; color:#b8860b; border:1px solid #d4af37; border-radius:6px; padding:0 5px;">本日ヘルプ</span>' : ''}${off ? ' <span style="font-size:13px; font-weight:normal;">（上がり）</span>' : ''}
           </div>
           <div style="font-size:12px; color:var(--text-muted);">
-            ${timeLabel ? '予定 ' + escapeHtml(timeLabel) : '予定なし'}${offTimeTxt ? ' ／ ' + escapeHtml(offTimeTxt) : ''}
+            ${c.helper ? '本日限りの追加' : (timeLabel ? '予定 ' + escapeHtml(timeLabel) : '予定なし')}${offTimeTxt ? ' ／ ' + escapeHtml(offTimeTxt) : ''}
           </div>
         </div>
         <button type="button" class="${off ? 'btn-sub' : 'btn'} btn-sm" data-cast-off="${escapeHtml(c.id)}"
           style="white-space:nowrap; min-width:92px;">${off ? '↩️ 戻す' : '🔚 上がり'}</button>
+        ${c.helper ? `<button type="button" class="btn-danger btn-sm" data-cast-remove="${escapeHtml(c.id)}" title="本日のヘルプ登録を削除">✕</button>` : ''}
       </div>`;
   }).join('');
 
@@ -4961,7 +5016,12 @@ function showCastOffModal() {
       <p style="font-size:12px; color:var(--text-sub); margin:0 0 8px;">
         実際に上がったキャストをタップして記録します。シフトの時刻は希望・予定なので、人数には反映されません。
       </p>
-      <div style="max-height:60vh; overflow-y:auto;">
+      <div style="display:flex; gap:6px; margin-bottom:10px; padding:10px; background:var(--surface-alt); border-radius:8px;">
+        <input type="text" id="helperCastNameInput" placeholder="コンパニオンなど本日だけの名前"
+          style="flex:1; min-width:0; font-size:16px; padding:8px 10px; border:1px solid var(--border); border-radius:6px;">
+        <button type="button" class="btn btn-sm" id="helperCastAddBtn" style="white-space:nowrap;">＋ 本日だけ追加</button>
+      </div>
+      <div style="max-height:55vh; overflow-y:auto;">
         ${rows || '<div style="padding:20px; text-align:center; color:var(--text-muted);">本日出勤のキャストがいません</div>'}
       </div>
       <div class="modal-footer" style="margin-top:10px;">
@@ -4971,6 +5031,30 @@ function showCastOffModal() {
 
   bg.addEventListener('click', (ev) => {
     if (ev.target === bg || ev.target.hasAttribute('data-close')) { close(); return; }
+    if (ev.target.id === 'helperCastAddBtn') {
+      const input = document.getElementById('helperCastNameInput');
+      const name = input ? input.value : '';
+      if (!name || !name.trim()) { input && input.focus(); return; }
+      addHelperCastToday(name);
+      updateActiveCountBanner();
+      updateTodayShiftCount();
+      close();
+      showCastOffModal();
+      return;
+    }
+    const rmBtn = ev.target.closest('[data-cast-remove]');
+    if (rmBtn) {
+      const cid = rmBtn.getAttribute('data-cast-remove');
+      if (!confirm('本日のヘルプ登録を削除しますか？（人数から外れます）')) return;
+      const c = (state.casts || []).find(x => x.id === cid);
+      if (c) { c.removed = true; c._updated = Date.now(); }
+      persistSave();
+      updateActiveCountBanner();
+      updateTodayShiftCount();
+      close();
+      showCastOffModal();
+      return;
+    }
     const btn = ev.target.closest('[data-cast-off]');
     if (!btn) return;
     const cid = btn.getAttribute('data-cast-off');
@@ -4983,7 +5067,16 @@ function showCastOffModal() {
     close();
     showCastOffModal(); // 開き直して最新状態を表示
   });
+  // Enterキーでも追加できるようにする
+  bg.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && ev.target && ev.target.id === 'helperCastNameInput') {
+      ev.preventDefault();
+      document.getElementById('helperCastAddBtn').click();
+    }
+  });
   document.body.appendChild(bg);
+  const nameInput = document.getElementById('helperCastNameInput');
+  if (nameInput) nameInput.focus();
 }
 
 // ===== 稼働卓タブ：使用中の卓だけを詳細展開して一覧 =====
@@ -12261,7 +12354,8 @@ function addCast() {
 function renderCastListUI() {
   const root = document.getElementById('castListUI');
   // 表示用：sortOrder 昇順、未設定（undefined）は末尾、同じなら _created 順
-  const list = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+  // 本日限りのヘルプ（helper:true）は、恒久的なキャスト管理には出さない
+  const list = state.casts.filter(c => !c.removed && !c.helper).slice().sort((a, b) => {
     const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
     const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
     if (sa !== sb) return sa - sb;
