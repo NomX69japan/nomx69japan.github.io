@@ -1006,6 +1006,15 @@
   table.shift tr.section-count-row td.cast-col {
     z-index: 12;
   }
+  /* ホール／ドライバーの役割見出し行：区切り見出しと同じ「人数表示」の体裁だが、
+     こちらは固定表示にはしない（同じtop位置で「🌹キャスト」等と重なってしまうため）。 */
+  table.shift tr.role-count-row td.section-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: inherit;
+    text-align: center;
+    letter-spacing: 0;
+  }
   table.shift td.shift-cell {
     cursor: pointer;
     min-width: 70px;
@@ -3103,9 +3112,18 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.01';
+const APP_VERSION = '2026.08.02';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.02',
+    date: '2026-08-02',
+    title: '🏠🚗 スタッフの人数表示をホール／ドライバーで分割',
+    items: [
+      'シフト表の人数表示について、これまで「スタッフ」として合算していたホールとドライバーを分けて表示するようにしました。',
+      '清掃は1名想定のため、人数表示は付けずラベルのみのままにしています。',
+    ],
+  },
   {
     version: '2026.08.01',
     date: '2026-08-01',
@@ -9576,21 +9594,28 @@ function renderShift() {
       });
     }
     // スタッフ行（役割ごとに色分け・区切り線付き）
+    // ★ホールとドライバーを分けて人数表示する（清掃は1名のみのため人数表示なし・v2026.08.02）
     if (activeStaff.length > 0) {
-      html += `<tr class="section-header section-count-row"><td class="cast-col">👔 スタッフ</td>`;
-      days.forEach(d => {
-        const dStr = localDateStr(d);
-        const cnt = activeStaff.reduce((n, s) => n + (getShiftStatus(dStr, s.id) === 'on' ? 1 : 0), 0);
-        html += `<td class="section-count">${cnt > 0 ? cnt + '名' : ''}</td>`;
-      });
-      html += '</tr>';
+      html += `<tr class="section-header"><td colspan="7">👔 スタッフ</td></tr>`;
       let prevRole = null;
       activeStaff.forEach(s => {
         const role = s.role || 'hall';
         const roleInfo = STAFF_ROLE_COLORS[role] || STAFF_ROLE_COLORS.hall;
         // 役割グループの先頭にラベル行を挿入（前の人と役割が変わった時）
         if (role !== prevRole) {
-          html += `<tr class="staff-role-header" data-staff-role="${role}"><td colspan="7">${roleInfo.label}</td></tr>`;
+          if (role === 'cleaning') {
+            // 清掃は1名想定のため人数表示は無し（ラベルのみ）
+            html += `<tr class="staff-role-header" data-staff-role="${role}"><td colspan="7">${roleInfo.label}</td></tr>`;
+          } else {
+            const roleStaff = activeStaff.filter(x => (x.role || 'hall') === role);
+            html += `<tr class="staff-role-header role-count-row" data-staff-role="${role}"><td class="cast-col">${roleInfo.label}</td>`;
+            days.forEach(d => {
+              const dStr = localDateStr(d);
+              const cnt = roleStaff.reduce((n, x) => n + (getShiftStatus(dStr, x.id) === 'on' ? 1 : 0), 0);
+              html += `<td class="section-count">${cnt > 0 ? cnt + '名' : ''}</td>`;
+            });
+            html += '</tr>';
+          }
           prevRole = role;
         }
         html += `<tr class="staff-row" data-staff-role="${role}">`;
