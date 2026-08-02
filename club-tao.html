@@ -987,6 +987,25 @@
   table.shift tr.section-header td.cast-col {
     background: #d6cfc1 !important;
   }
+  /* ★区切り行（🌹キャスト／👔スタッフ）自体もスクロール時に固定表示する。
+     theadのすぐ下に貼り付くよう、topの実測値をJS側（stickySectionHeaderOffsets）で設定する。 */
+  table.shift tr.section-count-row td {
+    position: -webkit-sticky;
+    position: sticky;
+    z-index: 8;
+    transform: translate3d(0,0,0);
+    contain: layout;
+  }
+  table.shift tr.section-count-row td.section-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b5f50;
+    text-align: center;
+    letter-spacing: 0;
+  }
+  table.shift tr.section-count-row td.cast-col {
+    z-index: 12;
+  }
   table.shift td.shift-cell {
     cursor: pointer;
     min-width: 70px;
@@ -3084,9 +3103,19 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.07.31';
+const APP_VERSION = '2026.08.01';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.01',
+    date: '2026-08-01',
+    title: '📅 シフト表に日別の出勤人数を表示',
+    items: [
+      'シフト表の「🌹 キャスト」「👔 スタッフ」の区切り行が、これまで空いたスペースが多かったので、そこに各曜日の出勤人数（○の人数）を表示するようにしました。',
+      'この区切り行自体も、スクロールしても常に見える位置に固定されるようにしました（名前・日付の見出しと同じ扱いです）。',
+      '「△未定」はカウントに含めていません。',
+    ],
+  },
   {
     version: '2026.07.31',
     date: '2026-07-31',
@@ -9473,7 +9502,14 @@ function renderShift() {
   } else {
     // キャスト行
     if (activeCasts.length > 0) {
-      html += `<tr class="section-header"><td colspan="7">🌹 キャスト</td></tr>`;
+      // ★区切り行の空いたスペースに、日ごとの出勤人数を表示する（v2026.08.01）
+      html += `<tr class="section-header section-count-row"><td class="cast-col">🌹 キャスト</td>`;
+      days.forEach(d => {
+        const dStr = localDateStr(d);
+        const cnt = activeCasts.reduce((n, c) => n + (getShiftStatus(dStr, c.id) === 'on' ? 1 : 0), 0);
+        html += `<td class="section-count">${cnt > 0 ? cnt + '名' : ''}</td>`;
+      });
+      html += '</tr>';
       const todayStr = businessDateStr();
       activeCasts.forEach(c => {
         const trialMark = c.trial
@@ -9541,7 +9577,13 @@ function renderShift() {
     }
     // スタッフ行（役割ごとに色分け・区切り線付き）
     if (activeStaff.length > 0) {
-      html += `<tr class="section-header"><td colspan="7">👔 スタッフ</td></tr>`;
+      html += `<tr class="section-header section-count-row"><td class="cast-col">👔 スタッフ</td>`;
+      days.forEach(d => {
+        const dStr = localDateStr(d);
+        const cnt = activeStaff.reduce((n, s) => n + (getShiftStatus(dStr, s.id) === 'on' ? 1 : 0), 0);
+        html += `<td class="section-count">${cnt > 0 ? cnt + '名' : ''}</td>`;
+      });
+      html += '</tr>';
       let prevRole = null;
       activeStaff.forEach(s => {
         const role = s.role || 'hall';
@@ -9573,6 +9615,21 @@ function renderShift() {
   html += '</tbody>';
   document.getElementById('shiftTable').innerHTML = html;
   bindShiftCellLongPress();
+  applyStickySectionOffsets();
+}
+
+// 区切り行（🌹キャスト／👔スタッフ）を、theadの実際の高さぶんだけ
+// 下にオフセットしてstickyさせる。theadの高さはフォント環境で変わるため、
+// 固定値を書かずその都度実測する。
+function applyStickySectionOffsets() {
+  const table = document.getElementById('shiftTable');
+  if (!table) return;
+  const thead = table.querySelector('thead');
+  if (!thead) return;
+  const offset = thead.offsetHeight;
+  table.querySelectorAll('tr.section-count-row td').forEach(td => {
+    td.style.top = offset + 'px';
+  });
 }
 
 // シフトセルの長押し検出：長押しで勤務時間の入力ミニモーダルを開く
