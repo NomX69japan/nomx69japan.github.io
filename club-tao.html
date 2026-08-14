@@ -3112,9 +3112,18 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.04';
+const APP_VERSION = '2026.08.05';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.05',
+    date: '2026-08-05',
+    title: '🍾 ボトル入力欄の順番とわかりやすさを改善',
+    items: [
+      'ボトル追加・編集フォームの入力欄の順番を、ネームタグ（お客様の名前）→種類（お酒の名前）の順に変更しました。ラベルにも説明を添えています。',
+      '残量表示を、記号の羅列（●●●○○○）から、バー表示＋「7/10（70%）」のような分数表記に変更しました。編集時のプルダウンと同じ表記なので分かりやすくなっています。',
+    ],
+  },
   {
     version: '2026.08.04',
     date: '2026-08-04',
@@ -10404,7 +10413,7 @@ function removeVisit(idx) {
 }
 function addBottleToEditing() {
   const name = document.getElementById('newBottleName').value.trim();
-  if (!name) { alert('ボトル名を入力してください'); return; }
+  if (!name) { alert('種類（お酒の名前）を入力してください'); return; }
   const tag = document.getElementById('newBottleTag').value.trim();
   const loc = document.getElementById('newBottleLoc').value.trim();
   const date = document.getElementById('newBottleDate').value;
@@ -10436,7 +10445,7 @@ function cancelEditBottle() {
 function saveEditBottle(idx) {
   if (!custEditing || !custEditing.bottles || !custEditing.bottles[idx]) return;
   const name = document.getElementById('editBottleName_' + idx).value.trim();
-  if (!name) { alert('ボトル名を入力してください'); return; }
+  if (!name) { alert('種類（お酒の名前）を入力してください'); return; }
   const tag = document.getElementById('editBottleTag_' + idx).value.trim();
   const loc = document.getElementById('editBottleLoc_' + idx).value.trim();
   const date = document.getElementById('editBottleDate_' + idx).value;
@@ -10464,15 +10473,20 @@ function adjustBottleRemain(idx, delta) {
   preserveAndReopen();
 }
 
-// 残量の視覚表示HTML（●○で10段階）
+// 残量の視覚表示HTML（プログレスバー＋分数表記。編集欄の「n/10」表記と揃えて分かりやすくする）
 function buildRemainBarHtml(remain) {
   const r = (typeof remain === 'number') ? Math.max(0, Math.min(10, remain)) : 10;
   // 残量に応じて色を変える：7以上=緑、4-6=琥珀、3以下=赤
   const color = r >= 7 ? '#5a9c5a' : (r >= 4 ? '#d4a017' : '#c0392b');
-  const filled = '●'.repeat(r);
-  const empty = '○'.repeat(10 - r);
   const pct = r * 10;
-  return `<span style="font-family:monospace; letter-spacing:1px; color:${color}; font-size:14px;">${filled}<span style="opacity:0.35;">${empty}</span></span> <span style="font-size:11px; color:#888;">${pct}%</span>`;
+  const label = r === 10 ? ' 満タン' : (r === 0 ? ' 空' : '');
+  return `
+    <span class="remain-bar-wrap" style="display:inline-flex; align-items:center; gap:6px; vertical-align:middle;">
+      <span class="remain-bar-track" style="position:relative; display:inline-block; width:88px; height:10px; background:#e6e0d0; border-radius:5px; overflow:hidden; flex-shrink:0;">
+        <span class="remain-bar-fill" style="position:absolute; left:0; top:0; bottom:0; width:${pct}%; background:${color}; border-radius:5px;"></span>
+      </span>
+      <span style="font-size:13px; font-weight:700; color:${color}; white-space:nowrap;">${r}/10<span style="font-weight:400; color:#888; margin-left:3px;">（${pct}%）${label}</span></span>
+    </span>`;
 }
 // ボトル一覧のHTML生成（編集中のものは入力欄に置き換え）
 function buildBottlesListHtml(bottles) {
@@ -10490,8 +10504,8 @@ function buildBottlesListHtml(bottles) {
         remainOpts.push(`<option value="${v}"${v===remainVal?' selected':''}>${v} / 10（${v*10}%）${v===10?' 満タン':(v===0?' 空':'')}</option>`);
       }
       return `<div class="bottle-row-v2 editing">
-        <div class="bav-row"><span class="bav-lab">🍾 ボトル名</span><input type="text" id="editBottleName_${idx}" value="${escapeHtml(b.name||'')}" placeholder="必須"></div>
-        <div class="bav-row"><span class="bav-lab">🏷 タグ</span><input type="text" id="editBottleTag_${idx}" value="${escapeHtml(b.tag||'')}" placeholder="ネームタグ"></div>
+        <div class="bav-row"><span class="bav-lab">🏷 ネームタグ<br><span style="font-size:10px; font-weight:normal; color:#999;">（お客様の名前）</span></span><input type="text" id="editBottleTag_${idx}" value="${escapeHtml(b.tag||'')}" placeholder="例：田中様"></div>
+        <div class="bav-row"><span class="bav-lab">🍾 種類<br><span style="font-size:10px; font-weight:normal; color:#999;">（お酒の名前）</span></span><input type="text" id="editBottleName_${idx}" value="${escapeHtml(b.name||'')}" placeholder="必須"></div>
         <div class="bav-row"><span class="bav-lab">📍 保管</span><input type="text" id="editBottleLoc_${idx}" value="${escapeHtml(b.location||'')}" list="bottleLocList" placeholder="旧キャッシャー / キッチン / 冷凍庫 / タグホルダー など"></div>
         <div class="bav-row"><span class="bav-lab">📅 入店日</span><input type="date" id="editBottleDate_${idx}" value="${escapeHtml(b.openedDate||'')}"></div>
         <div class="bav-row"><span class="bav-lab">🍶 残量</span><select id="editBottleRemain_${idx}">${remainOpts.join('')}</select></div>
@@ -10666,12 +10680,12 @@ function rebuildCustomerModalBody(cust) {
       <div id="bottlesList">${bottlesHtml}</div>
       <div class="bottle-add-v2">
         <label class="bav-row">
-          <span class="bav-lab">🍾 ボトル名</span>
-          <input type="text" id="newBottleName" placeholder="必須">
+          <span class="bav-lab">🏷 ネームタグ<br><span style="font-size:10px; font-weight:normal; color:#999;">（お客様の名前）</span></span>
+          <input type="text" id="newBottleTag" placeholder="例：田中様">
         </label>
         <label class="bav-row">
-          <span class="bav-lab">🏷 タグ</span>
-          <input type="text" id="newBottleTag" placeholder="ネームタグ">
+          <span class="bav-lab">🍾 種類<br><span style="font-size:10px; font-weight:normal; color:#999;">（お酒の名前）</span></span>
+          <input type="text" id="newBottleName" placeholder="必須">
         </label>
         <label class="bav-row">
           <span class="bav-lab">📍 保管</span>
