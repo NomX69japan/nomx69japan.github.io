@@ -1679,6 +1679,7 @@
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 3px;
+    flex-wrap: wrap;
   }
   .bk-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
   .bk-item-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
@@ -3112,9 +3113,19 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.05';
+const APP_VERSION = '2026.08.06';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.06',
+    date: '2026-08-06',
+    title: '🍾 オーダーからの自動ボトル登録でネームタグを引き継ぎ／残量バーを拡大',
+    items: [
+      'オーダーで同じ銘柄のボトルが再度入った場合、既存ボトルのネームタグ・保管場所を自動で引き継ぐようにしました。空になったボトルの銘柄と同じものが追加された時、毎回タグを入力し直す必要がなくなります。',
+      '複数同名ボトルがある場合は、直近に登録された方の情報を引き継ぎます。',
+      '残量バーを大きく見やすいサイズに変更しました（幅・高さ・文字サイズを拡大）。',
+    ],
+  },
   {
     version: '2026.08.05',
     date: '2026-08-05',
@@ -8825,8 +8836,10 @@ function addOrderToTable(tableId, itemId) {
 }
 
 // ボトルカテゴリのオーダーが入った際に、卓の代表顧客の顧客データへ
-// ボトルとして自動登録する。保存場所（location）は空のままにし、
-// あとから顧客編集画面の「ボトル」欄で入力してもらう想定。
+// ボトルとして自動登録する。
+// ★同じ銘柄のボトルを既に持っている場合、ネームタグ・保管場所を引き継ぐ（v2026.08.06）
+//   例：白州が空になり、同じ白州を新たに入れた場合、毎回タグを入力し直さなくて済むようにする。
+//   引き継ぐ元が無ければ、これまで通り空欄のままにし、あとから編集画面で入力してもらう。
 function addBottleFromOrder(tdata, bottleName) {
   // 代表顧客の決定：卓に直接紐付いた顧客を優先し、無ければ合流客リストの先頭を見る
   let customerId = tdata.customerId || '';
@@ -8838,16 +8851,22 @@ function addBottleFromOrder(tdata, bottleName) {
   const c = state.customers.find(x => x.id === customerId);
   if (!c) return;
   if (!Array.isArray(c.bottles)) c.bottles = [];
+  // 同じ名前（前後空白・大文字小文字を無視）のボトルを探し、タグ・保管場所を引き継ぐ。
+  // 複数あれば、最後に登録された（＝直近の）ものを優先する。
+  const norm = (s) => (s || '').trim().toLowerCase();
+  const sameNameBottles = c.bottles.filter(b => norm(b.name) === norm(bottleName) && (b.tag || b.location));
+  const inheritFrom = sameNameBottles[sameNameBottles.length - 1];
   c.bottles.push({
     name: bottleName,
-    tag: '',
-    location: '',
+    tag: inheritFrom?.tag || '',
+    location: inheritFrom?.location || '',
     openedDate: todayBusinessDate(),
     remain: 10,
     _autoFromOrder: true,
   });
   c._updated = Date.now();
-  showToast(`🍾 ${withSan(displayName(c))} 様のボトルに「${bottleName}」を追加しました`, 'normal');
+  const tagNote = inheritFrom?.tag ? `（ネームタグ「${inheritFrom.tag}」を引き継ぎ）` : '';
+  showToast(`🍾 ${withSan(displayName(c))} 様のボトルに「${bottleName}」を追加しました${tagNote}`, 'normal');
 }
 
 // モーダル内の現在のオーダー一覧描画
@@ -10481,11 +10500,11 @@ function buildRemainBarHtml(remain) {
   const pct = r * 10;
   const label = r === 10 ? ' 満タン' : (r === 0 ? ' 空' : '');
   return `
-    <span class="remain-bar-wrap" style="display:inline-flex; align-items:center; gap:6px; vertical-align:middle;">
-      <span class="remain-bar-track" style="position:relative; display:inline-block; width:88px; height:10px; background:#e6e0d0; border-radius:5px; overflow:hidden; flex-shrink:0;">
-        <span class="remain-bar-fill" style="position:absolute; left:0; top:0; bottom:0; width:${pct}%; background:${color}; border-radius:5px;"></span>
+    <span class="remain-bar-wrap" style="display:inline-flex; align-items:center; gap:10px; vertical-align:middle; flex-wrap:wrap;">
+      <span class="remain-bar-track" style="position:relative; display:inline-block; width:150px; height:20px; background:#e6e0d0; border-radius:10px; overflow:hidden; flex-shrink:0; box-shadow:inset 0 1px 2px rgba(0,0,0,0.12);">
+        <span class="remain-bar-fill" style="position:absolute; left:0; top:0; bottom:0; width:${pct}%; background:${color}; border-radius:10px; transition:width 0.2s;"></span>
       </span>
-      <span style="font-size:13px; font-weight:700; color:${color}; white-space:nowrap;">${r}/10<span style="font-weight:400; color:#888; margin-left:3px;">（${pct}%）${label}</span></span>
+      <span style="font-size:17px; font-weight:700; color:${color}; white-space:nowrap;">${r}/10<span style="font-size:13px; font-weight:400; color:#888; margin-left:4px;">（${pct}%）${label}</span></span>
     </span>`;
 }
 // ボトル一覧のHTML生成（編集中のものは入力欄に置き換え）
