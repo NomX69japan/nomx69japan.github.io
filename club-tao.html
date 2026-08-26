@@ -3113,9 +3113,21 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.10';
+const APP_VERSION = '2026.08.11';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.11',
+    date: '2026-08-11',
+    title: '📝 手動来店記録を手書き伝票に近づけました',
+    items: [
+      '【原因判明】手動追加画面で同伴・A/B指名が記録できなかった不具合：指名キャストにチェックを入れても、同伴チェックボックスとA/B指名ボタンが画面上に現れない作りになっていました。チェックを入れるとすぐに表示されるよう修正しました。',
+      'セット数の入力を、60分セット・30分延長それぞれの本数を＋−ボタンで増減する方式に変更しました。数字を打ち込む必要がなくなりました。',
+      '本数を増減するたびに退店時刻が自動で計算されます（手動で書き換えることもできます）。',
+      'タグ欄を追加しました：ご新規様／クレジットカード／領収書／掛け／VIP。来店詳細と日別の一覧の両方にバッジで表示されます。',
+      '金額の項目は追加していません（前回のご要望どおり）。',
+    ],
+  },
   {
     version: '2026.08.10',
     date: '2026-08-10',
@@ -5679,6 +5691,16 @@ function showVisitDetail(logId) {
           <tr><td style="color:#888; vertical-align:top;">人数</td><td>${log.guests || 0}名</td></tr>
           <tr><td style="color:#888; vertical-align:top;">担当キャスト</td><td>${escapeHtml(allCasts)}</td></tr>
           ${log.dohan && (log.dohanCastIds||[]).length > 0 ? `<tr><td style="color:#888; vertical-align:top;">同伴</td><td><span style="background:#fff4d6; color:#8a6a0a; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">${escapeHtml(buildDohanDisplay(log) || 'あり')}</span></td></tr>` : ''}
+          ${(() => {
+            const tags = [];
+            if (log.isNewCustomer) tags.push('<span style="background:#e8f4ff; color:#1a5a9e; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">🆕 ご新規様</span>');
+            if (log.paymentCard) tags.push('<span style="background:#f0f0f0; color:#555; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">💳 カード</span>');
+            if (log.receiptNeeded) tags.push('<span style="background:#f0f0f0; color:#555; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">🧾 領収書</span>');
+            if (log.onCredit) tags.push('<span style="background:#ffe9e9; color:#a33; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600;">📒 掛け</span>');
+            if (log.isVip) tags.push('<span style="background:#2a2520; color:#f0d98c; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:700;">👑 VIP</span>');
+            if (tags.length === 0) return '';
+            return `<tr><td style="color:#888; vertical-align:top;">タグ</td><td style="display:flex; flex-wrap:wrap; gap:4px;">${tags.join('')}</td></tr>`;
+          })()}
           <tr><td style="color:#888; vertical-align:top;">セット数</td><td>${setBreakdownText}</td></tr>
           ${(() => {
             const orders = (log.orders || []).filter(o => !o.removed);
@@ -6092,13 +6114,28 @@ function openVisitLogEditModal(logId) {
 
   const dohanIds = new Set(log.dohanCastIds || []);
 
+  // ★セット内訳（60分×N／30分×N）の初期値を算出（v2026.08.11）
+  // 新形式：log.extensions（1件＝1ブロック分の延長）があればそこから逆算。
+  // 旧形式：extensionsが無ければ、既存の表示ロジック（setBreakdownText）と同じ前提
+  // 「延長は60分」で逆算する（表示と食い違わないようにするため）。
+  let vleSet60Init = 1, vleSet30Init = 0;
+  if (Array.isArray(log.extensions) && log.extensions.length > 0) {
+    const ext60 = log.extensions.filter(e => e.min === 60).length;
+    const ext30 = log.extensions.filter(e => e.min === 30).length;
+    vleSet60Init = 1 + ext60;
+    vleSet30Init = ext30;
+  } else if ((log.setCount || 1) > 1) {
+    vleSet60Init = log.setCount || 1;
+    vleSet30Init = 0;
+  }
+
   const castRowsHtml = castSorted.map(c => {
     const checked = includedIds.has(c.id);
     const nom = (log.castNoms && log.castNoms[c.id]) || 'none';
     const isDohan = dohanIds.has(c.id);
     const trialMark = c.trial ? '<span style="background:#ffe0e6; color:#c2185b; font-size:10px; padding:1px 4px; border-radius:3px; margin-left:4px;">体験</span>' : '';
     return `
-      <div class="cast-pick-row vle-cast-row">
+      <div class="cast-pick-row vle-cast-row${checked?' picked':''}">
         <label class="vle-cast-name-label">
           <input type="checkbox" class="vle-cast-pick" data-cast-pick="${c.id}" value="${c.id}" ${checked?'checked':''}>
           <span>${escapeHtml(c.name)}${trialMark}</span>
@@ -6172,10 +6209,23 @@ function openVisitLogEditModal(logId) {
           <select id="vleStartMin" style="flex:1;">${buildMinOpts(sT.m)}</select>
         </div>
       </div>
-      <label class="field">
-        <span class="lab">セット数<br><span style="font-size:10px; font-weight:normal; color:#999;">（1セット目60分＋延長1セットにつき30分として退店時刻を計算）</span></span>
-        <input type="number" id="vleSetCount" value="${log.setCount || 1}" min="1" max="20">
-      </label>
+      <div class="field">
+        <span class="lab">セット内訳<br><span style="font-size:10px; font-weight:normal; color:#999;">（60分セット・30分延長の本数。退店時刻を自動計算します）</span></span>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:13px; font-weight:600;">60分</span>
+            <button type="button" class="btn-sub btn-sm vle-set-btn" data-vle-set-adj="60:-1" style="width:34px;">−</button>
+            <span id="vleSet60Count" style="min-width:22px; text-align:center; font-size:16px; font-weight:bold;">${vleSet60Init}</span>
+            <button type="button" class="btn-sub btn-sm vle-set-btn" data-vle-set-adj="60:1" style="width:34px;">＋</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:13px; font-weight:600;">30分延長</span>
+            <button type="button" class="btn-sub btn-sm vle-set-btn" data-vle-set-adj="30:-1" style="width:34px;">−</button>
+            <span id="vleSet30Count" style="min-width:22px; text-align:center; font-size:16px; font-weight:bold;">${vleSet30Init}</span>
+            <button type="button" class="btn-sub btn-sm vle-set-btn" data-vle-set-adj="30:1" style="width:34px;">＋</button>
+          </div>
+        </div>
+      </div>
       <div class="field">
         <span class="lab">退店時刻</span>
         <div style="display:flex; gap:4px; align-items:center;">
@@ -6184,7 +6234,7 @@ function openVisitLogEditModal(logId) {
           <select id="vleEndMin" style="flex:1;">${buildMinOpts(eT.m)}</select>
           <button type="button" id="vleAutoCalcEndBtn" class="btn-sub btn-sm" style="white-space:nowrap;">⏱ 自動計算</button>
         </div>
-        <span style="font-size:10px; color:#999;">入店時刻・セット数から計算します（手動で書き換えても構いません）</span>
+        <span style="font-size:10px; color:#999;">セットの本数を増減すると自動で計算されます（手動で書き換えても構いません）</span>
       </div>
 
       <div class="field">
@@ -6198,6 +6248,27 @@ function openVisitLogEditModal(logId) {
         <span class="lab">フリー入力（その他キャスト名）</span>
         <input type="text" id="vleCastFree" value="${escapeHtml(log.castFree || '')}" placeholder="未登録のヘルプ等">
       </label>
+
+      <div class="field">
+        <span class="lab">タグ</span>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 14px;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:13px;">
+            <input type="checkbox" id="vleTagNew" ${log.isNewCustomer ? 'checked' : ''}> ご新規様
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:13px;">
+            <input type="checkbox" id="vleTagCard" ${log.paymentCard ? 'checked' : ''}> クレジットカード
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:13px;">
+            <input type="checkbox" id="vleTagReceipt" ${log.receiptNeeded ? 'checked' : ''}> 領収書
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:13px;">
+            <input type="checkbox" id="vleTagCredit" ${log.onCredit ? 'checked' : ''}> 掛け
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:13px;">
+            <input type="checkbox" id="vleTagVip" ${log.isVip ? 'checked' : ''}> VIP
+          </label>
+        </div>
+      </div>
 
       <label class="field">
         <span class="lab">メモ</span>
@@ -6219,6 +6290,27 @@ function openVisitLogEditModal(logId) {
 
   // 顧客カード（複数・合流対応）を描画
   renderVleGuestList(bg);
+
+  // ★指名チェックのON/OFFで行に .picked を付け外しする（v2026.08.11）
+  // これが無いと「同」チェックボックスとA/B指名トグルがCSS上ずっと非表示のままになり、
+  // 同伴・A/Bを記録する手段が実質無い状態だった。
+  bg.querySelectorAll('input.vle-cast-pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const row = cb.closest('.cast-pick-row');
+      if (row) row.classList.toggle('picked', cb.checked);
+      if (!cb.checked) {
+        // 指名を外したら、同伴・A/B指名もあわせて解除する
+        const cid = cb.getAttribute('data-cast-pick');
+        const toggle = bg.querySelector(`.nom-toggle[data-vle-nom-toggle="${cid}"]`);
+        if (toggle) toggle.querySelectorAll('.nom-btn').forEach(b => b.classList.remove('active','a','b','none'));
+        const dohanCb = bg.querySelector(`input.vle-cast-dohan[data-vle-dohan="${cid}"]`);
+        if (dohanCb) {
+          dohanCb.checked = false;
+          dohanCb.closest('.dohan-toggle')?.classList.remove('is-dohan');
+        }
+      }
+    });
+  });
 
   // オーダー編集UIを描画
   renderVleOrderArea(logId, bg);
@@ -6320,14 +6412,14 @@ function openVisitLogEditModal(logId) {
   bg.querySelector('[data-save]').addEventListener('click', () => {
     saveVisitLogEdit(logId, bg);
   });
-  // ★退店時刻の自動計算（v2026.08.09）：入店時刻＋セット数から算出。
-  // 1セット目=60分、2セット目以降は1セットにつき30分延長という一般的な料金体系を想定。
+  // ★退店時刻の自動計算（v2026.08.11）：入店時刻＋60分セット数・30分延長数から算出。
   // 深夜0-4時台は「翌日」として扱う既存の営業日ルールに合わせて日跨ぎも計算する。
-  bg.querySelector('#vleAutoCalcEndBtn')?.addEventListener('click', () => {
+  const recalcVleEndTime = (showMsg) => {
     const sh = parseInt(bg.querySelector('#vleStartHour').value, 10);
     const sm = parseInt(bg.querySelector('#vleStartMin').value, 10);
-    const setCount = parseInt(bg.querySelector('#vleSetCount').value, 10) || 1;
-    const durationMin = 60 + Math.max(0, setCount - 1) * 30;
+    const n60 = parseInt(bg.querySelector('#vleSet60Count').textContent, 10) || 0;
+    const n30 = parseInt(bg.querySelector('#vleSet30Count').textContent, 10) || 0;
+    const durationMin = n60 * 60 + n30 * 30;
     // 0-4時台は翌日扱い、20-23時台は当日扱い（buildTsFromHHMMと同じルール）
     const isNextDay = (sh >= 0 && sh <= 4);
     const base = new Date(2000, 0, isNextDay ? 2 : 1, sh, sm, 0, 0);
@@ -6348,7 +6440,23 @@ function openVisitLogEditModal(logId) {
     }
     if (endHSel) endHSel.value = String(targetH).padStart(2, '0');
     if (endMSel) endMSel.value = String(targetM).padStart(2, '0');
-    showToast(`退店時刻を ${String(targetH).padStart(2,'0')}:${String(targetM).padStart(2,'0')} に設定しました（${setCount}セット＝${durationMin}分）`, 'normal');
+    if (showMsg) {
+      showToast(`退店時刻を ${String(targetH).padStart(2,'0')}:${String(targetM).padStart(2,'0')} に設定しました（60分×${n60}／30分×${n30}）`, 'normal');
+    }
+  };
+  bg.querySelector('#vleAutoCalcEndBtn')?.addEventListener('click', () => recalcVleEndTime(true));
+  // 60分／30分の＋−ボタン：本数を増減し、そのたびに退店時刻を自動更新する
+  bg.querySelectorAll('[data-vle-set-adj]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const [unit, deltaStr] = btn.getAttribute('data-vle-set-adj').split(':');
+      const delta = parseInt(deltaStr, 10);
+      const countEl = bg.querySelector(unit === '60' ? '#vleSet60Count' : '#vleSet30Count');
+      if (!countEl) return;
+      const cur = parseInt(countEl.textContent, 10) || 0;
+      const min = (unit === '60') ? 0 : 0; // どちらも0まで下げられる（0セットは保存時にチェック）
+      countEl.textContent = String(Math.max(min, Math.min(20, cur + delta)));
+      recalcVleEndTime(false);
+    });
   });
 }
 
@@ -6405,7 +6513,18 @@ function saveVisitLogEdit(logId, bg) {
   const startMin = bg.querySelector('#vleStartMin').value;
   const endHour = bg.querySelector('#vleEndHour').value;
   const endMin = bg.querySelector('#vleEndMin').value;
-  const setCount = parseInt(bg.querySelector('#vleSetCount').value, 10) || 1;
+  // ★60分・30分のカウンターからセット数・延長内訳を算出（v2026.08.11）
+  // 最初の1ブロックは「セット」、残りは setBreakdownText の表示と揃えて extensions に記録する。
+  const vleN60 = parseInt(bg.querySelector('#vleSet60Count')?.textContent, 10) || 0;
+  const vleN30 = parseInt(bg.querySelector('#vleSet30Count')?.textContent, 10) || 0;
+  if (vleN60 + vleN30 <= 0) {
+    alert('セット数（60分・30分のいずれか）を1つ以上入力してください');
+    return;
+  }
+  const setCount = vleN60 + vleN30;
+  const extensions = [];
+  for (let i = 0; i < Math.max(0, vleN60 - 1); i++) extensions.push({ min: 60, auto: false });
+  for (let i = 0; i < vleN30; i++) extensions.push({ min: 30, auto: false });
   const castFree = (bg.querySelector('#vleCastFree').value || '').trim();
   const memo = bg.querySelector('#vleMemo').value || '';
 
@@ -6477,6 +6596,13 @@ function saveVisitLogEdit(logId, bg) {
   log.startedAt = newStartedAt;
   log.endedAt = newEndedAt;
   log.setCount = setCount;
+  log.extensions = extensions;
+  // ★来店タグ（v2026.08.11）
+  log.isNewCustomer = !!bg.querySelector('#vleTagNew')?.checked;
+  log.paymentCard = !!bg.querySelector('#vleTagCard')?.checked;
+  log.receiptNeeded = !!bg.querySelector('#vleTagReceipt')?.checked;
+  log.onCredit = !!bg.querySelector('#vleTagCredit')?.checked;
+  log.isVip = !!bg.querySelector('#vleTagVip')?.checked;
   log.durationMin = Math.round((newEndedAt - newStartedAt) / 60000);
   // 複数顧客（合流含む）を guestList として保存。1人だけなら guestList は null（後方互換）
   if (cleanGuests.length > 1) {
@@ -7479,14 +7605,20 @@ function showDayDetailModal(dateStr) {
         const onclickAttr = v.ongoing
           ? `onclick="showOngoingDetail('${v.tableId}')"`
           : `onclick="showVisitDetail('${v.id}')"`;
-        // ★同伴・指名を手書き伝票のように、はっきり表示する（v2026.08.10）
+        // ★同伴・指名を手書き伝票のように、はっきり表示する（v2026.08.10, タグ追加v2026.08.11）
         const dohanDisp = (v.dohan && (v.dohanCastIds||[]).length > 0) ? buildDohanDisplay(v) : '';
         const dohanChip = dohanDisp
           ? `<span style="background:#fff4d6; color:#8a6a0a; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; margin-right:6px;">🤝 同伴 ${escapeHtml(dohanDisp)}</span>`
           : '';
+        const tagChips = [];
+        if (v.isNewCustomer) tagChips.push('<span style="background:#e8f4ff; color:#1a5a9e; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; margin-right:4px;">🆕新規</span>');
+        if (v.paymentCard) tagChips.push('<span style="background:#f0f0f0; color:#555; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; margin-right:4px;">💳</span>');
+        if (v.receiptNeeded) tagChips.push('<span style="background:#f0f0f0; color:#555; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; margin-right:4px;">🧾</span>');
+        if (v.onCredit) tagChips.push('<span style="background:#ffe9e9; color:#a33; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; margin-right:4px;">📒掛け</span>');
+        if (v.isVip) tagChips.push('<span style="background:#2a2520; color:#f0d98c; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; margin-right:4px;">👑VIP</span>');
         bodyHtml += `<div class="today-visit-row" ${onclickAttr}>
           <div class="row-1">
-            <span class="name">${escapeHtml(withSan(v.customerName) || '（記録なし）')}　<span style="color:#888; font-weight:normal; font-size:11px;">${v.guests || 0}名</span></span>
+            <span class="name">${tagChips.join('')}${escapeHtml(withSan(v.customerName) || '（記録なし）')}　<span style="color:#888; font-weight:normal; font-size:11px;">${v.guests || 0}名</span></span>
             <span class="time">${startStr} 〜 ${endStr}</span>
           </div>
           <div class="row-2">
