@@ -3113,9 +3113,31 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.13';
+const APP_VERSION = '2026.08.15';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.15',
+    date: '2026-08-15',
+    title: '🌙 退店処理忘れの自動片付け機能を追加',
+    items: [
+      'スタッフが退店処理を忘れて帰った卓を、翌朝アプリを開いた誰かの端末で自動的に退店処理するようにしました。前営業日から入店中のまま残っている卓が対象です。',
+      '通常の退店と同じく来店記録がきちんと作られます（記録が消える心配はありません）。メモ欄に「【自動退店】」と自動で追記され、通常の退店と区別できます。',
+      '当初AM2:00を起点に検討しましたが、延長を重ねて深夜2〜5時台まで実際に接客中のケースもあり得るため、確実に閉店しているとみなせるAM6:00を起点にしています。AM6:00〜18:00の間、アプリが開かれた際に自動で実行されます。',
+      'これにより、前営業日の残りが原因で「空席に戻しますか？」の確認が翌日に出ることは無くなるはずです。',
+    ],
+  },
+  {
+    version: '2026.08.14',
+    date: '2026-08-14',
+    title: '⚠ 「12時間ルール」誤表示の修正',
+    items: [
+      '他の端末で既に退店処理済みなのに、更新直後の端末を開くと「空席に戻しますか？」の確認が出てしまう不具合を修正しました。',
+      '原因：この確認は起動後1.5秒で判定していましたが、サーバーとの同期が完了する前に判定してしまうことがあり、同期が追いつく前の古いローカルデータをもとに誤って表示していました。',
+      '対策：サーバー同期が完了してから判定するように変更しました。',
+      '念のため、この確認の文言に「すでに記録済みの来店履歴は消えません」という説明を追加しました。実際にこの操作は今の画面表示（入店中かどうか）だけを空席に戻すもので、来店履歴（visitLog）には一切触れないため、OKを押しても過去の記録が消えることはありません。',
+    ],
+  },
   {
     version: '2026.08.13',
     date: '2026-08-13',
@@ -4767,9 +4789,45 @@ function initApp() {
     console.log(`起動時自己修復: ${healedAtBoot}卓を空席に戻しました`);
     persistSave(); // 修復結果を保存＆サーバー反映（他端末にも伝搬）
   }
-  // 12時間以上前に入店した卓の検出（退店ログの有無に関係なく掃除できる最終手段）
-  // 営業は深夜までだが12時間を超えることはないため、これは確実に残骸
-  setTimeout(() => {
+  // ★12時間以上前に入店した卓の検出（退店ログの有無に関係なく掃除できる最終手段）
+  // 営業は深夜までだが12時間を超えることはないため、これは確実に残骸。
+  // v2026.08.14：以前はここで固定1500ms待ってから判定していたが、サーバー同期
+  // （initServerSyncのloadFromServer）がまだ完了していない状態で判定してしまい、
+  // 「Androidで退店済みなのに、iPhoneでは同期が追いつく前の古いデータを見て
+  //  “空席に戻しますか？” と聞いてしまう」という紛らわしい誤表示の原因になっていた。
+  // サーバー同期が完了してから（＝最新状態に揃ってから）判定するように変更する。
+  // ★AM2:00以降の自動退店（v2026.08.15）
+  // スタッフが退店処理を忘れて帰った卓が、翌日「空席に戻しますか？」の紛らわしい
+  // 確認を出す原因になっていた。前営業日から入店中のまま残っている卓を検出し、
+  // 通常の退店処理（来店ログの記録あり）として自動的に片付ける。
+  // 営業日の境界は currentBusinessDate()（入店中卓に影響される）ではなく、
+  // 現在時刻だけで決まる todayBusinessDate() を基準にすることで、
+  // 「今夜まだ営業継続中の深夜のお客様」を誤って退店させないようにしている。
+  function autoCheckoutOvernightTables() {
+    try {
+      const h = new Date().getHours();
+      // ★開始時刻はAM6:00〜（v2026.08.15）。
+      // 当初AM2:00で検討したが、23時台に入店したお客様が延長を重ねて
+      // 深夜2〜5時台まで実際に滞在しているケースは普通にあり得るため、
+      // 2時ちょうどだと「まだ本当に接客中」のセッションを誤って強制退店してしまう
+      // 危険があった。安全のため、確実に閉店しているとみなせるAM6:00以降に変更している。
+      if (h < 6 || h >= 18) return; // AM6:00〜18:00の間だけ動作する「翌朝の片付け」用
+      const todayBiz = todayBusinessDate();
+      const targets = Object.keys(state.tables || {}).filter(tid => {
+        const td = state.tables[tid];
+        if (!td || !td.occupied || !td.startedAt) return false;
+        return businessDateStr(new Date(td.startedAt)) < todayBiz; // 前営業日以前からのセッション
+      });
+      if (targets.length === 0) return;
+      const names = targets.map(getTableName).join('・');
+      targets.forEach(tid => {
+        checkOut(tid, { autoNote: '【自動退店】終業時に退店処理が行われなかったため、AM6:00以降に自動的に退店処理されました。実際の退店時刻とは異なる場合があります。' });
+      });
+      showToast(`⚠ ${names} を自動退店しました（前営業日から入店中のまま残っていたため）`, 'info');
+    } catch(e) { console.warn('autoCheckoutOvernightTables failed', e); }
+  }
+
+  function checkStaleTablesAndPrompt() {
     try {
       const STALE_MS = 12 * 60 * 60 * 1000;
       const now0 = Date.now();
@@ -4782,7 +4840,8 @@ function initApp() {
         const ok = confirm(
           `⚠ 12時間以上前に入店した卓が残っています：\n${names}\n\n` +
           `空席に戻しますか？\n\n` +
-          `※来店記録は作られません。昨夜の記録が必要な場合は、\n` +
+          `※これは「今の画面表示」を空席に戻すだけで、すでに記録済みの来店履歴は消えません。\n` +
+          `※新しい来店記録は作られません。まだ記録していない場合は、\n` +
           `履歴タブの「⚡ 手動で来店記録を追加」で正しい時刻で登録できます。`
         );
         if (ok) {
@@ -4798,7 +4857,7 @@ function initApp() {
         }
       }
     } catch(e) { console.warn('stale table check failed', e); }
-  }, 1500);
+  }
   // テーブル初期化（不足分のみ追加）
   if (!state.tables) state.tables = {};
   DEFAULT_TABLES.forEach(t => {
@@ -4810,7 +4869,19 @@ function initApp() {
   // サーバー設定があれば自動接続
   loadServerConfigUI();
   if (server.url && server.token) {
-    initServerSync();
+    // ★同期が完了してから（成功・失敗いずれの場合も）判定する。
+    // initServerSync内部でエラーも処理済み（常にresolveされる）ため、thenのみで良い。
+    // 自動退店を先に行うことで、その後の12時間ルール確認が不要になるケースが多くなる。
+    initServerSync().then(() => {
+      autoCheckoutOvernightTables();
+      checkStaleTablesAndPrompt();
+    });
+  } else {
+    // サーバー未設定（単独運用）の場合は、同期を待つ必要が無いのですぐ判定する
+    setTimeout(() => {
+      autoCheckoutOvernightTables();
+      checkStaleTablesAndPrompt();
+    }, 1500);
   }
   // タイマー更新：アラート判定は常時走らせる（他タブを見ていてもPush通知が届くように）。
   // 画面のタイマー表示更新はフロアタブ表示時のみ。
@@ -5596,12 +5667,17 @@ function autoExtendStep(tableId) {
 }
 
 // 退店
-function checkOut(tableId) {
+function checkOut(tableId, opts) {
   const tName = getTableName(tableId);
   const prev = state.tables[tableId] || {};
+  const autoNote = (opts && opts.autoNote) ? opts.autoNote : '';
   // 来店ログに記録（入店していた場合のみ）
   if (prev.occupied && prev.startedAt) {
-    recordVisitLog(tableId, prev);
+    // ★自動退店（未終業対策）の場合、メモに印を残して通常の退店と区別できるようにする
+    const tdataForLog = autoNote
+      ? { ...prev, memo: (prev.memo ? prev.memo + '\n' : '') + autoNote }
+      : prev;
+    recordVisitLog(tableId, tdataForLog);
     // 退店済みセッション台帳に記録：他端末の古い「入店中」データが
     // 同期で復活するのを防ぐ（自動延長による _updated 更新にも勝つ）
     markSessionClosed(tableId, prev.startedAt);
@@ -14166,7 +14242,7 @@ function forceSync() {
 }
 function initServerSync() {
   setSyncDot(null, '接続中…');
-  loadFromServer().then(() => {
+  return loadFromServer().then(() => {
     server.connected = true;
     setSyncDot(true, '同期OK');
     setSrvStatus('✅ 接続済み');
