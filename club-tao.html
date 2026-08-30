@@ -2380,6 +2380,7 @@
     <label>STAFF LOGIN</label>
     <input type="password" inputmode="numeric" id="pinInput" placeholder="PIN" maxlength="8" autocomplete="off">
     <button onclick="tryLogin()">LOGIN</button>
+    <button id="bioLoginBtn" onclick="tryBiometricLogin()" style="display:none; margin-top:8px; background:#2a5cb8;">🔓 顔認証／指紋でログイン</button>
     <div class="err" id="pinErr"></div>
   </div>
 </div>
@@ -2611,6 +2612,15 @@
             <input type="text" id="pinNew" placeholder="新しいPIN">
           </label>
           <button class="btn btn-sm" onclick="savePin()">保存</button>
+
+          <hr style="margin:14px 0; border:none; border-top:1px solid var(--border);">
+          <div style="font-size:13px; font-weight:600; margin-bottom:6px;">🔓 顔認証／指紋ログイン（この端末のみ）</div>
+          <p style="font-size:12px; color:var(--text-sub); margin:0 0 8px;">
+            対応端末では、共通PINの代わりにFace ID・Touch ID・指紋認証でログインできます。
+            端末ごとの設定で、他のスタッフの端末には影響しません。生体認証が使えない場合は
+            いつも通りPINでログインできます。
+          </p>
+          <div id="bioSettingsArea"></div>
         </div>
       </details>
 
@@ -3113,9 +3123,32 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.15';
+const APP_VERSION = '2026.08.17';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.17',
+    date: '2026-08-17',
+    title: '🔓 顔認証・指紋ログインに対応（任意）',
+    items: [
+      '対応端末（iPhone/AndroidともにFace ID・Touch ID・指紋認証を利用できます）では、共通PINの代わりに生体認証でログインできるようになりました。',
+      '設定 → PINコードの中にある「顔認証／指紋ログイン」から、端末ごとに設定できます。使いたい人だけ設定すればよく、他のスタッフの端末には影響しません。',
+      '生体認証を設定しなくても、これまで通りPINでログインできます。',
+      '生体認証が失敗した場合や対応していない端末では、自動的にPINログインの案内が表示されます。',
+      'この機能はサーバー側で厳密に照合する本格的な認証基盤ではなく、端末に保存された鍵を使った画面ロックに近い仕組みです。ご了承ください。',
+    ],
+  },
+  {
+    version: '2026.08.16',
+    date: '2026-08-16',
+    title: '⏱ 入店直後のデータ消失対策を強化',
+    items: [
+      '予約からの入店処理などで、まれに入店直後のお客様データが一時的に消えて見える現象について対策しました。',
+      '仕組み上、消えても自動的に検知して再送信する保護は入っていましたが、その最初の確認まで8秒かかる作りだったため、その間にスタッフが気付いて手動で入店し直してしまうケースがありました。',
+      '確認までの時間を2秒に短縮し、他端末側の同期間隔も8秒に短縮しました（有料プランのため書き込み回数を気にする必要がなくなったため）。「消えたように見える時間」自体を大幅に短くしています。',
+      '卓数が多い（同時に稼働している卓が多い）ほど発生しやすいというご指摘も、複数端末が同時に書き込む機会が増えることと一致しており、対策の方向性と合致しています。',
+    ],
+  },
   {
     version: '2026.08.15',
     date: '2026-08-15',
@@ -4737,6 +4770,112 @@ function tryLogin() {
 document.getElementById('pinInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') tryLogin();
 });
+
+// ===== 生体認証ログイン（WebAuthn、端末ごとの任意設定）v2026.08.17 =====
+// 各スタッフの端末に登録されているFace ID／Touch ID／指紋認証を使って、
+// 共通PINの代わりにログインできるようにする。
+// 注意：このアプリには本格的なサーバー側の認証基盤（照合サーバー）が無いため、
+// 厳密な暗号学的検証は行わず、「その端末の生体認証プロンプトを突破できたか」を
+// 確認する簡易的な仕組みとして実装している（画面ロックの代替に近い位置づけ）。
+// 端末ごとにローカルストレージへ認証情報を保存し、他端末とは共有しない。
+const LS_BIO_CRED = 'tao_bio_cred_id';
+
+function isWebAuthnAvailable() {
+  return !!(window.PublicKeyCredential && navigator.credentials);
+}
+
+// 生体認証が使える端末かどうかを判定し、対応していれば設定画面にトグルを出す準備をする
+async function checkBiometricAvailability() {
+  if (!isWebAuthnAvailable()) return false;
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch(e) { return false; }
+}
+
+// この端末に生体認証が登録済みかどうか
+function hasBiometricRegistered() {
+  try { return !!localStorage.getItem(LS_BIO_CRED); } catch(e) { return false; }
+}
+
+// ログイン画面表示時：この端末に登録済みなら生体認証ボタンを見せる
+async function initBiometricLoginUI() {
+  const btn = document.getElementById('bioLoginBtn');
+  if (!btn) return;
+  if (hasBiometricRegistered() && await checkBiometricAvailability()) {
+    btn.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// 端末にこのアプリ用の生体認証キーを新規登録する（設定画面から呼ばれる）
+async function registerBiometricLogin() {
+  if (!(await checkBiometricAvailability())) {
+    alert('この端末では顔認証・指紋認証を利用できません（対応端末でのみ使えます）。');
+    return;
+  }
+  try {
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: 'club 道〜TAO〜' },
+        user: { id: userId, name: getDeviceLabel(), displayName: getDeviceLabel() },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+        timeout: 60000,
+      }
+    });
+    if (!cred) throw new Error('登録に失敗しました');
+    // 資格情報ID（このデバイスの鍵の識別子）だけを端末内に保存する。
+    // 秘密鍵自体は端末の安全な領域に留まり、アプリ側には渡らない。
+    const idB64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+    localStorage.setItem(LS_BIO_CRED, idB64);
+    showToast('✅ この端末で顔認証／指紋ログインを設定しました', 'normal');
+    initBiometricLoginUI();
+  } catch(e) {
+    console.error('registerBiometricLogin failed', e);
+    alert('生体認証の登録に失敗しました。' + (e && e.message ? '\n' + e.message : ''));
+  }
+}
+
+// この端末の生体認証ログイン設定を解除する
+function unregisterBiometricLogin() {
+  if (!confirm('この端末の顔認証／指紋ログインを解除しますか？')) return;
+  try { localStorage.removeItem(LS_BIO_CRED); } catch(e) {}
+  showToast('顔認証／指紋ログインを解除しました', 'info');
+  initBiometricLoginUI();
+}
+
+// ログイン画面の「顔認証／指紋でログイン」ボタン
+async function tryBiometricLogin() {
+  const idB64 = localStorage.getItem(LS_BIO_CRED);
+  if (!idB64) return;
+  try {
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const rawId = Uint8Array.from(atob(idB64), c => c.charCodeAt(0));
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ id: rawId, type: 'public-key' }],
+        userVerification: 'required',
+        timeout: 60000,
+      }
+    });
+    if (!assertion) throw new Error('認証に失敗しました');
+    // 生体認証プロンプトを突破できた＝この端末の持ち主として扱う
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').classList.add('active');
+    document.getElementById('pinErr').textContent = '';
+    initApp();
+  } catch(e) {
+    console.error('tryBiometricLogin failed', e);
+    document.getElementById('pinErr').textContent = '生体認証に失敗しました。PINでログインしてください。';
+  }
+}
+// ログイン画面が表示された時点でボタンの表示可否を判定
+initBiometricLoginUI();
 
 // ---------- Page nav ----------
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -12175,7 +12314,28 @@ function renderSettings() {
   const vEl = document.getElementById('curAppVersion');
   if (vEl) vEl.textContent = APP_VERSION;
   refreshStorageUsage();
+  renderBioSettingsArea();
 }
+
+// 生体認証ログインの設定エリアを描画（対応端末かどうかで表示を切り替える）
+async function renderBioSettingsArea() {
+  const el = document.getElementById('bioSettingsArea');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">確認中…</span>';
+  const available = await checkBiometricAvailability();
+  if (!available) {
+    el.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">この端末は顔認証・指紋認証に対応していないか、未設定です。</span>';
+    return;
+  }
+  if (hasBiometricRegistered()) {
+    el.innerHTML = `
+      <span style="color:#5a9c5a; font-size:13px; font-weight:600;">✅ この端末は設定済みです</span><br>
+      <button class="btn-sub btn-sm" style="margin-top:6px;" onclick="unregisterBiometricLogin()">解除する</button>`;
+  } else {
+    el.innerHTML = `<button class="btn btn-sm" onclick="registerBiometricLogin()">この端末に設定する</button>`;
+  }
+}
+
 
 // データ容量の表示
 function refreshStorageUsage() {
@@ -14190,7 +14350,11 @@ async function saveToServerAssured(retries) {
   for (let i = 0; i < max; i++) {
     // 書き込み自体が失敗している状態では、再送しても無駄に回数を消費するだけなので中断
     if (server.lastSaveError) return;
-    await new Promise(r => setTimeout(r, 8000 + i * 8000)); // 8s, 16s
+    // ★検証までの待ち時間を短縮（v2026.08.16）。
+    // 以前は最初の確認まで8秒待っていたため、スタッフが画面から消えたことに
+    // 気付いて手動で入店し直してしまい、自動修復より先に人間が対処する事故があった。
+    // 検証を早めることで「消えたように見える時間」自体を短くする。
+    await new Promise(r => setTimeout(r, 2000 + i * 3000)); // 2s, 5s
     let payload = null;
     try {
       const res = await fetch(server.url + '/get?_t=' + Date.now(), {
@@ -14255,7 +14419,8 @@ function initServerSync() {
 }
 function startPolling() {
   if (server.pollTimer) clearInterval(server.pollTimer);
-  server.pollTimer = setInterval(doPoll, 15000);
+  // ★有料プラン移行済みのため間隔を短縮し、他端末での自動修復も早める（v2026.08.16）
+  server.pollTimer = setInterval(doPoll, 8000);
 }
 // 巻き戻し検知による再送信の連打を防ぐクールダウン
 let _lastRegressionPushAt = 0;
