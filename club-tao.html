@@ -1075,6 +1075,27 @@
   table.shift td.shift-cell.on.has-resv {
     background: #e8e8b8 !important;
   }
+  /* ★過ぎた日はひと目で分かるようグレー・薄めにする（v2026.08.18） */
+  table.shift td.day-past {
+    filter: grayscale(0.85);
+    opacity: 0.55;
+  }
+  table.shift thead th.day-past {
+    background: #d8d2c4 !important;
+    color: #8a8272 !important;
+  }
+  table.shift thead th.day-past span {
+    color: #a39c8c !important;
+  }
+  /* 今日の列見出しは強調する */
+  table.shift thead th.day-today {
+    background: var(--accent-line, #b8860b) !important;
+    color: #fff !important;
+    box-shadow: inset 0 0 0 2px #fff;
+  }
+  table.shift thead th.day-today span {
+    color: #fff8e7 !important;
+  }
   /* セル上の予約マーカー（小バッジ） */
   .resv-marks {
     display: flex;
@@ -3123,9 +3144,19 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.17';
+const APP_VERSION = '2026.08.18';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.18',
+    date: '2026-08-18',
+    title: '📅 シフト表で過ぎた日をグレー表示',
+    items: [
+      'シフト表の月〜土のうち、既に過ぎた日をグレー・薄めの色にしました。',
+      '今日の列は見出しを金色で強調表示するようにしました。ぱっと見て「今日はどこか」が分かりやすくなります。',
+      '判定は他の画面と同じ営業日基準（深夜0-4時台は前日の続きとして扱う）なので、深夜営業中に日付が変わっても表示が食い違いません。',
+    ],
+  },
   {
     version: '2026.08.17',
     date: '2026-08-17',
@@ -10128,10 +10159,18 @@ function renderShift() {
     if (sa !== sb) return sa - sb;
     return (a._created || 0) - (b._created || 0);
   });
+  // ★過ぎた日をひと目で分かるようにする（v2026.08.18）
+  // 「今日」の判定は営業日基準（businessDateStr）で行い、深夜0-4時台の営業継続中は
+  // 前日側が今日として扱われる既存ルールと矛盾しないようにする。
+  const todayBiz = todayBusinessDate();
+  const dayIsPast = days.map(d => businessDateStr(d) < todayBiz);
+  const dayIsToday = days.map(d => businessDateStr(d) === todayBiz);
+
   let html = '<thead><tr><th class="cast-col">名前</th>';
   days.forEach((d, i) => {
     const dStr = `${d.getMonth()+1}/${d.getDate()}`;
-    html += `<th>${dayLabels[i]}<br><span style="font-weight:normal; color:#888; font-size:11px;">${dStr}</span></th>`;
+    const cls = dayIsPast[i] ? ' class="day-past"' : (dayIsToday[i] ? ' class="day-today"' : '');
+    html += `<th${cls}>${dayLabels[i]}<br><span style="font-weight:normal; color:#888; font-size:11px;">${dStr}</span></th>`;
   });
   html += '</tr></thead><tbody>';
 
@@ -10145,7 +10184,8 @@ function renderShift() {
       days.forEach(d => {
         const dStr = localDateStr(d);
         const cnt = activeCasts.reduce((n, c) => n + (getShiftStatus(dStr, c.id) === 'on' ? 1 : 0), 0);
-        html += `<td class="section-count">${cnt > 0 ? cnt + '名' : ''}</td>`;
+        const pastClsCnt = businessDateStr(d) < todayBiz ? ' day-past' : '';
+        html += `<td class="section-count${pastClsCnt}">${cnt > 0 ? cnt + '名' : ''}</td>`;
       });
       html += '</tr>';
       const todayStr = businessDateStr();
@@ -10208,7 +10248,8 @@ function renderShift() {
           // 勤務時間（出勤・未定の時のみ、設定されていれば小さく添える）
           const timeLabel = (status === 'on' || status === 'pending') ? buildShiftTimeLabel(dStr, c.id) : '';
           if (timeLabel) cellContent = `<div class="shift-cell-inner">${cellContent}<span class="shift-time-label">${timeLabel}</span></div>`;
-          html += `<td class="shift-cell ${cellClass}${hasResvCls}" data-date="${dStr}" data-cast="${c.id}" data-cast-name="${escapeHtml(c.name)}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
+          const pastCls = businessDateStr(d) < todayBiz ? ' day-past' : '';
+          html += `<td class="shift-cell ${cellClass}${hasResvCls}${pastCls}" data-date="${dStr}" data-cast="${c.id}" data-cast-name="${escapeHtml(c.name)}" onclick="toggleShift('${dStr}','${c.id}')">${cellContent}</td>`;
         });
         html += '</tr>';
       });
@@ -10232,7 +10273,8 @@ function renderShift() {
             days.forEach(d => {
               const dStr = localDateStr(d);
               const cnt = roleStaff.reduce((n, x) => n + (getShiftStatus(dStr, x.id) === 'on' ? 1 : 0), 0);
-              html += `<td class="section-count">${cnt > 0 ? cnt + '名' : ''}</td>`;
+              const pastClsCnt2 = businessDateStr(d) < todayBiz ? ' day-past' : '';
+              html += `<td class="section-count${pastClsCnt2}">${cnt > 0 ? cnt + '名' : ''}</td>`;
             });
             html += '</tr>';
           }
@@ -10250,7 +10292,8 @@ function renderShift() {
           else { mark = '−'; cls = 'unanswered'; }
           const timeLabel = (status === 'on' || status === 'pending') ? buildShiftTimeLabel(dStr, s.id) : '';
           const cellContentS = timeLabel ? `<div class="shift-cell-inner">${mark}<span class="shift-time-label">${timeLabel}</span></div>` : mark;
-          html += `<td class="shift-cell ${cls}" data-date="${dStr}" data-cast="${s.id}" data-cast-name="${escapeHtml(s.name)}" onclick="toggleShift('${dStr}','${s.id}')">${cellContentS}</td>`;
+          const pastClsS = businessDateStr(d) < todayBiz ? ' day-past' : '';
+          html += `<td class="shift-cell ${cls}${pastClsS}" data-date="${dStr}" data-cast="${s.id}" data-cast-name="${escapeHtml(s.name)}" onclick="toggleShift('${dStr}','${s.id}')">${cellContentS}</td>`;
         });
         html += '</tr>';
       });
