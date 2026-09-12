@@ -1132,18 +1132,34 @@
   }
 
   /* ====== 指名キャスト選択（A/B/なしトグル） ====== */
+  /* ★未選択時は2列でコンパクトに、選択済みは全幅に広げてA/B・同伴トグルを表示する。
+     以前は狭い画面（480px以下）専用だったが、タブレット等でも縦に長く探しづらい
+     という声を受けて、画面サイズによらず標準の表示に変更した（v2026.08.24）。 */
   .cast-pick-list {
-    display: flex; flex-direction: column; gap: 4px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
   }
   .cast-pick-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--surface); flex-wrap: wrap;
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface); min-width: 0;
   }
   .cast-pick-row .small-label {
     display: flex; align-items: center; gap: 4px;
-    cursor: pointer;
+    cursor: pointer; min-width: 0;
   }
+  /* 未選択：2列のコンパクト表示、同伴/指名トグルは隠す */
+  .cast-pick-row .dohan-toggle,
+  .cast-pick-row .nom-toggle { display: none; }
+  /* 選択済み：全幅に広げてトグルを表示 */
+  .cast-pick-row.picked {
+    grid-column: 1 / -1;
+    background: #fff8e7;
+    border-color: #d4af37;
+  }
+  .cast-pick-row.picked .dohan-toggle { display: inline-flex; }
+  .cast-pick-row.picked .nom-toggle { display: flex; }
   .nom-toggle {
     display: inline-flex; gap: 0;
     border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
@@ -3144,9 +3160,30 @@ const ALERT_10_MIN = 10;           // 残りこの分数で延長確認
 // ===== アプリバージョン & リリースノート =====
 // 新リリース時は APP_VERSION を上げ、RELEASE_NOTES の先頭に追記する。
 // 起動時に LS_LAST_SEEN_VERSION より新しければポップアップで通知する。
-const APP_VERSION = '2026.08.22';
+const APP_VERSION = '2026.08.24';
 const LS_LAST_SEEN_VERSION = 'tao_lite_last_seen_version';
 const RELEASE_NOTES = [
+  {
+    version: '2026.08.24',
+    date: '2026-08-24',
+    title: '🌹 キャスト選択欄をコンパクトに（予約・入店・履歴編集）',
+    items: [
+      '新規予約・入店・来店履歴の編集などで表示されるキャスト選択欄を、2列のコンパクト表示に変更しました。',
+      '未選択のキャストは名前だけの小さな行になり、探しやすくなります。選択すると、その行だけ全幅に広がってA/B指名・同伴のボタンが表示されます。',
+      '以前から狭い画面（スマホの小さい機種）向けにはこの表示がありましたが、タブレットなど画面が広い場合は縦長の1列表示のままでした。画面サイズによらず、この見やすい表示に統一しました。',
+    ],
+  },
+  {
+    version: '2026.08.23',
+    date: '2026-08-23',
+    title: '📖 予約作成時に同伴・A/B指名を記録できるように',
+    items: [
+      '【原因判明】予約編集画面で指名キャストを選んでも、A/B指名の切り替えボタンが表示されなかった不具合を修正しました。加えて、内部のID処理に誤りがあり、A/B指名の情報が正しいキャストに結び付いていませんでした。両方を修正しています。',
+      'キャストごとに「同」チェックボックスを追加し、同伴担当を指定できるようにしました。',
+      '予約から入店処理をした際、同伴・A/B指名の情報がそのまま引き継がれ、来店履歴にも正しく反映されるようになりました。',
+      '新規予約のキャスト選択一覧から、本日限りのヘルプ（コンパニオンなど）を除外しました。現在のキャストと体験キャストのみが表示されます。',
+    ],
+  },
   {
     version: '2026.08.22',
     date: '2026-08-22',
@@ -11779,6 +11816,7 @@ function proceedCheckInFromReservation(r, tableId) {
     guests: r.guests || 1,
     castIds: r.castIds || [],
     castNoms: r.castNoms || {},
+    dohan: !!(r.dohanCastIds && r.dohanCastIds.length > 0),
     dohanCastIds: r.dohanCastIds || [],
     castFree: r.castFree || '',
     memo: r.memo || '',
@@ -11890,7 +11928,8 @@ function applyResvCustomerMemo(custId) {
 
 function buildResvGuestCardHtml(guest, idx) {
   // キャスト選択肢（sortOrder順）
-  const castOpts = state.casts.filter(c => !c.removed).slice().sort((a, b) => {
+  // ★本日限りのヘルプ（helper:true）は恒久的なキャスト一覧には出さない（v2026.08.23）
+  const castOpts = state.casts.filter(c => !c.removed && !c.helper).slice().sort((a, b) => {
     const sa = (a.sortOrder == null) ? Number.MAX_SAFE_INTEGER : a.sortOrder;
     const sb = (b.sortOrder == null) ? Number.MAX_SAFE_INTEGER : b.sortOrder;
     if (sa !== sb) return sa - sb;
@@ -11898,13 +11937,18 @@ function buildResvGuestCardHtml(guest, idx) {
   }).map(c => {
     const checked = (guest.castIds || []).includes(c.id) ? 'checked' : '';
     const cur = (guest.castNoms && guest.castNoms[c.id]) || 'none';
+    const isDohan = (guest.dohanCastIds || []).includes(c.id);
     const trialBadge = c.trial ? '<span class="trial-badge">体験</span>' : '';
-    return `<div class="cast-pick-row" data-rg-cast-row="${guest.id}_${c.id}">
+    return `<div class="cast-pick-row${checked?' picked':''}" data-guest-id="${guest.id}" data-cast-id="${c.id}">
       <label class="small-label" style="margin:0; flex:1; min-width:0;">
-        <input type="checkbox" value="${c.id}" ${checked} class="rg-cast-pick" data-rg-cast-pick="${guest.id}_${c.id}">
+        <input type="checkbox" value="${c.id}" ${checked} class="rg-cast-pick" data-guest-id="${guest.id}" data-cast-id="${c.id}">
         ${escapeHtml(c.name)}${trialBadge}
       </label>
-      <div class="nom-toggle" data-rg-nom-toggle="${guest.id}_${c.id}">
+      <label class="dohan-toggle ${isDohan?'is-dohan':''}" data-guest-id="${guest.id}" data-cast-id="${c.id}" title="同伴">
+        <input type="checkbox" class="rg-cast-dohan" data-guest-id="${guest.id}" data-cast-id="${c.id}" ${isDohan?'checked':''}>
+        <span>同</span>
+      </label>
+      <div class="nom-toggle" data-guest-id="${guest.id}" data-cast-id="${c.id}">
         <button type="button" class="nom-btn ${cur==='A'?'active a':''}" data-nom="A">A</button>
         <button type="button" class="nom-btn ${cur==='B'?'active b':''}" data-nom="B">B</button>
         <button type="button" class="nom-btn ${cur==='none'?'active none':''}" data-nom="none">なし</button>
@@ -11952,7 +11996,9 @@ function buildResvGuestCardHtml(guest, idx) {
         </div>
         <div class="guest-card-casts">
           <div style="font-size:11px; color:var(--text-sub); margin-bottom:4px;">指名キャスト</div>
-          ${castOpts || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
+          <div class="cast-pick-list">
+            ${castOpts || '<span style="color:var(--text-muted); font-size:12px;">設定からキャストを追加してください</span>'}
+          </div>
           <input type="text" class="rg-cast-free" value="${escapeHtml(guest.castFree || '')}" placeholder="リストにない人（複数可：ママ・代表 など）" style="margin-top:6px; width:100%; padding:5px 6px; font-size:12px;">
         </div>
       </div>
@@ -11973,7 +12019,7 @@ function syncResvGuestCardFromDom() {
     // castNoms
     g.castNoms = {};
     g.castIds.forEach(cid => {
-      const toggle = card.querySelector(`.nom-toggle[data-rg-nom-toggle="${gid}_${cid}"]`);
+      const toggle = card.querySelector(`.nom-toggle[data-guest-id="${gid}"][data-cast-id="${cid}"]`);
       if (!toggle) return;
       const activeBtn = toggle.querySelector('.nom-btn.active');
       if (!activeBtn) return;
@@ -11985,6 +12031,12 @@ function syncResvGuestCardFromDom() {
     g.castFree = (card.querySelector('.rg-cast-free')?.value || '').trim();
     g.dohan = !!card.querySelector('.rg-dohan')?.checked;
     g.visit = !!card.querySelector('.rg-visit')?.checked;
+    // ★キャスト単位の同伴（v2026.08.23）：どのキャストが同伴だったかを記録する
+    g.dohanCastIds = Array.from(card.querySelectorAll('.rg-cast-dohan:checked')).map(cb =>
+      cb.getAttribute('data-cast-id')
+    );
+    // キャスト単位で同伴が1件でもあれば、来店予定客の同伴フラグも自動的にON
+    if (g.dohanCastIds.length > 0) g.dohan = true;
   });
 }
 
@@ -12017,7 +12069,7 @@ function bindResvGuestCardHandlers() {
     const gid = card.getAttribute('data-rg-id');
     // A/B/なしトグル
     card.querySelectorAll('.nom-toggle').forEach(toggle => {
-      const cid = toggle.getAttribute('data-rg-nom-toggle').split('_')[1];
+      const cid = toggle.getAttribute('data-cast-id');
       toggle.querySelectorAll('.nom-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const nom = btn.getAttribute('data-nom');
@@ -12026,21 +12078,47 @@ function bindResvGuestCardHandlers() {
           });
           btn.classList.add('active', nom.toLowerCase());
           // 対応するチェックボックスを自動的にON
-          const cb = card.querySelector(`.rg-cast-pick[data-rg-cast-pick="${gid}_${cid}"]`);
-          if (cb) cb.checked = true;
+          const cb = card.querySelector(`.rg-cast-pick[data-guest-id="${gid}"][data-cast-id="${cid}"]`);
+          if (cb && !cb.checked) {
+            cb.checked = true;
+            cb.closest('.cast-pick-row')?.classList.add('picked');
+          }
         });
       });
     });
-    // チェックボックスOFF時にA/B/なしリセット
+    // ★指名チェックのON/OFFで .picked を付け外しする（v2026.08.23）。
+    // これが無いと「同」チェックボックスとA/B指名トグルがCSS上ずっと非表示のままになる。
     card.querySelectorAll('.rg-cast-pick').forEach(cb => {
       cb.addEventListener('change', () => {
+        const cid = cb.getAttribute('data-cast-id');
+        const row = cb.closest('.cast-pick-row');
+        if (row) row.classList.toggle('picked', cb.checked);
         if (!cb.checked) {
-          const cid = cb.getAttribute('data-rg-cast-pick').split('_')[1];
-          const toggle = card.querySelector(`.nom-toggle[data-rg-nom-toggle="${gid}_${cid}"]`);
+          const toggle = card.querySelector(`.nom-toggle[data-guest-id="${gid}"][data-cast-id="${cid}"]`);
           if (toggle) {
             toggle.querySelectorAll('.nom-btn').forEach(b => {
               b.classList.remove('active', 'a', 'b', 'none');
             });
+          }
+          // 指名を外したら同伴もあわせて解除
+          const dohanCb = card.querySelector(`.rg-cast-dohan[data-guest-id="${gid}"][data-cast-id="${cid}"]`);
+          if (dohanCb) {
+            dohanCb.checked = false;
+            dohanCb.closest('.dohan-toggle')?.classList.remove('is-dohan');
+          }
+        }
+      });
+    });
+    // 同伴チェック表示更新
+    card.querySelectorAll('.rg-cast-dohan').forEach(cb => {
+      cb.addEventListener('change', () => {
+        cb.closest('.dohan-toggle')?.classList.toggle('is-dohan', cb.checked);
+        if (cb.checked) {
+          const cid = cb.getAttribute('data-cast-id');
+          const pick = card.querySelector(`.rg-cast-pick[data-guest-id="${gid}"][data-cast-id="${cid}"]`);
+          if (pick && !pick.checked) {
+            pick.checked = true;
+            pick.closest('.cast-pick-row')?.classList.add('picked');
           }
         }
       });
@@ -12314,15 +12392,19 @@ function saveReservation() {
   const castIdsSet = new Set();
   const castNoms = {};
   const castFreeList = [];
+  const dohanCastIdsSet = new Set();
   modalResvGuests.forEach(g => {
     (g.castIds || []).forEach(cid => castIdsSet.add(cid));
     Object.keys(g.castNoms || {}).forEach(cid => {
       if (g.castNoms[cid] === 'A' || g.castNoms[cid] === 'B') castNoms[cid] = g.castNoms[cid];
     });
     if (g.castFree) castFreeList.push(g.castFree);
+    // ★キャスト単位の同伴もカードを横断して集約する（v2026.08.23）
+    (g.dohanCastIds || []).forEach(cid => dohanCastIdsSet.add(cid));
   });
   const castIds = Array.from(castIdsSet);
   const castFree = castFreeList.join('・');
+  const dohanCastIds = Array.from(dohanCastIdsSet);
   const guestList = modalResvGuests.map(g => ({ ...g }));
   const tableId = document.getElementById('resvTable').value || '';
   const memo = document.getElementById('resvMemo').value || '';
@@ -12337,6 +12419,7 @@ function saveReservation() {
       r.castIds = castIds;
       r.castNoms = castNoms;
       r.castFree = castFree;
+      r.dohanCastIds = dohanCastIds;
       r.guestList = guestList;
       r.datetime = datetime;
       r.types = types;
@@ -12353,6 +12436,7 @@ function saveReservation() {
       castIds,
       castNoms,
       castFree,
+      dohanCastIds,
       guestList,
       datetime,
       types,
